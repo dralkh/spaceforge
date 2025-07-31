@@ -5,6 +5,6 @@
   "minAppVersion": "0.15.0",
   "description": "A spaced repetition FSRS & SM-2 Algorithm powered by AI plugin for efficient knowledge review with pomodoro timer",
   "author": "dralkh",
-  "authorUrl": "https://github.com/dralkh/spaceforge",
+  "authorUrl": "https://github.com/dralkh",
   "isDesktopOnly": false
 }
