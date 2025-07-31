@@ -1,0 +1,890 @@
+/* Spaceforge - Sidebar View Styles */
+
+.spaceforge-container {
+  padding: var(--sf-space-md);
+  overflow-y: auto;
+  height: 100%;
+  background: var(--background-primary); /* Use Obsidian background */
+  color: var(--text-normal); /* Use Obsidian text color */
+  box-shadow: var(--sf-shadow-md); /* Added subtle shadow */
+}
+
+/* Upcoming Reviews Section */
+.review-upcoming-section {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.review-upcoming-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Space between day items */
+}
+
+.review-upcoming-day {
+    padding: 5px 8px;
+    border-radius: var(--radius-s);
+    transition: background-color 0.2s ease;
+}
+
+.review-upcoming-day.clickable {
+    cursor: pointer;
+}
+
+.review-upcoming-day.clickable:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.review-upcoming-day-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.review-upcoming-day-name {
+    font-weight: 500;
+    color: var(--text-normal);
+}
+
+.review-upcoming-day-count {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+/* Style for expanded day */
+.review-upcoming-day.is-expanded {
+    background-color: var(--background-secondary);
+    margin-bottom: 5px; /* Add some space below expanded item */
+}
+
+.review-upcoming-notes-container {
+    margin-top: 8px;
+    padding-left: 10px; /* Indent notes slightly */
+    border-left: 2px solid var(--background-modifier-border-hover); /* Visual indicator */
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Space between notes in expanded view */
+}
+
+/* Ensure notes within upcoming section have consistent styling */
+.review-upcoming-notes-container .review-note-item {
+    /* Inherit most styles from .review-note-item */
+    /* Add any specific overrides if needed */
+    padding: 5px 0; /* Adjust padding if necessary */
+}
+
+/* Disable drag handle visually for upcoming notes */
+.review-note-drag-handle.is-disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+.review-note-drag-handle.is-disabled .drag-handle-line {
+    background-color: var(--text-faint);
+}
+
+.review-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--sf-space-md);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: var(--sf-space-sm);
+}
+
+.review-header h2 {
+  margin: 0 0 var(--sf-space-sm) 0;
+  font-size: 20px;
+  color: var(--text-normal); /* Use Obsidian text color */
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.review-stats {
+  margin-top: var(--sf-space-xs);
+  font-size: 14px;
+  color: var(--text-muted); /* Using theme variable */
+  display: flex;
+  gap: var(--sf-space-md);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center; /* Center the content */
+}
+
+.review-stats-count {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-align: center; /* Ensure text inside is centered if it wraps */
+}
+
+/* Removed ::before to remove bullet point */
+
+.review-stats-time {
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.review-stats-time::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-accent); /* Using theme variable */
+}
+
+.review-stats-custom-order {
+  color: var(--interactive-accent) !important; /* Using theme variable */
+  font-style: italic;
+  font-size: 0.85em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.review-stats-custom-order::before {
+  content: "⭐";
+  font-style: normal;
+}
+
+/* Container for all primary action buttons */
+.review-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Use a smaller fixed gap for tighter spacing */
+  margin-bottom: var(--sf-space-md); /* Space below the entire button group */
+}
+
+/* Force ALL direct children to have zero margins to let gap control spacing */
+.review-buttons-container > * {
+  margin: 0 !important; /* Override any potential conflicting margins */
+}
+
+
+.review-all-button,
+.review-all-mcq-button {
+  width: 100%;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  margin: 0 !important; /* Ensure no margin */
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--interactive-accent); /* Using theme variable */
+  color: var(--text-on-accent); /* Using theme variable */
+  border: none;
+  transition: var(--sf-transition);
+  box-shadow: var(--sf-shadow-sm); /* Using defined shadow variable */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.review-all-mcq-button {
+  background-color: var(--text-accent); /* Using theme variable */
+}
+
+.review-all-button:hover,
+.review-all-mcq-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(66, 153, 225, 0.4);
+  filter: brightness(1.05);
+}
+
+.review-all-button:active,
+.review-all-mcq-button:active {
+  transform: translateY(0);
+}
+
+.review-view-toggle {
+  display: flex;
+  margin-top: var(--sf-space-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  overflow: hidden;
+}
+
+.review-view-btn {
+  flex: 1;
+  text-align: center;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-normal);
+  background-color: var(--background-secondary);
+  transition: var(--sf-transition);
+  font-weight: 500;
+}
+
+.review-view-btn.active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.review-bulk-actions {
+  display: flex;
+  gap: var(--sf-space-sm);
+  margin-bottom: var(--sf-space-md);
+  flex-wrap: wrap;
+}
+
+.review-bulk-button {
+  flex: 1;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  border: none;
+  transition: var(--sf-transition);
+  box-shadow: var(--sf-shadow-sm);
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.review-bulk-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.review-bulk-button:active {
+  transform: translateY(0);
+}
+
+
+.review-date-section {
+  margin-bottom: var(--sf-space-lg);
+  border-radius: var(--radius-m, 6px); /* Use Obsidian radius if available */
+  overflow: hidden;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.review-date-section-overdue {
+  border-left: 3px solid var(--text-error); /* Use Obsidian error color */
+  background-color: var(--background-secondary);
+}
+
+.review-date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  background-color: var(--background-secondary-alt);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.review-date-header-container {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  flex-grow: 1; /* Allow container to grow */
+  flex-shrink: 1; /* Allow container to shrink */
+  overflow: hidden; /* Prevent content from overflowing container */
+  margin-right: var(--sf-space-sm); /* Add some space before the time estimate */
+}
+
+.review-date-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-normal);
+  font-weight: 600;
+  white-space: normal; /* Allow header text to wrap */
+  overflow-wrap: break-word; /* Break long words if necessary */
+  flex-grow: 1; /* Allow h3 to take available space */
+  min-width: 0; /* Allow h3 to shrink below its content size if needed */
+}
+
+.review-date-section-overdue .review-date-header h3 {
+  color: var(--text-error);
+}
+
+.review-date-postpone-all {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px; /* Rounder buttons */
+  flex-shrink: 0; /* Prevent button from shrinking */
+  cursor: pointer;
+  background-color: #edf2f7; /* Very light gray */
+  color: #4a5568; /* Dark slate */
+  border: none;
+  transition: var(--sf-transition);
+}
+
+.review-date-postpone-all:hover {
+  background-color: var(--sf-warning); /* Using defined warning color */
+  color: white;
+}
+
+.review-date-time {
+  font-size: 12px;
+  color: var(--text-muted); /* Using theme variable */
+  font-style: italic;
+  padding: 3px 8px;
+  background-color: var(--background-primary); /* Using theme variable */
+  border-radius: 100px;
+  border: 1px solid var(--background-modifier-border); /* Using theme variable */
+}
+
+.review-notes-container {
+  padding: var(--sf-space-sm);
+  background-color: var(--sf-bg-primary);
+}
+
+.review-note-item {
+  display: flex;
+  align-items: flex-start; /* Align items to the top to allow title wrapping */
+  padding: var(--sf-space-sm);
+  margin-bottom: var(--sf-space-sm);
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  transition: var(--sf-transition);
+  border: 1px solid transparent;
+}
+
+.review-note-item:last-child {
+  margin-bottom: 0;
+}
+
+.review-note-item:hover {
+  border-color: var(--interactive-hover);
+  background-color: var(--background-modifier-hover);
+}
+
+.review-note-item.selected {
+  background-color: var(--background-modifier-form-focus); /* Highlight color for selected items */
+  border-color: var(--interactive-accent);
+}
+
+
+.review-note-item.overdue-note {
+  background-color: var(--background-modifier-error-hover);
+  border-left: 3px solid var(--text-error);
+}
+
+.review-note-title {
+  font-weight: 500;
+  flex-grow: 1;
+  margin-right: 10px;
+  min-width: 150px; /* Ensure a minimum width for the title */
+  overflow: visible; /* Allow content to overflow */
+  text-overflow: clip; /* Prevent ellipsis */
+  white-space: normal; /* Allow text to wrap */
+  position: relative;
+}
+
+.review-note-info {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  margin-right: 10px;
+}
+
+.review-note-phase {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: inline-block;
+  background-color: var(--sf-bg-primary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.review-note-time {
+  font-size: 12px;
+  color: var(--sf-text-muted);
+}
+
+.review-note-buttons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.review-note-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.review-note-button,
+.review-note-postpone,
+.review-note-remove {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  transition: var(--sf-transition);
+  background-color: var(--background-primary);
+}
+
+/* Adjust button order when space is limited */
+@media (max-width: 400px) { /* Adjust breakpoint as needed */
+  .review-note-actions {
+    flex-direction: column; /* Stack buttons vertically */
+    width: 100%; /* Allow buttons to take full width */
+  }
+
+  .review-note-button,
+  .review-note-postpone,
+  .review-note-remove {
+    width: 100%; /* Make buttons take full width when stacked */
+    margin-bottom: 5px; /* Add some space between stacked buttons */
+  }
+
+  .review-note-remove {
+    order: -1; /* Place remove button above others when stacked */
+  }
+}
+
+.review-note-button {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  padding: 6px 12px; /* Increased padding */
+  font-size: 13px; /* Slightly larger font */
+}
+
+.review-note-postpone {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  padding: 6px 12px; /* Increased padding */
+  font-size: 13px; /* Slightly larger font */
+}
+
+.review-note-remove {
+  background-color: var(--text-error);
+  color: white;
+  border-color: var(--text-error);
+  padding: 6px 12px; /* Increased padding */
+  font-size: 13px; /* Slightly larger font */
+}
+
+.review-note-button:hover,
+.review-note-postpone:hover,
+.review-note-remove:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.review-note-drag-handle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: grab;
+  padding: 6px 8px; /* Increased padding */
+  margin-left: 5px;
+  flex-shrink: 0;
+  border-radius: var(--sf-radius-sm);
+  transition: var(--sf-transition);
+}
+
+.review-note-drag-handle:hover {
+  background-color: var(--sf-bg-modifier);
+}
+
+.drag-handle-line {
+  width: 15px;
+  height: 2px;
+  background-color: var(--sf-text-muted);
+  border-radius: 1px;
+  transition: var(--sf-transition);
+}
+
+.review-note-drag-handle:hover .drag-handle-line {
+  background-color: var(--sf-primary);
+}
+
+.review-note-drag-handle:active {
+  cursor: grabbing;
+}
+
+.review-note-item.dragging {
+  opacity: 0.5;
+  box-shadow: var(--sf-shadow-lg);
+}
+
+.review-note-item.drag-over {
+  background-color: var(--sf-primary-light);
+  border: 1px dashed var(--sf-primary);
+}
+
+.review-all-caught-up {
+  padding: var(--sf-space-md);
+  text-align: center;
+  font-weight: 500;
+  color: var(--sf-text-muted);
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  box-shadow: var(--sf-shadow-md); /* Using defined shadow variable */
+  border: 1px solid var(--background-modifier-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.review-all-caught-up::before {
+  content: "🎉";
+  font-size: 24px;
+  display: block;
+  margin-bottom: var(--sf-space-sm);
+}
+
+.review-all-caught-up::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 300%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+.review-session-section {
+  margin-bottom: var(--sf-space-lg);
+  padding: var(--sf-space-md);
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  box-shadow: var(--sf-shadow-md); /* Using defined shadow variable */
+  border-left: 4px solid var(--sf-primary);
+}
+
+.review-session-info {
+  margin-bottom: var(--sf-space-md);
+}
+
+.review-session-name {
+  font-weight: 500;
+  margin-bottom: 5px;
+  font-size: 16px;
+  color: var(--sf-primary);
+}
+
+.review-session-progress {
+  font-size: 12px;
+  color: var(--sf-text-muted);
+  margin-bottom: 5px;
+}
+
+.review-session-progress-bar-container {
+  height: 5px;
+  background-color: var(--background-modifier-border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.review-session-progress-bar {
+  height: 100%;
+  background-color: var(--sf-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.review-session-progress-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+.review-session-continue,
+.review-session-end {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 5px;
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  border: none;
+  transition: var(--sf-transition);
+}
+
+.review-session-continue {
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+.review-session-end {
+  background-color: var(--background-modifier-border);
+  color: var(--sf-text);
+}
+
+.review-session-continue:hover,
+.review-session-end:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow-lg); /* Using defined shadow variable */
+}
+
+.review-upcoming-section {
+  margin-top: var(--sf-space-lg);
+}
+
+.review-upcoming-section h3 {
+  font-size: 16px;
+  margin-bottom: var(--sf-space-sm);
+  color: var(--sf-text);
+  font-weight: 600;
+}
+
+.review-upcoming-list {
+  margin-top: var(--sf-space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+}
+
+.review-upcoming-day {
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  border-radius: var(--sf-radius-sm);
+  background-color: var(--sf-bg-secondary);
+  transition: var(--sf-transition);
+  border: 1px solid transparent;
+  display: flex;
+  justify-content: space-between;
+}
+
+.review-upcoming-day:hover {
+  border-color: var(--interactive-accent); /* Using theme variable */
+  transform: translateX(3px);
+}
+
+.review-upcoming-day-name {
+  font-weight: 500;
+}
+
+.review-upcoming-day-count {
+  color: var(--sf-text-muted);
+  font-size: 12px;
+  background-color: var(--sf-bg-primary);
+  padding: 1px 6px;
+  border-radius: 100px;
+}
+
+
+/* --- Pomodoro Timer Styles --- */
+/* Styles for Pomodoro section when inside review-buttons-container */
+.review-buttons-container .pomodoro-toggle-container {
+  width: 100%; /* Make toggle container take full width */
+  margin: 0 !important; /* Ensure no margin */
+}
+
+.review-buttons-container .pomodoro-visibility-toggle-btn {
+  width: 100%;
+  padding: calc(var(--sf-space-xs) / 1.5) var(--sf-space-sm); /* Reduced vertical padding */
+  margin: 0 !important; /* Ensure no margin */
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  transition: var(--sf-transition);
+}
+
+.review-buttons-container .pomodoro-visibility-toggle-btn:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.review-buttons-container .pomodoro-section-content {
+  width: 100%; /* Make content take full width */
+  margin: 0 !important; /* Ensure no margin */
+}
+
+.pomodoro-container {
+  /* margin-top is removed as it's handled by pomodoro-toggle-container or pomodoro-section-content */
+  padding: 2px var(--sf-space-xs); /* Minimal vertical padding, keep horizontal */
+  margin: 0 !important; /* Ensure no margin */
+  background-color: var(--background-secondary); /* Slightly different background */
+  border-radius: var(--radius-m);
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs); /* Reduced gap */
+}
+
+.pomodoro-main-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px; /* Further reduced gap for compactness */
+}
+
+.pomodoro-timer-display {
+  font-size: 22px; /* Further reduced font size for compact row */
+  font-weight: 600;
+  font-family: monospace; /* Monospaced font for alignment */
+  color: var(--text-normal);
+  padding: calc(var(--sf-space-xs) / 2) 8px; /* Explicit symmetrical horizontal padding */
+  border-radius: var(--radius-s);
+  background-color: var(--background-primary);
+  min-width: 65px; /* Keep min-width */
+  text-align: center;
+  order: 2; /* Order for flex: Start(1) Timer(2) Skip(3) Cog(4) */
+  flex-grow: 1; /* Allow timer to take some space */
+  border: none; /* Base border is none */
+  transition: border-color 0.3s ease; /* Transition border color */
+}
+
+/* Fade effect for timer display */
+.pomodoro-timer-fade {
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+.pomodoro-timer-fade.timer-visible {
+  opacity: 1;
+  visibility: visible;
+}
+/* .timer-hidden is no longer used to hide, opacity is handled by .is-paused or .is-idle */
+
+
+/* Mode-specific styling (using border-left and border-right) */
+.pomodoro-timer-display {
+  border-left: 3px solid transparent; /* Default transparent border */
+  border-right: 3px solid transparent; /* Default transparent border */
+  background-color: var(--background-primary); /* Reset background */
+  color: var(--text-normal); /* Reset text color */
+}
+.pomodoro-timer-display.mode-work { 
+  border-left-color: var(--interactive-accent); 
+  border-right-color: var(--interactive-accent); 
+}
+.pomodoro-timer-display.mode-shortBreak { 
+  border-left-color: var(--color-green); 
+  border-right-color: var(--color-green); 
+}
+.pomodoro-timer-display.mode-longBreak { 
+  border-left-color: var(--color-blue); 
+  border-right-color: var(--color-blue); 
+}
+.pomodoro-timer-display.mode-idle { 
+  border-left-color: var(--text-muted); 
+  border-right-color: var(--text-muted); 
+  color: var(--text-muted); /* Keep text muted for idle */
+}
+
+
+.pomodoro-quick-settings-toggle {
+  cursor: pointer;
+  padding: 5px;
+  order: 4; /* Cog at the end */
+  border-radius: var(--radius-s);
+  display: flex; /* Use flex to center icon */
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.pomodoro-quick-settings-toggle:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.pomodoro-quick-settings-toggle svg { /* Target the icon */
+  width: 18px;
+  height: 18px;
+}
+
+/* Styling for buttons within pomodoro-main-controls */
+.pomodoro-main-controls .pomodoro-start-btn,
+.pomodoro-main-controls .pomodoro-stop-btn,
+.pomodoro-main-controls .pomodoro-skip-btn {
+  flex-grow: 0; /* Don't allow buttons to grow excessively */
+  flex-shrink: 0;
+  padding: 4px 8px; /* Reduced padding for buttons */
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary-alt);
+  cursor: pointer;
+  transition: var(--sf-transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-normal);
+}
+.pomodoro-main-controls .pomodoro-start-btn { order: 1; }
+.pomoro-main-controls .pomodoro-stop-btn { order: 1; } /* Same order as start, one will be hidden */
+.pomodoro-main-controls .pomodoro-skip-btn { order: 3; }
+
+.pomodoro-main-controls button:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent-hover);
+}
+.pomodoro-main-controls button svg { /* Target icons inside buttons */
+   width: 16px;
+   height: 16px;
+}
+
+.pomodoro-quick-settings-panel {
+  padding: var(--sf-space-xs); /* Reduced padding */
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: var(--sf-space-xs); /* Reduced margin-top */
+  display: flex; /* Changed from none by JS to flex */
+  flex-direction: column;
+  gap: calc(var(--sf-space-xs) / 2); /* Reduced gap */
+  background-color: var(--background-primary); /* Slightly different background */
+  border-radius: var(--radius-s);
+}
+
+.pomodoro-quick-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sf-space-sm);
+}
+.pomodoro-quick-setting label {
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.pomodoro-quick-setting input[type="number"] {
+  width: 60px; /* Fixed width for number inputs */
+  text-align: right;
+  padding: 4px 6px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+}
+
+.pomodoro-quick-save-btn {
+  margin-top: var(--sf-space-xs);
+  padding: 6px 12px;
+  border-radius: var(--radius-s);
+  border: none;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: var(--sf-transition);
+  align-self: flex-end; /* Align button to the right */
+}
+.pomodoro-quick-save-btn:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+/* Container state classes */
+.pomodoro-container.is-paused .pomodoro-timer-display {
+  opacity: 0.7; /* Dim timer when paused */
+}
+.pomodoro-container.is-idle .pomodoro-timer-display {
+  opacity: 0.5; /* Dim timer more when idle */
+}

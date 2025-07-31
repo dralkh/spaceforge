@@ -1,0 +1,14 @@
+/* Spaceforge - Main CSS File
+   This file imports all the modular CSS components */
+
+@import url('./_variables.css');
+@import url('./_animations.css');
+@import url('./_buttons.css');
+@import url('./_components.css');
+@import url('./review-buttons.css');
+@import url('./settings.css');
+@import url('./sidebar.css');
+@import url('./calendar.css');
+@import url('./mcq.css');
+@import url('./pomodoro.css'); /* Added Pomodoro styles */
+@import url('./responsive.css');

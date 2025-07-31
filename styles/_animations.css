@@ -1,0 +1,67 @@
+/* Spaceforge - Animations and Common Elements */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0.8; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes progressDots {
+  from { background-position: 0 0; }
+  to { background-position: 20px 0; }
+}
+
+@keyframes celebrationConfetti {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) rotate(720deg);
+  }
+}
+
+@keyframes correctPulse {
+  0% { box-shadow: 0 0 0 0 rgba(56, 161, 105, 0.3); }
+  100% { box-shadow: 0 2px 8px rgba(56, 161, 105, 0.1); }
+}
+
+@keyframes ripple {
+  0% {
+    opacity: 1;
+    transform: scale(0, 0) translate(-50%, -50%);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(20, 20) translate(-50%, -50%);
+  }
+}
+
+@keyframes keyPress {
+  0% { transform: scale(0.98); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Animation classes */
+.sf-animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.sf-animate-pulse {
+  animation: pulse 2s infinite;
+}

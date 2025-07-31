@@ -1,0 +1,175 @@
+/* Spaceforge - Responsive Design Styles */
+
+/* Tablet and smaller devices */
+@media (max-width: 768px) {
+  .sf-space-lg {
+    --sf-space-lg: 16px;
+  }
+  
+  .sf-space-xl {
+    --sf-space-xl: 24px;
+  }
+  
+  .mcq-header-container h2 {
+    font-size: 1.5rem;
+  }
+  
+  .mcq-question-text {
+    font-size: 1.1em;
+  }
+  
+  .mcq-choice-btn {
+    padding: var(--sf-space-sm) var(--sf-space-md);
+  }
+  
+  .mcq-score-text {
+    font-size: 1.6em;
+  }
+  
+  .review-note-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .review-note-title {
+    margin-right: 0;
+    margin-bottom: 5px;
+    width: 100%;
+  }
+
+  .review-note-info {
+    margin-right: 0;
+    margin-bottom: 5px;
+    width: 100%;
+  }
+
+  .review-note-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .review-note-actions {
+    flex-grow: 1;
+    justify-content: flex-start;
+  }
+
+  .review-note-drag-handle {
+    margin-left: 0;
+  }
+  
+  .sf-setting-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .setting-item-info {
+    margin-bottom: 8px;
+  }
+  
+  .setting-item-control {
+    width: 100%;
+  }
+}
+
+/* Mobile devices */
+@media (max-width: 480px) {
+  .mcq-header-container h2 {
+    font-size: 1.3rem;
+  }
+  
+  .mcq-refresh-btn {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .review-stats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .review-view-toggle {
+    margin-top: 12px;
+  }
+  
+  .calendar-day {
+    min-height: 40px;
+    padding: 2px;
+  }
+  
+  .calendar-weekday {
+    font-size: 10px;
+  }
+  
+  .calendar-review-count {
+    width: 16px;
+    height: 16px;
+    font-size: 9px;
+  }
+  
+  .review-date-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .review-date-postpone-all {
+    margin-top: 8px;
+  }
+  
+  .sf-settings-section-header h3 {
+    font-size: 16px;
+  }
+  
+  .sf-settings-section-content {
+    padding-left: 0;
+  }
+}
+
+/* Landscape mode optimization */
+@media (max-height: 580px) and (orientation: landscape) {
+  .mcq-question-container {
+    max-height: 60vh;
+    min-height: 200px;
+  }
+  
+  .mcq-choice-btn {
+    min-height: 50px;
+    padding: 10px 16px;
+  }
+  
+  .calendar-day {
+    height: 40px;
+  }
+  
+  .mcq-progress {
+    margin-bottom: 12px;
+    height: 24px;
+  }
+}
+
+/* Large screens optimization */
+@media (min-width: 1600px) {
+  .sf-space-lg {
+    --sf-space-lg: 28px;
+  }
+  
+  .sf-space-xl {
+    --sf-space-xl: 36px;
+  }
+  
+  .mcq-question-container {
+    max-height: 1000px;
+  }
+  
+  .calendar-grid {
+    grid-auto-rows: minmax(90px, auto);
+  }
+  
+  .calendar-day {
+    height: 90px;
+  }
+}

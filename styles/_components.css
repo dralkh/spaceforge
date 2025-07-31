@@ -1,0 +1,161 @@
+/* Spaceforge - Cards, Containers, Badges & Components */
+
+/* ====== Cards & Containers ====== */
+.sf-card {
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  padding: var(--sf-space-md);
+  box-shadow: var(--sf-shadow);
+  transition: var(--sf-transition);
+}
+
+.sf-card:hover {
+  box-shadow: var(--sf-shadow-lg);
+}
+
+.sf-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sf-space-md);
+  padding-bottom: var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sf-card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ====== Badges & Tags ====== */
+.sf-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.sf-badge-primary {
+  background-color: var(--sf-primary-light);
+  color: var(--sf-primary);
+}
+
+.sf-badge-success {
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.sf-badge-warning {
+  background-color: var(--sf-warning-light);
+  color: var(--sf-warning);
+}
+
+.sf-badge-danger {
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+/* ====== Progress Bars ====== */
+.sf-progress-container {
+  width: 100%;
+  height: 8px;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: var(--sf-space-md) 0;
+}
+
+.sf-progress-bar {
+  height: 100%;
+  background-color: var(--sf-primary);
+  transition: width 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.sf-progress-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.sf-progress-bar-success {
+  background-color: var(--sf-success);
+}
+
+.sf-progress-bar-warning {
+  background-color: var(--sf-warning);
+}
+
+.sf-progress-bar-danger {
+  background-color: var(--sf-danger);
+}
+
+/* Enhanced time indicators with modern styling */
+.review-time-short {
+  color: #38a169; /* Modern green */
+  font-weight: 500;
+  background-color: rgba(56, 161, 105, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.review-time-medium {
+  color: #dd6b20; /* Modern orange */
+  font-weight: 500;
+  background-color: rgba(221, 107, 32, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.review-time-long {
+  color: #e53e3e; /* Modern red */
+  font-weight: 500;
+  background-color: rgba(229, 62, 62, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.review-phase-initial {
+  color: var(--text-accent); /* Use Obsidian accent color */
+  font-weight: 500;
+  background-color: var(--background-modifier-success-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.review-phase-spaced {
+  color: var(--text-success, #50fa7b); /* Use Obsidian success color */
+  font-weight: 500;
+  background-color: var(--background-modifier-success-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.phase-time {
+  font-size: 10px;
+  color: var(--sf-text-muted);
+  margin-top: 2px;
+}

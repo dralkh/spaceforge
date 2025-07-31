@@ -1,0 +1,10 @@
+{
+  "id": "spaceforge",
+  "name": "Spaceforge",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "A spaced repetition FSRS & SM-2 Algorithm powered by AI plugin for efficient knowledge review.",
+  "author": "dralkh",
+  "authorUrl": "https://github.com/dralkh/spaceforge",
+  "isDesktopOnly": false
+}

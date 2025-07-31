@@ -1,0 +1,514 @@
+/* Spaceforge - Calendar View Styles */
+
+.calendar-container-wrapper {
+  height: 100%;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.calendar-container {
+  padding: var(--sf-space-md);
+  width: 100%;
+  background-color: var(--background-primary);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--sf-shadow-md); /* Added subtle shadow */
+}
+
+/* Styles for collapsed sidebar */
+.is-collapsed .calendar-container-wrapper {
+  /* Adjust styles for a narrower container */
+}
+
+.is-collapsed .calendar-container {
+  padding: var(--sf-space-sm); /* Reduced padding */
+}
+
+.is-collapsed .calendar-header {
+  margin-bottom: var(--sf-space-sm); /* Reduced margin */
+}
+
+.is-collapsed .calendar-month-title {
+  font-size: 16px; /* Smaller font size */
+}
+
+.is-collapsed .calendar-nav-btn {
+  padding: 4px 8px; /* Reduced padding */
+  font-size: 13px; /* Smaller font size */
+}
+
+.is-collapsed .calendar-today-btn {
+  margin-left: 5px; /* Reduced margin */
+  padding: 4px 8px; /* Reduced padding */
+  font-size: 12px; /* Smaller font size */
+}
+
+.is-collapsed .calendar-grid {
+  gap: 1px; /* Further reduced gap */
+  grid-auto-rows: minmax(40px, auto); /* Further reduced minimum height */
+}
+
+.is-collapsed .calendar-weekday {
+  font-size: 10px; /* Further smaller font size */
+  padding: 2px 0; /* Further reduced padding */
+}
+
+.is-collapsed .calendar-day {
+  min-height: 40px; /* Further reduced minimum height */
+  padding: 2px; /* Further reduced padding */
+  font-size: 10px; /* Further smaller font size */
+  border-radius: 3px; /* Further smaller border radius */
+}
+
+.is-collapsed .calendar-day-number {
+  font-size: 11px; /* Further smaller font size */
+  margin-bottom: 1px; /* Further reduced margin */
+}
+
+.is-collapsed .calendar-day.today .calendar-day-number::after {
+  width: 10px; /* Further reduced underline width */
+}
+
+.is-collapsed .calendar-review-count {
+  width: 16px; /* Further smaller size */
+  height: 16px; /* Further smaller size */
+  font-size: 8px; /* Further smaller font size */
+  top: 2px; /* Adjusted position */
+  right: 2px; /* Adjusted position */
+}
+
+.is-collapsed .calendar-time-estimate {
+  font-size: 8px; /* Further smaller font size */
+  padding: 0 2px; /* Further reduced padding */
+}
+
+.is-collapsed .calendar-day {
+  min-height: 40px; /* Reduced minimum height */
+  padding: 4px; /* Reduced padding */
+  font-size: 12px; /* Smaller font size */
+  border-radius: 4px; /* Smaller border radius */
+}
+
+.is-collapsed .calendar-day-number {
+  font-size: 13px; /* Smaller font size */
+  margin-bottom: 2px; /* Reduced margin */
+}
+
+.is-collapsed .calendar-day.today .calendar-day-number::after {
+  width: 12px; /* Reduced underline width */
+}
+
+.is-collapsed .calendar-review-count {
+  width: 20px; /* Smaller size */
+  height: 20px; /* Smaller size */
+  font-size: 10px; /* Smaller font size */
+  top: 4px; /* Adjusted position */
+  right: 4px; /* Adjusted position */
+}
+
+.is-collapsed .calendar-time-estimate {
+  font-size: 10px; /* Smaller font size */
+  padding: 1px 3px; /* Reduced padding */
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .calendar-grid {
+    gap: 2px;
+    grid-template-columns: repeat(7, 1fr); /* Ensure 7 equal columns on smaller screens */
+  }
+
+  .calendar-day {
+    min-height: 30px; /* Further adjusted minimum height */
+    padding: 3px; /* Reduced padding */
+    font-size: 11px; /* Slightly smaller font */
+    border-radius: 4px; /* Smaller border radius */
+    aspect-ratio: auto; /* Allow aspect ratio to adjust */
+  }
+
+  .calendar-weekday {
+    font-size: 10px; /* Slightly smaller font */
+    padding: 3px 0; /* Reduced padding */
+  }
+
+  .calendar-day-number {
+    font-size: 12px; /* Adjusted font size */
+    margin-bottom: 3px; /* Adjusted margin */
+  }
+
+  .calendar-review-count {
+    width: 18px; /* Adjusted size */
+    height: 18px; /* Adjusted size */
+    font-size: 9px; /* Adjusted font size */
+    top: 3px; /* Adjusted position */
+    right: 3px; /* Adjusted position */
+  }
+
+  .calendar-time-estimate {
+    font-size: 9px; /* Adjusted font size */
+    padding: 1px 3px; /* Adjusted padding */
+  }
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--sf-space-md);
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.calendar-month-title {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  font-size: 18px; /* Slightly larger font */
+  color: var(--text-normal);
+}
+
+.calendar-nav-btn {
+  cursor: pointer;
+  padding: 6px 12px; /* Increased padding */
+  border-radius: var(--sf-radius-sm);
+  background-color: transparent;
+  transition: var(--sf-transition);
+  color: var(--text-muted);
+  font-size: 15px; /* Slightly larger font */
+}
+
+.calendar-nav-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.calendar-today-btn {
+  margin-left: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 20px; /* More rounded */
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  transition: var(--sf-transition);
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-today-btn:hover {
+  background-color: var(--interactive-accent-hover);
+  transform: translateY(-1px);
+}
+
+/* Calendar grid with equal-sized cells */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* Ensure 7 equal columns */
+  grid-auto-rows: minmax(50px, auto); /* Force equal heights */
+  gap: 4px; /* Consistent spacing */
+  margin-top: var(--sf-space-md);
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 0;
+  color: var(--text-muted);
+}
+
+/* Standardized calendar day cells */
+.calendar-day {
+  position: relative;
+  height: auto; /* Changed from fixed height */
+  min-height: 50px; /* Minimum height */
+  width: 100%; /* Ensure full width */
+  padding: 8px; /* Increased padding */
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px; /* Slightly more rounded */
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background-secondary-alt);
+  box-sizing: border-box; /* Include borders in size calculation */
+}
+
+.calendar-day:hover {
+  border-color: var(--interactive-accent);
+  box-shadow: var(--sf-shadow-lg); /* Using defined shadow variable */
+  transform: translateY(-2px);
+  z-index: 10;
+}
+
+.calendar-day.empty {
+  background-color: var(--background-secondary);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.calendar-day.empty:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--background-modifier-border);
+}
+
+.calendar-day.today {
+  background-color: rgba(var(--interactive-accent-rgb), 0.15);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+  box-shadow: var(--sf-shadow-sm); /* Added subtle shadow for today */
+}
+
+.calendar-day.has-reviews {
+  background-color: rgba(var(--interactive-accent-rgb), 0.1);
+  border-color: var(--interactive-accent);
+  box-shadow: var(--sf-shadow-sm); /* Added subtle shadow for days with reviews */
+}
+
+.calendar-day.has-reviews:hover {
+  background-color: rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+.calendar-day-number {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+.calendar-day.today .calendar-day-number {
+  color: var(--interactive-accent);
+  position: relative;
+}
+
+.calendar-day.today .calendar-day-number::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  height: 2px;
+  width: 16px;
+  background-color: var(--interactive-accent);
+  border-radius: 1px;
+}
+
+/* Colored review count indicators with fade */
+.calendar-day.light-load .calendar-review-count {
+  background-color: var(--sf-success); /* Green */
+  animation: fadeScale 0.3s ease-out forwards;
+}
+
+.calendar-day.medium-load .calendar-review-count {
+  background-color: var(--sf-warning); /* Orange */
+  animation: fadeScale 0.3s ease-out forwards;
+}
+
+.calendar-day.heavy-load .calendar-review-count {
+  background-color: var(--sf-danger); /* Red */
+  animation: fadeScale 0.3s ease-out forwards;
+}
+
+/* Improved review count indicator */
+.calendar-review-count {
+  position: absolute;
+  top: 8px; /* Adjusted position */
+  right: 8px; /* Adjusted position */
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  box-shadow: var(--sf-shadow-sm); /* Using defined shadow variable */
+  transition: transform 0.2s ease;
+}
+
+.calendar-day:hover .calendar-review-count {
+  transform: scale(1.1);
+}
+
+/* Improved time estimate with fade */
+.calendar-time-estimate {
+  margin-top: auto; /* Push to bottom */
+  align-self: flex-end; /* Align to the right */
+  font-size: 11px; /* Slightly smaller font */
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 2px 5px; /* Adjusted padding */
+  background-color: var(--background-modifier-hover); /* Using theme variable */
+  border-radius: 4px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.day-reviews-container {
+  padding: var(--sf-space-md);
+  animation: fadeIn 0.4s ease-out;
+}
+
+.day-reviews-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--sf-space-md);
+}
+
+.day-reviews-back-btn {
+  margin-right: 10px;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: var(--sf-transition);
+  background-color: var(--sf-bg-secondary);
+  color: var(--sf-text-muted);
+}
+
+.day-reviews-back-btn:hover {
+  background-color: var(--sf-primary-light);
+  color: var(--sf-primary);
+}
+
+.day-reviews-header-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.day-reviews-date {
+  font-weight: 600;
+  color: var(--sf-primary);
+  font-size: 16px;
+}
+
+.day-reviews-postpone-all {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--sf-radius-sm);
+  cursor: pointer;
+  background-color: var(--sf-bg-secondary);
+  color: var(--sf-text);
+  border: 1px solid var(--background-modifier-border);
+  transition: var(--sf-transition);
+}
+
+.day-reviews-postpone-all:hover {
+  background-color: var(--sf-warning);
+  color: white;
+  border-color: var(--sf-warning);
+}
+
+.day-reviews-stats {
+  margin-bottom: var(--sf-space-md);
+  font-size: 14px;
+  color: var(--sf-text-muted);
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-reviews-count {
+  font-weight: 500;
+  color: var(--sf-primary);
+}
+
+.day-reviews-time {
+  font-style: italic;
+}
+
+.day-reviews-all-button {
+  width: 100%;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  margin-bottom: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+  border: none;
+  transition: var(--sf-transition);
+  box-shadow: var(--sf-shadow);
+}
+
+.day-reviews-all-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow-lg);
+  filter: brightness(1.05);
+}
+
+.day-reviews-notes {
+  margin-top: var(--sf-space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+}
+
+.day-reviews-skip-next-button {
+  width: 100%;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  margin-bottom: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--warning-color, #e78a4e);
+  color: white;
+  border: none;
+  transition: var(--sf-transition);
+  box-shadow: var(--sf-shadow);
+  margin-top: var(--sf-space-sm);
+}
+
+.day-reviews-skip-next-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow-lg);
+  filter: brightness(1.05);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .calendar-grid {
+    gap: 2px;
+    grid-template-columns: repeat(7, 1fr); /* Ensure 7 equal columns on smaller screens */
+  }
+  
+  .calendar-day {
+    min-height: 30px; /* Further adjusted minimum height */
+    padding: 3px; /* Reduced padding */
+    font-size: 11px; /* Slightly smaller font */
+    border-radius: 4px; /* Smaller border radius */
+    aspect-ratio: auto; /* Allow aspect ratio to adjust */
+  }
+  
+  .calendar-weekday {
+    font-size: 10px; /* Slightly smaller font */
+    padding: 3px 0; /* Reduced padding */
+  }
+
+  .calendar-day-number {
+    font-size: 12px; /* Adjusted font size */
+    margin-bottom: 3px; /* Adjusted margin */
+  }
+
+  .calendar-review-count {
+    width: 18px; /* Adjusted size */
+    height: 18px; /* Adjusted size */
+    font-size: 9px; /* Adjusted font size */
+    top: 3px; /* Adjusted position */
+    right: 3px; /* Adjusted position */
+  }
+
+  .calendar-time-estimate {
+    font-size: 9px; /* Adjusted font size */
+    padding: 1px 3px; /* Adjusted padding */
+  }
+}

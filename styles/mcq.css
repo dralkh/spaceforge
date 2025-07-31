@@ -1,0 +1,1015 @@
+/* Spaceforge - MCQ Styles */
+
+/* ====== MCQ Modal Base Styles ====== */
+.mcq-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sf-space-md);
+  padding-bottom: var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+  position: relative;
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.mcq-header-container h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--sf-primary);
+  letter-spacing: -0.02em;
+}
+
+.mcq-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  color: var(--sf-text-muted);
+  background-color: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--sf-transition-bounce);
+}
+
+.mcq-refresh-btn:hover {
+  color: var(--sf-primary);
+  background-color: var(--sf-primary-light);
+  transform: rotate(15deg);
+}
+
+/* ====== Improved MCQ Progress Indicator ====== */
+.mcq-progress {
+  position: relative;
+  margin-bottom: 24px;
+  font-weight: 600;
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1em;
+  height: 32px; /* Taller for better visibility */
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+/* Question counter text styling */
+.mcq-progress span {
+  white-space: nowrap;
+}
+
+/* Clean, modern progress bar */
+.mcq-progress::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 6px; /* Thicker bar */
+  background: var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mcq-progress::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 6px; /* Thicker bar */
+  background: var(--interactive-accent);
+  border-radius: 6px;
+  z-index: 2;
+  width: 0%; /* Default width, overridden by data-progress */
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(var(--interactive-accent-rgb), 0.4);
+}
+
+/* Secondary information below progress */
+.mcq-progress-info {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: -12px;
+  margin-bottom: 16px;
+  padding-left: 2px;
+}
+
+/* MCQ Question Container - Much larger dimensions */
+.mcq-question-container {
+  margin-bottom: 20px;
+  background-color: var(--background-primary);
+  border-radius: var(--radius-m, 8px);
+  padding: 20px;
+  border: 1px solid var(--background-modifier-border);
+  animation: fadeIn 0.5s ease-out;
+  min-height: 300px; /* Much greater minimum height */
+  max-height: 900px; /* Much greater maximum height */
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex-grow: 1; /* Allow to grow and take available space */
+  overflow-y: auto; /* Add scrolling if content overflows */
+}
+
+/* Improve question text visibility */
+.mcq-question-text {
+  font-size: 1em;
+  margin-bottom: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-normal);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Ensure the MCQ modal takes more space */
+.spaceforge-mcq-modal.modal-content {
+  min-width: 500px; /* Ensure modal has minimum width */
+  max-width: 90vw; /* Allow up to 90% of viewport width */
+  min-height: 300px; /* Ensure minimum height */
+  padding: 28px !important;
+  display: flex; /* Make modal content a flex container */
+  flex-direction: column; /* Stack children vertically */
+}
+
+/* Enhanced progress indicator with more granular steps */
+[data-progress="0"] .mcq-progress::before { width: 0% !important; }
+[data-progress="5"] .mcq-progress::before { width: 5% !important; }
+[data-progress="10"] .mcq-progress::before { width: 10% !important; }
+[data-progress="15"] .mcq-progress::before { width: 15% !important; }
+[data-progress="20"] .mcq-progress::before { width: 20% !important; }
+[data-progress="25"] .mcq-progress::before { width: 25% !important; }
+[data-progress="30"] .mcq-progress::before { width: 30% !important; }
+[data-progress="35"] .mcq-progress::before { width: 35% !important; }
+[data-progress="40"] .mcq-progress::before { width: 40% !important; }
+[data-progress="45"] .mcq-progress::before { width: 45% !important; }
+[data-progress="50"] .mcq-progress::before { width: 50% !important; }
+[data-progress="55"] .mcq-progress::before { width: 55% !important; }
+[data-progress="60"] .mcq-progress::before { width: 60% !important; }
+[data-progress="65"] .mcq-progress::before { width: 65% !important; }
+[data-progress="70"] .mcq-progress::before { width: 70% !important; }
+[data-progress="75"] .mcq-progress::before { width: 75% !important; }
+[data-progress="80"] .mcq-progress::before { width: 80% !important; }
+[data-progress="85"] .mcq-progress::before { width: 85% !important; }
+[data-progress="90"] .mcq-progress::before { width: 90% !important; }
+[data-progress="95"] .mcq-progress::before { width: 95% !important; }
+[data-progress="100"] .mcq-progress::before { width: 100% !important; }
+
+/* ====== MCQ Warning Message ====== */
+.mcq-attempt-warning {
+  margin-bottom: var(--sf-space-lg);
+  padding: var(--sf-space-md) var(--sf-space-md);
+  background-color: var(--sf-warning-light);
+  border-left: 4px solid var(--sf-warning);
+  color: var(--sf-warning);
+  font-weight: 500;
+  border-radius: var(--sf-radius-md);
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-md);
+  box-shadow: var(--sf-shadow);
+  animation: pulse 2s infinite;
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+/* ====== MCQ Answer Choices ====== */
+.mcq-choices-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Increased gap between choices */
+  margin-top: 20px; /* Increased margin top */
+  padding-right: 8px; /* Room for scrollbar */
+  overflow-y: auto; /* Add scrolling for choices if needed */
+  max-height: 450px; /* Increased max height */
+}
+
+.mcq-choice {
+  width: 100%;
+}
+
+/* Large, prominent MCQ choice buttons */
+.mcq-choice-btn {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: flex-start; /* Align items to the start for multi-line text */
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-normal);
+  position: relative;
+  /* overflow: hidden; Removed to prevent clipping */
+  min-height: auto; /* Allow button to grow with content */
+  height: auto; /* Allow button to grow with content */
+  margin-bottom: 6px;
+  box-sizing: border-box;
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved hover and active states */
+.mcq-choice-btn:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  transform: translateX(4px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.mcq-choice-btn:active {
+  transform: translateX(2px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.mcq-choice-btn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.mcq-choice-btn:hover::before {
+  background-color: var(--sf-primary-light);
+}
+
+/* Prominent letter indicator */
+.mcq-choice-letter {
+  font-weight: 700;
+  margin-right: 8px;
+  color: var(--interactive-accent);
+  font-size: 0.9em;
+  min-width: 25px;
+  text-align: center;
+  background-color: rgba(var(--interactive-accent-rgb), 0.1);
+  height: 30px;
+  width: 30px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* Enhanced answer text */
+.mcq-choice-text {
+  flex: 1;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal; /* Ensure text wraps */
+  padding-right: 60px; /* Increased padding to ensure more space for hint */
+  font-size: 15px; /* Slightly increased font size */
+  line-height: 1.5; /* Increased line height */
+}
+
+/* Key indicator on the right of choices */
+.mcq-shortcut-hint {
+  position: absolute;
+  top: 8px; /* Position hint at the top right */
+  right: 10px; /* Position hint at the top right */
+  font-size: 12px;
+  color: var(--text-muted);
+  background-color: var(--background-secondary-alt);
+  padding: 3px 8px;
+  border-radius: 12px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.mcq-choice-btn:hover .mcq-shortcut-hint {
+  opacity: 1;
+}
+
+/* Make the MCQ modal significantly larger */
+.spaceforge-mcq-modal.modal {
+  max-width: 95vw;
+  max-height: 95vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* MCQ Choice Correct/Incorrect Styling - fixed dimensions with modern colors */
+.mcq-choice-correct {
+  background-color: var(--sf-success-light) !important; /* Modern green with lower opacity */
+  border-color: var(--sf-success) !important; /* Modern green */
+  color: var(--text-normal) !important;
+  box-shadow: 0 2px 8px rgba(56, 161, 105, 0.1) !important;
+  animation: correctPulse 0.5s ease-out;
+  transform: none !important; /* Prevent layout shifts */
+}
+
+.mcq-choice-correct::before {
+  background-color: var(--sf-success) !important; /* Modern green */
+  width: 6px;
+}
+
+.mcq-choice-correct .mcq-choice-letter {
+  color: var(--sf-success); /* Modern green */
+}
+
+.mcq-choice-incorrect {
+  background-color: var(--sf-danger-light) !important; /* Modern red with lower opacity */
+  border-color: var(--sf-danger) !important; /* Modern red */
+  color: var(--text-normal) !important;
+  animation: none; /* Remove the shake animation to prevent layout shifts */
+  box-shadow: 0 2px 8px rgba(229, 62, 62, 0.1) !important;
+}
+
+.mcq-choice-incorrect::before {
+  background-color: var(--sf-danger) !important; /* Modern red */
+  width: 6px;
+}
+
+.mcq-choice-incorrect .mcq-choice-letter {
+  color: var(--sf-danger); /* Modern red */
+}
+
+/* Skip/Continue Button Styling */
+.mcq-skip-container {
+  margin-bottom: var(--sf-space-md);
+  text-align: right;
+}
+
+.mcq-skip-button,
+.mcq-continue-button,
+.mcq-postpone-button {
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+  border: none;
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  min-height: 40px; /* Consistent height */
+}
+
+.mcq-postpone-button {
+  background-color: var(--sf-warning);
+  color: white;
+  margin-right: var(--sf-space-sm);
+}
+
+.mcq-skip-button:hover,
+.mcq-continue-button:hover {
+  filter: brightness(1.1);
+}
+
+.mcq-continue-button {
+  margin-top: var(--sf-space-md);
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+  width: 100%;
+  padding: var(--sf-space-md);
+  font-size: 1.05em;
+  min-height: 48px; /* Slightly taller for emphasis */
+}
+
+/* Correct Answer Display */
+.mcq-correct-answer-display {
+  background-color: var(--background-secondary);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  margin-bottom: var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  animation: fadeIn 0.5s ease-out;
+  color: var(--text-normal);
+  box-shadow: var(--sf-shadow);
+}
+
+/* ====== MCQ Results Styling ====== */
+.mcq-score {
+  margin: var(--sf-space-lg) 0;
+  text-align: center;
+  padding: var(--sf-space-lg);
+  background-color: var(--background-modifier-hover);
+  border-radius: var(--sf-radius-md);
+  box-shadow: var(--sf-shadow);
+  position: relative;
+}
+
+.mcq-score-text {
+  font-size: 2em;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: var(--sf-space-sm);
+  text-shadow: 0 0 8px rgba(var(--text-normal-rgb), 0.3);
+}
+
+.mcq-score::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 300%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--interactive-accent-rgb), 0.1) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+.mcq-results {
+  margin-top: var(--sf-space-lg);
+}
+
+.mcq-results h3 {
+  margin-bottom: var(--sf-space-md);
+  padding-bottom: var(--sf-space-md);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: 1.4em;
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.mcq-result-item {
+  margin-bottom: var(--sf-space-lg);
+  padding: var(--sf-space-md);
+  background-color: var(--background-secondary);
+  border-radius: var(--sf-radius-md);
+  box-shadow: var(--sf-shadow);
+  border-left: 4px solid var(--background-modifier-border);
+  transition: var(--sf-transition);
+}
+
+.mcq-result-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow-lg);
+}
+
+.mcq-result-question {
+  font-weight: 600;
+  margin-bottom: var(--sf-space-md);
+  font-size: 1.1em;
+  color: var(--text-normal);
+  padding-bottom: var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mcq-result-your-answer,
+.mcq-result-correct-answer,
+.mcq-result-attempts,
+.mcq-result-time {
+  margin-top: var(--sf-space-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sf-space-sm);
+}
+
+.mcq-result-label {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.mcq-result-correct {
+  color: var(--sf-success);
+  font-weight: 500;
+}
+
+.mcq-result-incorrect {
+  color: var(--sf-danger);
+  font-weight: 500;
+}
+
+.mcq-result-attempts,
+.mcq-result-time {
+  font-size: 0.9em;
+  color: var(--text-normal);
+}
+
+.mcq-close-btn {
+  width: 100%;
+  padding: var(--sf-space-md);
+  margin-top: var(--sf-space-lg);
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+  border: none;
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.1em;
+  transition: var(--sf-transition);
+  box-shadow: var(--sf-shadow);
+}
+
+.mcq-close-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow-lg);
+}
+
+.mcq-close-btn:active {
+  transform: translateY(0);
+}
+
+/* ====== Consolidated MCQ Modal Styles ====== */
+.mcq-note-info {
+  font-style: italic;
+  margin-bottom: var(--sf-space-md);
+  padding: var(--sf-space-md) var(--sf-space-md);
+  background-color: var(--background-secondary);
+  border-radius: var(--sf-radius-md);
+  border-left: 4px solid var(--interactive-accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--sf-shadow);
+  color: var(--text-normal);
+}
+
+.mcq-note-info::before {
+  content: "📄";
+  font-style: normal;
+}
+
+.mcq-collection-progress {
+  width: 100%;
+  height: 6px;
+  margin-top: var(--sf-space-lg);
+  background-color: var(--background-modifier-border);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mcq-collection-progress::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: var(--sf-primary);
+  transition: width 0.5s ease;
+}
+
+.batch-review-status {
+  margin-top: var(--sf-space-md);
+  color: var(--sf-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.mcq-note-scores {
+  margin-top: var(--sf-space-xl);
+  max-height: 350px;
+  overflow-y: auto;
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  padding: var(--sf-space-lg);
+  box-shadow: var(--sf-shadow);
+  scrollbar-width: thin;
+}
+
+.mcq-note-scores::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mcq-note-scores::-webkit-scrollbar-track {
+  background: var(--sf-bg-primary);
+}
+
+.mcq-note-scores::-webkit-scrollbar-thumb {
+  background-color: var(--background-modifier-border);
+  border-radius: 10px;
+}
+
+.mcq-note-score {
+  margin-bottom: var(--sf-space-md);
+  padding-bottom: var(--sf-space-md);
+  border-bottom: 1px solid var(--background-modifier-border);
+  transition: var(--sf-transition);
+}
+
+.mcq-note-score:hover {
+  background-color: var(--sf-bg-modifier);
+  padding: 10px;
+  margin: -10px -10px 6px -10px;
+  border-radius: var(--sf-radius-md);
+}
+
+.mcq-note-score:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.mcq-note-score-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+}
+
+.mcq-note-score-value {
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 100px;
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.95em;
+}
+
+/* ====== Batch Review Modal Styles ====== */
+.batch-review-info {
+  margin-bottom: var(--sf-space-lg);
+  background-color: var(--sf-info-light);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border-left: 4px solid var(--sf-info);
+}
+
+.batch-review-time {
+  font-style: italic;
+  color: var(--sf-text-muted);
+  margin-top: var(--sf-space-xs);
+}
+
+.batch-review-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  margin: var(--sf-space-lg) 0;
+}
+
+.batch-review-buttons button {
+  padding: var(--sf-space-md);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  transition: var(--sf-transition);
+  border: none;
+}
+
+.batch-review-start-button {
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+.batch-review-toggle-button {
+  background-color: var(--sf-secondary);
+  color: var(--sf-text-on-primary);
+}
+
+.batch-review-regenerate-button {
+  background-color: var(--sf-info);
+  color: white;
+}
+
+.batch-review-cancel-button {
+  background-color: var(--sf-bg-secondary);
+  color: var(--sf-text);
+  border: 1px solid var(--background-modifier-border) !important;
+}
+
+.batch-review-progress {
+  margin-bottom: var(--sf-space-lg);
+  padding: var(--sf-space-md);
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+}
+
+.batch-review-current-note {
+  font-weight: bold;
+  color: var(--sf-primary);
+  margin-bottom: var(--sf-space-xs);
+}
+
+.batch-review-summary-stats {
+  background-color: var(--sf-bg-secondary);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  margin: var(--sf-space-lg) 0;
+  box-shadow: var(--sf-shadow);
+}
+
+.batch-review-success {
+  color: var(--sf-success);
+  font-weight: bold;
+}
+
+.batch-review-needs-improvement {
+  color: var(--sf-danger);
+  font-weight: bold;
+}
+
+.batch-review-results {
+  margin-top: var(--sf-space-lg);
+}
+
+.batch-review-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sf-space-md);
+  margin-bottom: var(--sf-space-xs);
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  transition: var(--sf-transition);
+}
+
+.batch-review-result-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow);
+}
+
+.batch-review-result-filename {
+  font-weight: 500;
+  flex: 1;
+}
+
+.batch-review-result-mcq-score {
+  font-style: italic;
+  margin-left: 10px;
+}
+
+.batch-review-complete-blackout,
+.batch-review-incorrect,
+.batch-review-incorrect-familiar,
+.batch-review-correct-difficulty,
+.batch-review-correct-hesitation,
+.batch-review-perfect-recall,
+.batch-review-hard,
+.batch-review-fair,
+.batch-review-good,
+.batch-review-perfect {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.batch-review-complete-blackout {
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-incorrect {
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-incorrect-familiar {
+  background-color: var(--sf-danger-light); /* Using light danger variable */
+  color: var(--sf-danger); /* Using danger variable */
+}
+
+.batch-review-correct-hesitation {
+  background-color: var(--sf-success-light); /* Using light success variable */
+  color: var(--sf-success); /* Using success variable */
+}
+
+/* Legacy result styles */
+.batch-review-hard {
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-fair {
+  background-color: var(--sf-warning-light);
+  color: var(--sf-warning);
+}
+
+.batch-review-good {
+  background-color: var(--sf-success-light); /* Using light success variable */
+  color: var(--sf-success); /* Using success variable */
+}
+
+.batch-review-perfect {
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.batch-review-good {
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.batch-review-perfect {
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.batch-review-close-button {
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+  padding: var(--sf-space-md);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  transition: var(--sf-transition);
+  margin-top: var(--sf-space-lg);
+  width: 100%;
+  border: none;
+}
+
+.batch-review-close-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow);
+}
+
+/* Additional MCQ enhancements */
+.mcq-choice-btn {
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.mcq-choice-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(var(--sf-primary), 0.3);
+  opacity: 0;
+  border-radius: 100%;
+  transform: scale(1, 1) translate(-50%, -50%);
+  transform-origin: 50% 50%;
+  z-index: -1;
+}
+
+.mcq-choice-btn:focus {
+  outline: none;
+}
+
+.mcq-choice-btn:focus::after {
+  animation: ripple 0.8s ease-out;
+}
+
+/* MCQ celebration styles */
+.mcq-celebration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.mcq-celebration-item {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--sf-primary);
+  border-radius: 2px;
+  animation: celebrationConfetti 3s ease-out forwards;
+}
+
+/* Fix for letter indicators in MCQ UI */
+[class*=" or "], [class^="or "] {
+  background-color: var(--sf-bg-primary) !important;
+  color: var(--sf-text) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+}
+
+/* Preserve legacy class function while improving appearance */
+.review-time-short, .review-time-medium, .review-time-long,
+.sm2-info, .sm2-ratings-title, .sm2-ratings-desc, .sm2-ratings-table, .sm2-ratings-table th, .sm2-ratings-table td,
+.prompt-setting, .prompt-textarea, .sf-settings-section, .sf-settings-section-header, .sf-settings-icon,
+.sf-settings-section-header h3, .sf-settings-collapse-indicator, .sf-settings-section-content, .sf-settings-subsection,
+.sf-setting-explain, .sf-setting-highlight, .sf-setting-grid, .sf-settings-actions, .sf-info-box, .sf-prompt-label,
+.sf-system-prompts-container, .sf-danger-zone, .mcq-shortcut-hint, .hidden {
+  /* Preserve the classes for compatibility */
+}
+
+/* Style for the selected answer using keyboard navigation */
+.mcq-choice-selected {
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.5), 0 1px 3px rgba(0, 0, 0, 0.1);
+  transform: translateX(4px); /* Consistent with hover */
+}
+
+/* Style for the button when a key is pressed */
+.mcq-key-pressed {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+/* Dark theme specific overrides for text visibility - MORE SPECIFIC */
+.theme-dark .spaceforge-mcq-modal .mcq-choice-btn {
+    color: var(--text-normal) !important; /* Attempt with !important if necessary */
+}
+.theme-dark .spaceforge-mcq-modal .mcq-choice-btn .mcq-choice-text {
+    color: var(--text-normal) !important; /* Attempt with !important if necessary */
+}
+.theme-dark .spaceforge-mcq-modal .mcq-choice-btn .mcq-shortcut-hint {
+    color: var(--text-muted) !important; /* Attempt with !important if necessary */
+    /* Consider a lighter background for the hint if still problematic */
+    /* background-color: var(--background-modifier-hover) !important; */
+}
+
+/* Styles for Algorithm Details in Results */
+.mcq-result-algorithm-details {
+    margin-top: var(--sf-space-sm);
+    padding-top: var(--sf-space-sm);
+    border-top: 1px dashed var(--background-modifier-border);
+    font-size: 0.9em;
+}
+.mcq-result-algorithm-details .mcq-result-label { /* Re-uses general label styling if available, or define specific */
+    font-weight: 600;
+    color: var(--text-normal); /* Ensure label is clearly visible */
+    margin-right: var(--sf-space-xs);
+}
+.mcq-result-algorithm-value {
+    color: var(--text-muted); /* Or a more prominent color like var(--sf-primary) */
+}
+.mcq-result-algorithm-item { /* For multiple lines of FSRS/SM-2 info */
+    margin-bottom: var(--sf-space-xs);
+    display: flex; /* Align label and value nicely */
+    align-items: baseline;
+}
+
+.mcq-result-algorithm-details h4.mcq-result-label { /* Specific styling for the sub-header */
+  margin-bottom: var(--sf-space-sm);
+  font-size: 1.1em; /* Slightly larger for a sub-header */
+  color: var(--text-normal);
+}
+
+/* ====== Detailed Question Breakdown Styles ====== */
+:root {
+  --mcq-correct-answer-text: var(--sf-success-dark, #276749); /* Darker green for text, fallback if sf-success-dark not defined */
+}
+
+.mcq-detailed-breakdown {
+  margin-top: var(--sf-space-xl);
+  padding-top: var(--sf-space-lg);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.mcq-detailed-breakdown h3 {
+  margin-bottom: var(--sf-space-lg);
+  font-size: 1.3em;
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.mcq-breakdown-item {
+  margin-bottom: var(--sf-space-lg);
+  padding: var(--sf-space-md);
+  background-color: var(--background-secondary); /* Use secondary background for items */
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  box-shadow: var(--sf-shadow-sm); /* Softer shadow for individual items */
+}
+
+.mcq-breakdown-q-header {
+  font-weight: 600;
+  color: var(--text-muted); /* Muted color for "Q1 (from NoteX):" part */
+}
+
+.mcq-breakdown-item div { /* General styling for text lines within an item */
+  margin-bottom: var(--sf-space-xs);
+  line-height: 1.5;
+}
+
+.mcq-breakdown-item span { /* Ensure spans behave as expected */
+  display: inline; /* Default span behavior */
+}
+
+/* Styling for "Your answer: " and "Correct answer: " labels */
+.mcq-breakdown-item div > span:first-child {
+  font-weight: 500;
+  color: var(--text-faint); /* Slightly fainter for the label part */
+}
+
+/* Specific styling for the user's answer text and correctness indicator */
+.mcq-breakdown-item .user-answer-text { /* Class to be added in JS if needed for more specific targeting */
+  /* (color is set dynamically in JS) */
+}
+
+.mcq-breakdown-item .correctness-indicator { /* Class to be added in JS */
+  font-weight: bold;
+  /* (color is set dynamically in JS) */
+}
+
+/* Styling for the correct answer text */
+.mcq-breakdown-item .correct-answer-text { /* Class to be added in JS */
+  color: var(--mcq-correct-answer-text);
+  font-weight: bold;
+}

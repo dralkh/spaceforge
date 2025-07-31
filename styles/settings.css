@@ -1,0 +1,187 @@
+/* Spaceforge - Settings Tab Styles */
+
+.sf-settings-section {
+  margin-bottom: var(--sf-space-lg);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.sf-settings-section-header {
+  display: flex;
+  align-items: center;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  margin-top: var(--sf-space-lg);
+  margin-bottom: var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  border-radius: var(--sf-radius-sm);
+  transition: var(--sf-transition);
+}
+
+.sf-settings-section-header:hover {
+  background-color: var(--sf-bg-secondary);
+}
+
+.sf-settings-icon {
+  margin-right: var(--sf-space-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.sf-settings-section-header h3 {
+  margin: 0;
+  flex-grow: 1;
+  font-size: 18px;
+}
+
+.sf-settings-collapse-indicator {
+  margin-left: var(--sf-space-sm);
+  font-size: 12px;
+  transition: var(--sf-transition);
+}
+
+.sf-settings-section-content {
+  padding-left: var(--sf-space-md);
+  margin-bottom: var(--sf-space-lg);
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.sf-settings-subsection {
+  margin: var(--sf-space-lg) 0 var(--sf-space-md) 0;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--sf-text);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 6px;
+}
+
+.sf-setting-explain {
+  font-size: 12px;
+  color: var(--sf-text-muted);
+  margin-top: -8px;
+  margin-bottom: var(--sf-space-md);
+  margin-left: 26px;
+  font-style: italic;
+}
+
+.sf-setting-highlight {
+  background-color: var(--sf-bg-secondary);
+  border-left: 3px solid var(--sf-primary);
+  padding: var(--sf-space-md);
+  margin: var(--sf-space-md) 0;
+  border-radius: var(--sf-radius-sm);
+}
+
+.sf-setting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--sf-space-md);
+  margin: var(--sf-space-md) 0;
+}
+
+.sf-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-md);
+  margin: var(--sf-space-md) 0 var(--sf-space-lg) 0;
+}
+
+.sf-settings-actions button {
+  flex: 1;
+  min-width: 120px;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+  border: none;
+  border-radius: var(--sf-radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--sf-transition);
+}
+
+.sf-settings-actions button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.sf-info-box {
+  background-color: var(--sf-bg-secondary);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  margin: var(--sf-space-md) 0;
+  box-shadow: var(--sf-shadow);
+}
+
+.sf-info-box h4 {
+  margin-top: 0;
+  margin-bottom: var(--sf-space-sm);
+  color: var(--sf-primary);
+}
+
+.sf-prompt-label {
+  font-weight: 500;
+  margin: var(--sf-space-md) 0 var(--sf-space-sm) 0;
+}
+
+.sf-system-prompts-container {
+  margin-top: var(--sf-space-lg);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  padding: 0 var(--sf-space-md) var(--sf-space-md) var(--sf-space-md);
+}
+
+.sf-system-prompts-container summary {
+  cursor: pointer;
+  padding: var(--sf-space-md) 0;
+  margin-bottom: var(--sf-space-md);
+  font-weight: 500;
+}
+
+.sf-danger-zone {
+  background-color: var(--sf-danger-light);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--sf-danger);
+  margin-top: var(--sf-space-lg);
+}
+
+.sf-danger-zone h4 {
+  color: var(--sf-danger);
+  margin-top: 0;
+}
+
+/* Enhance setting items */
+.setting-item {
+  padding: var(--sf-space-sm) 0;
+  border-top: none !important;
+}
+
+.setting-item-info {
+  font-size: 14px;
+}
+
+.setting-item-control {
+  justify-content: flex-end;
+}
+
+/* Textarea styling */
+.prompt-textarea {
+  width: 100%;
+  font-family: monospace;
+  font-size: 13px;
+  min-height: 100px;
+  background-color: var(--sf-bg-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  padding: var(--sf-space-sm);
+  resize: vertical;
+  transition: var(--sf-transition);
+}
+
+.prompt-textarea:focus {
+  border-color: var(--sf-primary);
+  box-shadow: 0 0 0 2px var(--sf-primary-light);
+  outline: none;
+}

@@ -1,0 +1,225 @@
+/* Pomodoro Styles */
+.pomodoro-visibility-toggle-container {
+  display: none !important; /* Hide the old toggle button */
+}
+
+.sidebar-pomodoro-section-container {
+  width: 100%; /* Make it fit the width of its parent in the sidebar */
+  margin-top: 8px; /* Space above Pomodoro section */
+  margin-bottom: 8px; /* Space below Pomodoro section */
+  padding: 8px; /* Padding inside the Pomodoro container */
+  background-color: var(--background-secondary); /* Match sidebar section bg */
+  border-radius: var(--radius-m); /* Consistent border radius */
+  border: 1px solid var(--background-modifier-border); /* Consistent border */
+  box-sizing: border-box; /* Ensure padding and border are within width */
+}
+
+.pomodoro-visibility-toggle-container {
+  margin-bottom: 8px; /* Space between toggle and timer content */
+}
+
+.pomodoro-visibility-toggle-container .pomodoro-visibility-toggle-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background-color: var(--background-modifier-border); /* Subtle background */
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.pomodoro-visibility-toggle-container .pomodoro-visibility-toggle-btn:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* .pomodoro-section-content is pomodoroRootEl, container for timer and quick settings */
+/* No specific styles needed here unless for overriding children */
+
+.pomodoro-main-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px; /* Space between control elements */
+  width: 100%;
+}
+
+.pomodoro-main-controls .pomodoro-start-btn,
+.pomodoro-main-controls .pomodoro-stop-btn,
+.pomodoro-main-controls .pomodoro-skip-btn {
+  padding: 6px; /* Smaller padding for icon buttons */
+  border-radius: var(--radius-s);
+  background-color: var(--background-secondary-alt);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.pomodoro-main-controls .pomodoro-start-btn:hover,
+.pomodoro-main-controls .pomodoro-stop-btn:hover,
+.pomodoro-main-controls .pomodoro-skip-btn:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent-hover); /* Use a variable if possible */
+}
+
+.pomodoro-main-controls .pomodoro-start-btn svg,
+.pomodoro-main-controls .pomodoro-stop-btn svg,
+.pomodoro-main-controls .pomodoro-skip-btn svg {
+  width: 18px; /* Adjust icon size */
+  height: 18px;
+}
+
+.pomodoro-timer-display {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--text-normal);
+  padding: 4px 10px;
+  border-radius: var(--radius-s);
+  background-color: var(--background-primary);
+  min-width: 60px;
+  text-align: center;
+  flex-grow: 1;
+  margin: 0 5px;
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer; /* Make it look clickable */
+  transition: background-color 0.2s ease-in-out; /* Subtle hover for timer display */
+}
+.pomodoro-timer-display:hover {
+  background-color: var(--background-secondary-alt); /* Subtle hover */
+}
+
+.pomodoro-timer-display.mode-work {
+  border-left-color: var(--interactive-accent); /* Use existing variable */
+  border-right-color: var(--interactive-accent);
+}
+.pomodoro-timer-display.mode-shortBreak {
+  border-left-color: var(--sf-success); /* Use existing variable from _variables.css */
+  border-right-color: var(--sf-success);
+}
+.pomodoro-timer-display.mode-longBreak {
+  border-left-color: var(--sf-info); /* Use existing variable from _variables.css */
+  border-right-color: var(--sf-info);
+}
+.pomodoro-timer-display.mode-idle {
+  border-left-color: var(--text-muted);
+  border-right-color: var(--text-muted);
+  color: var(--text-muted);
+}
+
+/* Removed .pomodoro-quick-settings-toggle styles as the element is gone */
+
+/* New container for the settings panel to allow absolute positioning of the panel itself */
+.pomodoro-settings-panel-container {
+  position: relative; /* Anchor for the absolute positioned panel */
+  width: 100%;
+  z-index: 10; /* Ensure dropdown is above other elements if necessary */
+}
+
+.pomodoro-quick-settings-panel {
+  position: absolute;
+  top: 0; /* Position it right below where the toggle was (conceptually) */
+  left: 0;
+  right: 0;
+  background-color: var(--background-secondary); /* Modern dropdown bg */
+  border: 1px solid var(--background-modifier-border);
+  border-top: none; /* Remove top border as it connects visually */
+  border-radius: 0 0 var(--radius-m) var(--radius-m); /* Rounded bottom corners */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Modern shadow */
+  padding: 0; /* Initial padding for transition */
+  /* display: flex; is handled by JS */
+  flex-direction: column;
+  gap: 8px; /* Increased gap for better spacing */
+  overflow: hidden; /* Crucial for max-height transition */
+  max-height: 0; /* Initially hidden */
+  opacity: 0; /* Initially transparent */
+  transition: max-height 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), /* Smoother ease */
+              opacity 0.3s ease-out,
+              padding 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* margin-top: 0; /* Removed original margin-top */
+}
+
+/* Styles when the panel is open (display: flex is set by JS) */
+.pomodoro-quick-settings-panel[style*="display: flex"] {
+  padding: 12px; /* Restored padding */
+  max-height: 500px; /* Large enough to fit content */
+  opacity: 1;
+  border-top: 1px solid var(--background-modifier-border); /* Add a separator line when open */
+}
+
+.pomodoro-quick-setting { /* Added for individual setting item styling */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pomodoro-quick-setting label {
+  font-size: 13px;
+  color: var(--text-muted); /* Ensure consistency */
+}
+.pomodoro-quick-setting input[type=number] {
+  width: 50px;
+  background-color: var(--background-secondary); /* Ensure consistency */
+  border: 1px solid var(--background-modifier-border); /* Ensure consistency */
+  border-radius: var(--radius-s); /* Ensure consistency */
+  padding: 4px 6px; /* Ensure consistency */
+  text-align: right; /* Ensure consistency */
+}
+.pomodoro-quick-settings-buttons {
+    display: flex;
+    justify-content: flex-end; /* Align buttons to the right */
+    align-items: center; /* Align children along their text baseline */
+    gap: 8px; /* Space between buttons */
+    margin-top: 8px;
+}
+.pomodoro-quick-save-btn, .pomodoro-quick-calculate-btn {
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  padding: 6px 10px; 
+  font-size: 13px;
+  line-height: 1.3; /* Normalize line-height for consistent baseline */
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: var(--sf-transition);
+  border: none;
+  box-sizing: border-box; /* Important for consistent box model */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  text-align: center; /* Fallback text alignment */
+}
+.pomodoro-quick-save-btn {
+  /* background-color: var(--interactive-accent); */
+  /* color: var(--text-on-accent); */
+  display: none; /* Hide the save button */
+}
+.pomodoro-quick-save-btn:hover {
+  /* background-color: var(--interactive-accent-hover); */ /* Use existing variable if available */
+}
+.pomodoro-quick-calculate-btn {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  /* position: relative; */ /* Allow fine-tuning of position */
+  /* top: -1px; */ /* Nudge it up slightly */
+}
+.pomodoro-quick-calculate-btn:hover {
+  background-color: var(--background-modifier-hover);
+}
+.pomodoro-calculation-result {
+    font-size: 0.9em;
+    margin-top: 8px; /* Increased margin */
+    padding: 8px; /* Increased padding */
+    background-color: var(--background-secondary-alt);
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border); /* Add border for definition */
+}
+.pomodoro-calculation-result p {
+    margin: 4px 0; /* Spacing for paragraphs within result */
+}

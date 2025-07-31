@@ -1,0 +1,81 @@
+/* Spaceforge - Buttons & Interactive Elements */
+
+.sf-btn {
+  padding: 8px 16px;
+  border-radius: var(--sf-radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--sf-transition);
+  border: none;
+  font-size: 14px;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.sf-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+  box-shadow: var(--sf-shadow);
+}
+
+.sf-btn:active {
+  transform: translateY(0);
+}
+
+.sf-btn-primary {
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+.sf-btn-success {
+  background-color: var(--sf-success);
+  color: white;
+}
+
+.sf-btn-warning {
+  background-color: var(--sf-warning);
+  color: white;
+}
+
+.sf-btn-danger {
+  background-color: var(--sf-danger);
+  color: white;
+}
+
+.sf-btn-ghost {
+  background-color: transparent;
+  color: var(--sf-text);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sf-btn-ghost:hover {
+  background-color: var(--sf-bg-modifier);
+}
+
+.sf-btn-block {
+  display: flex;
+  width: 100%;
+}
+
+.sf-icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--sf-text-muted);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.sf-icon-btn:hover {
+  color: var(--sf-primary);
+  background-color: var(--sf-primary-light);
+}

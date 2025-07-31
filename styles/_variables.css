@@ -1,0 +1,65 @@
+/* Spaceforge - CSS Variables & Theme Integration */
+
+:root {
+  /* Primary theme colors - will inherit from Obsidian theme */
+  --sf-primary: var(--interactive-accent, #5e81ac);
+  --sf-primary-light: color-mix(in srgb, var(--sf-primary), white 75%); /* Adjusted for less white in light mode */
+  --sf-primary-dark: color-mix(in srgb, var(--sf-primary), black 20%);
+  --sf-secondary: var(--text-accent, #7ba1df);
+  
+  /* Semantic colors */
+  --sf-success: #4caf50;
+  --sf-success-light: rgba(76, 175, 80, 0.15); /* Adjusted opacity */
+  --sf-warning: #ff9800;
+  --sf-warning-light: rgba(255, 152, 0, 0.15); /* Adjusted opacity */
+  --sf-danger: #f44336;
+  --sf-danger-light: rgba(244, 67, 54, 0.15); /* Adjusted opacity */
+  --sf-info: #2196f3;
+  --sf-info-light: rgba(33, 150, 243, 0.15); /* Adjusted opacity */
+  
+  /* Text colors */
+  --sf-text: var(--text-normal, #333);
+  --sf-text-muted: var(--text-muted, #888);
+  --sf-text-on-primary: var(--text-on-accent, white);
+  
+  /* Background colors */
+  --sf-bg-primary: var(--background-primary, white);
+  --sf-bg-secondary: var(--background-secondary, #f5f5f5);
+  --sf-bg-modifier: var(--background-modifier-hover);
+  
+  /* Spacing */
+  --sf-space-xs: 4px;
+  --sf-space-sm: 8px;
+  --sf-space-md: 16px;
+  --sf-space-lg: 24px;
+  --sf-space-xl: 32px;
+  
+  /* Card styling */
+  --sf-radius-sm: 4px;
+  --sf-radius-md: 8px;
+  --sf-radius-lg: 12px;
+  --sf-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --sf-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+  
+  /* Transitions */
+  --sf-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sf-transition: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sf-transition-bounce: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Dark mode adjustments */
+.theme-dark {
+  --sf-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --sf-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --sf-primary-light: color-mix(in srgb, var(--sf-primary), black 65%); /* Adjusted for less black in dark mode */
+  --sf-success-light: rgba(76, 175, 80, 0.2); /* Adjusted opacity */
+  --sf-warning-light: rgba(255, 152, 0, 0.2); /* Adjusted opacity */
+  --sf-danger-light: rgba(244, 67, 54, 0.2); /* Adjusted opacity */
+  --sf-info-light: rgba(33, 150, 243, 0.2); /* Adjusted opacity */
+  --sf-bg-primary: var(--background-primary-alt);
+  --sf-bg-secondary: var(--background-secondary-alt);
+}
+
+.theme-dark .mcq-question-text {
+  color: var(--text-normal); /* Ensure question text is visible in dark mode */
+}

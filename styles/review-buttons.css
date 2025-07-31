@@ -1,0 +1,261 @@
+/* Spaceforge - Review Button Styles */
+
+.review-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  margin: var(--sf-space-md) 0;
+}
+
+.review-button-complete-blackout,
+.review-button-incorrect,
+.review-button-incorrect-familiar,
+.review-button-correct-difficulty,
+.review-button-correct-hesitation,
+.review-button-perfect-recall,
+.review-button-hard,
+.review-button-fair,
+.review-button-good,
+.review-button-perfect,
+.review-button-postpone,
+.review-button-skip,
+.review-button-mcq {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  transition: var(--sf-transition);
+  border: none;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Modern color palette for review buttons */
+.review-button-complete-blackout {
+  background-color: #e53e3e; /* Modern red */
+  color: white;
+  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.2);
+}
+
+.review-button-incorrect {
+  background-color: #e53e3e; /* Modern red */
+  color: white;
+  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.2);
+}
+
+.review-button-incorrect-familiar {
+  background-color: #feb2b2; /* Light red */
+  color: #c53030; /* Dark red */
+  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.1);
+}
+
+.review-button-correct-difficulty {
+  background-color: #fbd38d; /* Light amber */
+  color: #c05621; /* Dark amber */
+  box-shadow: 0 1px 3px rgba(192, 86, 33, 0.1);
+}
+
+.review-button-correct-hesitation {
+  background-color: #c6f6d5; /* Light green */
+  color: #2f855a; /* Dark green */
+  box-shadow: 0 1px 3px rgba(47, 133, 90, 0.1);
+}
+
+.review-button-perfect-recall {
+  background-color: #38a169; /* Modern green */
+  color: white;
+  box-shadow: 0 1px 3px rgba(56, 161, 105, 0.2);
+}
+
+/* Legacy button styles with modern colors */
+.review-button-hard {
+  background-color: #e53e3e; /* Modern red */
+  color: white;
+  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.2);
+}
+
+.review-button-fair {
+  background-color: #fbd38d; /* Light amber */
+  color: #c05621; /* Dark amber */
+  box-shadow: 0 1px 3px rgba(192, 86, 33, 0.1);
+}
+
+.review-button-good {
+  background-color: #c6f6d5; /* Light green */
+  color: #2f855a; /* Dark green */
+  box-shadow: 0 1px 3px rgba(47, 133, 90, 0.1);
+}
+
+.review-button-perfect {
+  background-color: #38a169; /* Modern green */
+  color: white;
+  box-shadow: 0 1px 3px rgba(56, 161, 105, 0.2);
+}
+
+.review-button-postpone {
+  background-color: #ed8936; /* Modern orange */
+  color: white;
+  box-shadow: 0 1px 3px rgba(237, 137, 54, 0.2);
+}
+
+.review-button-skip {
+  background-color: #f7fafc; /* Light gray */
+  color: #4a5568; /* Dark gray */
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.review-button-mcq {
+  background-color: #4299e1; /* Modern blue */
+  color: white;
+  box-shadow: 0 1px 3px rgba(66, 153, 225, 0.2);
+}
+
+.review-button-mcq-refresh {
+  background-color: #667eea; /* Modern indigo */
+  color: white;
+  box-shadow: 0 1px 3px rgba(102, 126, 234, 0.2);
+}
+
+.review-button-advance,
+.review-note-advance, /* For individual note item button if specific styling needed */
+.review-bulk-advance, /* For bulk action button */
+.review-date-advance-all /* For date section button */ {
+  background-color: #38B2AC; /* Teal */
+  color: white;
+  box-shadow: 0 1px 3px rgba(56, 178, 172, 0.2); /* Teal shadow */
+}
+
+/* Button hover states */
+.review-button-complete-blackout:hover,
+.review-button-incorrect:hover,
+.review-button-incorrect-familiar:hover,
+.review-button-correct-difficulty:hover,
+.review-button-correct-hesitation:hover,
+.review-button-perfect-recall:hover,
+.review-button-hard:hover,
+.review-button-fair:hover,
+.review-button-good:hover,
+.review-button-perfect:hover,
+.review-button-postpone:hover,
+.review-button-skip:hover,
+.review-button-mcq:hover,
+.review-button-mcq-refresh:hover,
+.review-button-advance:hover,
+.review-note-advance:hover,
+.review-bulk-advance:hover,
+.review-date-advance-all:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sf-shadow);
+  filter: brightness(1.1);
+}
+
+/* Disabled state for buttons */
+.review-note-button:disabled, /* General class for individual note buttons */
+.review-bulk-button:disabled, /* General class for bulk action buttons */
+.review-date-action-button:disabled, /* General class for date section buttons */
+button.disabled { /* Fallback for any button with .disabled class */
+  opacity: 0.5;
+  cursor: not-allowed !important; /* Ensure cursor changes */
+  filter: grayscale(60%);
+  box-shadow: none;
+}
+
+.review-note-button:disabled:hover,
+.review-bulk-button:disabled:hover,
+.review-date-action-button:disabled:hover,
+button.disabled:hover {
+  transform: none; /* No hover effect */
+  filter: grayscale(60%); /* Maintain disabled look on hover */
+  box-shadow: none;
+}
+
+
+.review-button-complete-blackout:active,
+.review-button-incorrect:active,
+.review-button-incorrect-familiar:active,
+.review-button-correct-difficulty:active,
+.review-button-correct-hesitation:active,
+.review-button-perfect-recall:active,
+.review-button-hard:active,
+.review-button-fair:active,
+.review-button-good:active,
+.review-button-perfect:active,
+.review-button-postpone:active,
+.review-button-skip:active,
+.review-button-mcq:active,
+.review-button-mcq-refresh:active,
+.review-button-advance:active,
+.review-note-advance:active,
+.review-bulk-advance:active,
+.review-date-advance-all:active {
+  transform: translateY(0);
+}
+
+.review-button-separator {
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 10px 0;
+}
+
+.review-info-text {
+  margin-top: var(--sf-space-md);
+  padding: var(--sf-space-md);
+  background-color: var(--sf-bg-secondary);
+  border-radius: var(--sf-radius-md);
+  border-left: 4px solid var(--sf-primary);
+  line-height: 1.5;
+}
+
+.review-session-info {
+  font-weight: bold;
+  color: var(--sf-primary);
+}
+
+.review-nav-buttons {
+  display: flex;
+  gap: var(--sf-space-sm);
+  margin-bottom: var(--sf-space-sm);
+  width: 100%;
+}
+
+.review-nav-buttons button {
+  flex: 1;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  transition: var(--sf-transition);
+}
+
+.review-skip-next-day-button {
+  background-color: var(--warning-color, #e78a4e);
+  color: white;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  border: none;
+  margin-top: var(--sf-space-sm);
+  transition: var(--sf-transition);
+  width: 100%;
+}
+
+.review-skip-next-day-button:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.review-nav-buttons button:hover {
+  background-color: var(--sf-primary-light);
+  border-color: var(--sf-primary);
+  color: var(--sf-primary);
+}
