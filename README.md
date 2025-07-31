@@ -1,6 +1,6 @@
 # Spaceforge: Advanced Spaced Repetition & AI-Powered Study Plugin for Obsidian
 
-**Spaceforge: Your ultimate Obsidian plugin for efficient knowledge management, memory retention, and exam preparation. Featuring advanced spaced repetition (FSRS & SM-2), AI-powered MCQ generation, and an integrated Pomodoro study timer.**
+**Spaceforge: Your ultimate Obsidian plugin for efficient knowledge management, memory retention, and exam preparation. Featuring advanced spaced repetition (FSRS & SM-2), AI-powered MCQ generation, and an integrated study Pomodoro timer.**
 
 Spaceforge transforms your Obsidian notes into a powerful learning and revision tool. It enhances your learning workflow by providing intelligent flashcards, automated multiple-choice question generation, and focused study sessions, all designed for optimal memory retention and active recall.
 
