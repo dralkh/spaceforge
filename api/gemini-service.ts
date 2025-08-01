@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -92,7 +92,8 @@ export class GeminiService implements IMCQGenerationService {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         try {
-            const response = await fetch(apiUrl, {
+            const response = await requestUrl({
+                url: apiUrl,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -108,14 +109,14 @@ export class GeminiService implements IMCQGenerationService {
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            if (response.status !== 200) {
+                const errorData = response.json;
                 console.error('Gemini API error:', response.status, errorData);
                 const errorMessage = errorData?.error?.message || errorData?.message || 'Unknown error';
                 throw new Error(`API request failed (${response.status}): ${errorMessage}`);
             }
 
-            const data = await response.json();
+            const data = response.json;
             // Gemini response structure: data.candidates[0].content.parts[0].text
             if (!data.candidates || !data.candidates.length || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts.length || !data.candidates[0].content.parts[0].text) {
                 console.error('Invalid API response format from Gemini:', data);

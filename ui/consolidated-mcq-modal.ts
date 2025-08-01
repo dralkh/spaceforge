@@ -138,13 +138,9 @@ export class ConsolidatedMCQModal extends Modal {
         progressEl.setText(`Question ${this.currentQuestionIndex + 1} of ${this.allQuestions.length}`);
         
         // Display a progress counter badge
-        const progressCounter = contentEl.createDiv();
-        progressCounter.style.textAlign = 'center';
-        progressCounter.style.marginBottom = '12px';
-        progressCounter.style.fontSize = '0.9em';
-        progressCounter.style.color = 'var(--mcq-text-muted)';
+        const progressCounter = contentEl.createDiv('mcq-progress-counter');
         progressCounter.setText(`${this.allQuestions.length} questions from ${this.mcqSets.length} notes`);
-        
+
         // Display note information with enhanced styling
         const noteInfoEl = contentEl.createDiv('mcq-note-info');
         noteInfoEl.setText(`Question from: ${this.allQuestions[this.currentQuestionIndex].fileName}`);
@@ -527,11 +523,8 @@ export class ConsolidatedMCQModal extends Modal {
         contentEl.empty();
         
         // Display results header with stylized heading
-        const headerEl = contentEl.createEl('h2', { text: 'MCQ Review Complete' });
-        headerEl.style.color = 'var(--mcq-primary)';
-        headerEl.style.textAlign = 'center';
-        headerEl.style.marginBottom = '24px';
-        
+        const headerEl = contentEl.createEl('h2', { text: 'MCQ Review Complete', cls: 'mcq-review-complete-header' });
+
         // Display overall score with enhanced styling
         const totalCorrectOverall = this.answers.filter(a => a.correct && a.attempts <= 1).length;
         const totalQuestionsOverall = this.allQuestions.length;
@@ -543,35 +536,29 @@ export class ConsolidatedMCQModal extends Modal {
         scoreTextEl.setText(`Overall Score: ${scorePercentOverall}%`);
         
         // Add performance indicator based on score
-        const performanceIndicator = scoreEl.createDiv();
-        performanceIndicator.style.marginTop = '8px';
-        performanceIndicator.style.fontSize = '1.1em';
-        
+        const performanceIndicator = scoreEl.createDiv('mcq-performance-indicator');
+
         if (scorePercentOverall >= 90) {
             performanceIndicator.setText('🎓 Excellent Performance!');
-            performanceIndicator.style.color = 'var(--mcq-correct)';
+            performanceIndicator.addClass('excellent');
         } else if (scorePercentOverall >= 70) {
             performanceIndicator.setText('👍 Good Work!');
-            performanceIndicator.style.color = 'var(--mcq-primary)';
+            performanceIndicator.addClass('good');
         } else if (scorePercentOverall >= 50) {
             performanceIndicator.setText('🔄 Keep Practicing');
-            performanceIndicator.style.color = 'var(--mcq-warning)';
+            performanceIndicator.addClass('needs-improvement');
         } else {
             performanceIndicator.setText('📚 More Review Recommended');
-            performanceIndicator.style.color = 'var(--mcq-text-muted)';
+            performanceIndicator.addClass('review-recommended');
         }
-        
+
         // Add stats summary
-        const statsEl = scoreEl.createDiv();
-        statsEl.style.marginTop = '12px';
-        statsEl.style.fontSize = '0.9em';
-        statsEl.style.color = 'var(--mcq-text-muted)';
+        const statsEl = scoreEl.createDiv('mcq-stats-summary');
         statsEl.setText(`${totalCorrectOverall} correct out of ${totalQuestionsOverall} questions`);
-        
+
         // Display note scores with enhanced styling
         const noteScoresEl = contentEl.createDiv('mcq-note-scores');
-        const scoreHeading = noteScoresEl.createEl('h3', { text: 'Scores by Note' });
-        scoreHeading.style.marginTop = '20px'; // Added margin
+        const scoreHeading = noteScoresEl.createEl('h3', { text: 'Scores by Note', cls: 'mcq-note-scores-heading' });
         
         // Sort notes by score for better visualization (highest first)
         const sortedNotes = Object.keys(noteScores).sort((a, b) => noteScores[b].score - noteScores[a].score);
@@ -592,75 +579,51 @@ export class ConsolidatedMCQModal extends Modal {
                 text: `Score: ${scorePercent}% (${noteScore.correctAnswers}/${noteScore.totalQuestions})`,
                 cls: 'mcq-note-score-value'
             });
-            
+
             // Style score badge based on performance
             if (noteScore.score >= 0.7) {
-                scoreTextValueEl.style.backgroundColor = 'rgba(76, 175, 80, 0.1)';
-                scoreTextValueEl.style.color = 'var(--mcq-correct)';
-                scoreTextValueEl.style.border = '1px solid var(--mcq-correct)';
+                scoreTextValueEl.addClass('high-score');
             } else if (noteScore.score >= 0.5) {
-                scoreTextValueEl.style.backgroundColor = 'rgba(255, 152, 0, 0.1)';
-                scoreTextValueEl.style.color = 'var(--mcq-warning)';
-                scoreTextValueEl.style.border = '1px solid var(--mcq-warning)';
+                scoreTextValueEl.addClass('medium-score');
             } else {
-                scoreTextValueEl.style.backgroundColor = 'rgba(244, 67, 54, 0.1)';
-                scoreTextValueEl.style.color = 'var(--mcq-incorrect)';
-                scoreTextValueEl.style.border = '1px solid var(--mcq-incorrect)';
+                scoreTextValueEl.addClass('low-score');
             }
-            
+
             // Add a visual progress bar
-            const progressBar = noteScoreEl.createDiv();
-            progressBar.style.height = '4px';
-            progressBar.style.backgroundColor = 'var(--background-modifier-border)';
-            progressBar.style.borderRadius = '2px';
-            progressBar.style.marginTop = '6px';
-            progressBar.style.position = 'relative';
-            progressBar.style.overflow = 'hidden';
-            
-            const progressFill = progressBar.createDiv();
-            progressFill.style.position = 'absolute';
-            progressFill.style.left = '0';
-            progressFill.style.top = '0';
-            progressFill.style.height = '100%';
+            const progressBar = noteScoreEl.createDiv('mcq-progress-bar');
+            const progressFill = progressBar.createDiv('mcq-progress-fill');
             progressFill.style.width = `${scorePercent}%`;
-            progressFill.style.transition = 'width 0.5s ease';
-            
+
             if (noteScore.score >= 0.7) {
-                progressFill.style.backgroundColor = 'var(--mcq-correct)';
+                progressFill.addClass('high-score');
             } else if (noteScore.score >= 0.5) {
-                progressFill.style.backgroundColor = 'var(--mcq-warning)';
+                progressFill.addClass('medium-score');
             } else {
-                progressFill.style.backgroundColor = 'var(--mcq-incorrect)';
+                progressFill.addClass('low-score');
             }
         }
 
         // --- Detailed Question Breakdown ---
         const breakdownContainer = contentEl.createDiv('mcq-detailed-breakdown');
-        breakdownContainer.style.marginTop = '24px';
         breakdownContainer.createEl('h3', { text: 'Detailed Question Breakdown' });
 
         this.allQuestions.forEach((question, index) => {
             const questionEl = breakdownContainer.createDiv('mcq-breakdown-item');
-            questionEl.style.marginBottom = '12px';
-            questionEl.style.padding = '8px';
-            questionEl.style.border = '1px solid var(--background-modifier-border)';
-            questionEl.style.borderRadius = '4px';
 
             const questionHeader = questionEl.createDiv();
             questionHeader.createSpan({ text: `Q${index + 1} (from ${question.fileName}): `, cls: 'mcq-breakdown-q-header' });
             questionHeader.createSpan({ text: question.question });
-            
+
             const userAnswer = this.answers.find(a => a.questionIndex === index);
-            
-            const userAnswerTextEl = questionEl.createDiv();
-            userAnswerTextEl.style.marginLeft = '10px';
+
+            const userAnswerTextEl = questionEl.createDiv('mcq-user-answer-text');
             let userAnswerDisplay = "Not answered";
             if (userAnswer && userAnswer.selectedAnswerIndex !== -1 && userAnswer.selectedAnswerIndex < question.choices.length) {
                 userAnswerDisplay = question.choices[userAnswer.selectedAnswerIndex];
             } else if (userAnswer && userAnswer.selectedAnswerIndex === -1) {
                 // This case should ideally not happen with the new logic in handleAnswer
                 // but good to have a fallback.
-                 userAnswerDisplay = "Attempted, but no valid choice recorded";
+                userAnswerDisplay = "Attempted, but no valid choice recorded";
             }
 
 
@@ -668,33 +631,27 @@ export class ConsolidatedMCQModal extends Modal {
                 const correctnessText = userAnswer.correct ? ' (Correct)' : ' (Incorrect)';
                 userAnswerTextEl.createSpan({ text: 'Your answer: ' });
                 const userAnswerSpan = userAnswerTextEl.createSpan({ text: userAnswerDisplay });
-                const correctnessSpan = userAnswerTextEl.createSpan({ text: correctnessText });
-                correctnessSpan.style.fontWeight = 'bold';
+                const correctnessSpan = userAnswerTextEl.createSpan({ text: correctnessText, cls: 'mcq-correctness-indicator' });
                 if (userAnswer.correct) {
-                    userAnswerSpan.style.color = 'var(--mcq-correct)';
-                    correctnessSpan.style.color = 'var(--mcq-correct)';
+                    userAnswerSpan.addClass('correct');
+                    correctnessSpan.addClass('correct');
                 } else {
-                    userAnswerSpan.style.color = 'var(--mcq-incorrect)';
-                    correctnessSpan.style.color = 'var(--mcq-incorrect)';
+                    userAnswerSpan.addClass('incorrect');
+                    correctnessSpan.addClass('incorrect');
                 }
             } else {
-                 userAnswerTextEl.createSpan({ text: 'Your answer: ' + userAnswerDisplay });
-                 userAnswerTextEl.style.fontStyle = 'italic';
+                userAnswerTextEl.createSpan({ text: 'Your answer: ' + userAnswerDisplay });
+                userAnswerTextEl.style.fontStyle = 'italic';
             }
 
-            const correctAnswerEl = questionEl.createDiv();
-            correctAnswerEl.style.marginLeft = '10px';
+            const correctAnswerEl = questionEl.createDiv('mcq-correct-answer');
             correctAnswerEl.createSpan({ text: 'Correct answer: ' });
-            const correctAnswerSpan = correctAnswerEl.createSpan({ text: question.choices[question.correctAnswerIndex] });
-            correctAnswerSpan.style.color = 'var(--mcq-correct-answer-text)'; // A distinct color for the correct answer text itself
-            correctAnswerSpan.style.fontWeight = 'bold';
+            correctAnswerEl.createSpan({ text: question.choices[question.correctAnswerIndex], cls: 'mcq-correct-answer-text' });
         });
         
         // Create close button
-        const closeBtn = contentEl.createEl('button', 'mcq-close-btn');
-        closeBtn.setText('Close');
-        closeBtn.style.marginTop = '24px'; // Added margin
-        
+        const closeBtn = contentEl.createEl('button', {cls: 'mcq-close-btn', text: 'Close'});
+
         closeBtn.addEventListener('click', () => {
             this.close();
         });

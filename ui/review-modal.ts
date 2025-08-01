@@ -129,6 +129,7 @@ export class ReviewModal extends Modal {
 
         // Note Info Section
         const infoText = contentEl.createDiv("review-info-text");
+        infoText.empty();
         // const schedule = this.plugin.reviewScheduleService.schedules[this.path]; // Already fetched
 
         if (schedule) {
@@ -171,6 +172,5 @@ export class ReviewModal extends Modal {
     onClose(): void {
         const { contentEl } = this;
         contentEl.empty();
-        console.log("Review modal closed for path: " + this.path);
     }
 }

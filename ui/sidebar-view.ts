@@ -30,6 +30,7 @@ export class ReviewSidebarView extends ItemView {
     private lastSelectedNotePath: string | null = null;
     private lastScrollPosition: number = 0;
     private expandedUpcomingDayKey: string | null = null; // State for upcoming section
+    private resizeObserver: ResizeObserver | null = null;
 
     // Sub-components for rendering different parts
     private pomodoroUIManager: PomodoroUIManager;
@@ -67,15 +68,15 @@ export class ReviewSidebarView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        if ((this as any).resizeObserver) {
-            (this as any).resizeObserver.disconnect();
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
         }
         this.plugin.events.off('sidebar-update', this.refresh.bind(this));
         // No need to explicitly unregister pomodoro-update as the manager handles its own logic
     }
 
     private ensureBaseStructure(): void {
-        const contentEl = this.containerEl || (this as any).contentEl;
+        const contentEl = this.containerEl;
         if (!contentEl) return;
 
         if (!this.mainContainer) {
@@ -280,7 +281,7 @@ export class ReviewSidebarView extends ItemView {
 
         if (this.containerEl) {
              resizeObserver.observe(this.containerEl);
-             (this as any).resizeObserver = resizeObserver;
+             this.resizeObserver = resizeObserver;
              this.updateCalendarContainerClass();
         }
     }
@@ -389,7 +390,7 @@ export class ReviewSidebarView extends ItemView {
         };
     }
 
-    async setViewState(state: ReviewSidebarViewState, e?: any): Promise<void> {
+    async setViewState(state: ReviewSidebarViewState): Promise<void> {
         if (!state) return;
 
         // Restore non-UI-dependent state first

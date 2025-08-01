@@ -280,7 +280,6 @@ export class PomodoroService {
                 // Timer should have ended while plugin was inactive/closed
                 // We could try to simulate the transition, but it gets complex.
                 // Simplest: Stop the timer, reset to the expected next state's duration.
-                console.log("Pomodoro timer ended while inactive. Handling potential transition.");
                 this.handleTimerEnd(true); // Treat as skipped to avoid sound, force transition logic
             }
         } else if (!this.state.pomodoroIsRunning) {

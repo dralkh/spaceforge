@@ -28,7 +28,6 @@ export class ContextMenuHandler {
         this.plugin.registerEvent(
             this.plugin.app.workspace.on("file-menu", this.handleFileMenuEvent.bind(this))
         );
-        console.log("Unified context menu handler registered for 'file-menu'.");
     }
 
     /**
@@ -40,11 +39,9 @@ export class ContextMenuHandler {
     handleFileMenuEvent(menu: Menu, abstractFile: TAbstractFile): void {
         if (abstractFile instanceof TFolder) {
             // Handle folder context menu
-            console.log("Folder right-clicked:", abstractFile.path);
             this.addFolderMenuItems(menu, abstractFile);
         } else if (abstractFile instanceof TFile && abstractFile.extension === "md") {
             // Handle markdown file context menu
-            console.log("Markdown file right-clicked:", abstractFile.path);
             this.addFileMenuItems(menu, abstractFile);
         }
     }
@@ -113,17 +110,14 @@ export class ContextMenuHandler {
      * @param folder Target folder
      */
     private addFolderMenuItems(menu: Menu, folder: TFolder): void {
-        console.log("Adding menu items for folder:", folder.path);
         try {
             menu.addItem((item) => {
                 item.setTitle("Add folder to review")
                    .setIcon("calendar-plus")
                    .onClick(() => {
-                       console.log("Context menu: Adding folder to review:", folder.path);
                        this.addFolderToReview(folder);
                    });
             });
-            console.log("Menu items added successfully for folder:", folder.path);
         } catch (error) {
             console.error("Error adding folder menu items:", error);
         }
@@ -135,7 +129,6 @@ export class ContextMenuHandler {
      * @param folder Target folder
      */
     async addFolderToReview(folder: TFolder): Promise<void> {
-        console.log("Processing folder:", folder.path);
 
         // Show immediate notification
         new Notice(`Analyzing folder structure for "${folder.name}"...`);
@@ -174,7 +167,6 @@ export class ContextMenuHandler {
                 // Exact match first
                 if (fileName === folderName) {
                     mainFilePath = file.path;
-                    console.log(`Found main file with exact folder name match: ${mainFilePath}`);
                     break;
                 }
             }
@@ -192,7 +184,6 @@ export class ContextMenuHandler {
                         fileName.includes('index') ||
                         fileName.includes('main')) {
                         mainFilePath = file.path;
-                        console.log(`Found main file by partial name match: ${mainFilePath}`);
                         break;
                     }
                 }
@@ -205,7 +196,6 @@ export class ContextMenuHandler {
                     activeFile.extension === "md" &&
                     allFiles.some(f => f.path === activeFile.path)) {
                     mainFilePath = activeFile.path;
-                    console.log(`Using active note as main file: ${mainFilePath}`);
                 }
             }
 
@@ -218,7 +208,6 @@ export class ContextMenuHandler {
                 }
                 visited.add(path);
                 traversalOrder.push(path);
-                // console.log(`Added to traversal: ${path}`); // Keep console logs minimal for production
 
                 const links = await LinkAnalyzer.analyzeNoteLinks(
                     this.plugin.app.vault,
@@ -238,7 +227,6 @@ export class ContextMenuHandler {
                         if (!visited.has(linkFile.path)) {
                             visited.add(linkFile.path);
                             traversalOrder.push(linkFile.path);
-                            // console.log(`Added external link (no recursion): ${linkFile.path}`);
                         }
                     }
                 }
@@ -246,7 +234,6 @@ export class ContextMenuHandler {
 
             // If a mainFilePath was identified, process it first.
             if (mainFilePath) {
-                console.log(`Starting traversal from identified main file: ${mainFilePath}`);
                 await processLinksRecursively(mainFilePath);
             }
 
@@ -256,12 +243,10 @@ export class ContextMenuHandler {
             const sortedAllFiles = [...allFiles].sort((a,b) => a.path.localeCompare(b.path));
             for (const file of sortedAllFiles) {
                 if (!visited.has(file.path)) {
-                    console.log(`Processing new branch or unlinked file: ${file.path}`);
                     await processLinksRecursively(file.path);
                 }
             }
             
-            console.log(`Final traversal order determined with ${traversalOrder.length} files.`);
 
             // Schedule notes in the traversal order using the service
             const count = await this.plugin.reviewScheduleService.scheduleNotesInOrder(traversalOrder);

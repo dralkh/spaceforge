@@ -250,10 +250,8 @@ export class LinkAnalyzer {
      * @returns Array with the path of the best starting node
      */
     private static findStartingNode(nodes: Record<string, FileNode>): string[] {
-        console.log("LinkAnalyzer: Starting node selection process...");
         // If we have no nodes, return an empty array
         if (Object.keys(nodes).length === 0) {
-            console.log("LinkAnalyzer: No nodes found, returning empty array.");
             return [];
         }
         
@@ -274,42 +272,25 @@ export class LinkAnalyzer {
             const filesInFolder = folderNodes[folderPath];
             
             // HIGHEST PRIORITY: Exact match with folder name
-            console.log(`LinkAnalyzer: Checking for exact match with folder name "${folderName}" in folder "${folderPath}"...`);
             for (const path of filesInFolder) {
-                const fileName = path.split('/').pop()?.toLowerCase() || '';
-                const fileNameWithoutExt = fileName.replace(/\.md$/, '');
-                
-                if (fileNameWithoutExt === folderName) {
-                    console.log(`LinkAnalyzer: Selected main file with exact folder name match: ${path}`);
+                const fileName = path.split('/').pop()?.toLowerCase().replace(/\.md$/, '') || '';
+                if (fileName === folderName) {
                     return [path];
                 }
             }
-            
+
             // SECOND PRIORITY: Partial match with folder name
-            console.log(`LinkAnalyzer: Checking for partial match with folder name "${folderName}"...`);
             for (const path of filesInFolder) {
-                const fileName = path.split('/').pop()?.toLowerCase() || '';
-                const fileNameWithoutExt = fileName.replace(/\.md$/, '');
-                
-                if (fileNameWithoutExt.includes(folderName) || folderName.includes(fileNameWithoutExt)) {
-                    console.log(`LinkAnalyzer: Selected main file with partial folder name match: ${path}`);
+                const fileName = path.split('/').pop()?.toLowerCase().replace(/\.md$/, '') || '';
+                if (fileName.includes(folderName) || folderName.includes(fileName)) {
                     return [path];
                 }
             }
-            
+
             // THIRD PRIORITY: Common index or main file patterns
-            console.log("LinkAnalyzer: Checking for common index or main file patterns...");
             for (const path of filesInFolder) {
-                const fileName = path.split('/').pop()?.toLowerCase() || '';
-                const fileNameWithoutExt = fileName.replace(/\.md$/, '');
-                
-                if (fileNameWithoutExt === 'index' || 
-                    fileNameWithoutExt === 'main' || 
-                    fileNameWithoutExt.includes('index') || 
-                    fileNameWithoutExt.includes('readme') ||
-                    fileNameWithoutExt.includes('main')) {
-                    
-                    console.log(`LinkAnalyzer: Selected main file by standard name pattern: ${path}`);
+                const fileName = path.split('/').pop()?.toLowerCase().replace(/\.md$/, '') || '';
+                if (fileName === 'index' || fileName === 'main' || fileName.includes('index') || fileName.includes('readme') || fileName.includes('main')) {
                     return [path];
                 }
             }
@@ -317,7 +298,6 @@ export class LinkAnalyzer {
         
         // FOURTH PRIORITY: Look for files with the most outgoing links
         // Prefer regular links over embeds
-        console.log("LinkAnalyzer: Checking for files with the most outgoing links...");
         const sortedNodes = Object.values(nodes)
             .sort((a, b) => {
                 // First, prioritize by regular link count (non-embed links)
@@ -333,12 +313,10 @@ export class LinkAnalyzer {
         if (sortedNodes.length > 0 && 
             (sortedNodes[0].regularLinks.length > 0 || sortedNodes[0].outgoingLinks.length > 0)) {
             // Return the node with the most links
-            console.log(`LinkAnalyzer: Selected main file by link count: ${sortedNodes[0].path} with ${sortedNodes[0].regularLinks.length} regular links`);
             return [sortedNodes[0].path];
         }
         
         // FALLBACK: Use all files as root nodes if none of the above criteria match
-        console.log(`LinkAnalyzer: No clear main file identified, using first file as root node`);
         return Object.keys(nodes).length > 0 ? [Object.keys(nodes)[0]] : [];
     }
     
@@ -376,12 +354,10 @@ export class LinkAnalyzer {
         }
         
         const mainFolder = fileFolders.get(startNodePath) || "";
-        console.log(`LinkAnalyzer: Starting ordered traversal from: ${startNodePath} in main folder: ${mainFolder || "vault root"}`);
 
         // Helper function for depth-first traversal, respecting link order and folder constraints
         const traverse = (currentNodePath: string, currentDepth: number = 0, currentMainFolder: string) => {
             if (visited.has(currentNodePath)) {
-                console.log(`${"  ".repeat(currentDepth)}LinkAnalyzer: Already visited: ${currentNodePath}`);
                 return;
             }
 
@@ -391,7 +367,6 @@ export class LinkAnalyzer {
                 return;
             }
             
-            console.log(`${"  ".repeat(currentDepth)}LinkAnalyzer: Traversing: ${currentNodePath}`);
             visited.add(currentNodePath);
             traversalOrder.push(currentNodePath);
             
@@ -402,7 +377,6 @@ export class LinkAnalyzer {
             
             for (const linkedPath of linksToFollow) {
                 if (!nodes[linkedPath]) { // Ensure the linked path is a known node in the current analysis context
-                    console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Skipping unknown linked path: ${linkedPath}`);
                     continue;
                 }
 
@@ -411,14 +385,11 @@ export class LinkAnalyzer {
                 // MODIFIED RULE: Traverse if the linked note is within the scope of the main analysis folder.
                 if (nodes[linkedPath] && linkedNodeFolder.startsWith(currentMainFolder)) { // Ensure it's a known node and within the main hierarchy
                     if (!visited.has(linkedPath)) { // Avoid re-traversing already processed branches
-                        console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Following link within main hierarchy to: ${linkedPath}`);
                         traverse(linkedPath, currentDepth + 1, currentMainFolder);
                     } else {
-                        console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Link to already visited node in main hierarchy: ${linkedPath}`);
                     }
                 } else {
                     // This link goes outside the main folder being analyzed or is not a known node.
-                    console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Ignoring link outside main hierarchy or unknown node: ${linkedPath} (from ${currentNodeFolder} to ${linkedNodeFolder})`);
                 }
             }
         };
@@ -435,7 +406,6 @@ export class LinkAnalyzer {
         // unlinked files from the mainFolder.
         
         // Log the traversal order summary
-        console.log(`LinkAnalyzer: Final traversal order from ${startNodePath} (in folder '${mainFolder || "vault root"}') has ${traversalOrder.length} files: ${traversalOrder.join(' -> ')}`);
         
         return traversalOrder;
     }
@@ -538,7 +508,6 @@ export class LinkAnalyzer {
                 }
             }
             
-            console.log(`LinkAnalyzer: Analyzed links in ${filePath}, found ${resolvedLinks.length} unique links in order`);
             
             return resolvedLinks;
         } catch (error) {

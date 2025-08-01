@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -89,7 +89,8 @@ export class OllamaService implements IMCQGenerationService {
         console.log(`Making API request to Ollama at ${apiUrl} using model: ${model} with difficulty: ${difficulty}`);
 
         try {
-            const response = await fetch(`${apiUrl}/api/chat`, { // Common Ollama chat endpoint
+            const response = await requestUrl({
+                url: `${apiUrl}/api/chat`,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -104,13 +105,13 @@ export class OllamaService implements IMCQGenerationService {
                 })
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
+            if (response.status !== 200) {
+                const errorText = response.text;
                 console.error('Ollama API error:', response.status, errorText);
                 throw new Error(`API request failed (${response.status}): ${errorText}`);
             }
 
-            const data = await response.json();
+            const data = response.json;
             // Ollama's non-streaming chat response structure is typically { model, created_at, message: { role, content }, done }
             if (!data.message || !data.message.content) {
                 console.error('Invalid API response format from Ollama:', data);

@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -89,7 +89,8 @@ export class TogetherService implements IMCQGenerationService {
         console.log(`Making API request to Together AI using model: ${model} with difficulty: ${difficulty}`);
 
         try {
-            const response = await fetch('https://api.together.xyz/v1/chat/completions', {
+            const response = await requestUrl({
+                url: 'https://api.together.xyz/v1/chat/completions',
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -105,13 +106,13 @@ export class TogetherService implements IMCQGenerationService {
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            if (response.status !== 200) {
+                const errorData = response.json || { message: response.text };
                 console.error('Together AI API error:', response.status, errorData);
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
             }
 
-            const data = await response.json();
+            const data = response.json;
             if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
                 console.error('Invalid API response format from Together AI:', data);
                 throw new Error('Invalid API response format from Together AI - missing content');

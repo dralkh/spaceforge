@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian'; // Removed TFile as it wasn't used
+import { Notice, requestUrl } from 'obsidian'; // Removed TFile as it wasn't used
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -147,7 +147,8 @@ For example:
                 ? settings.mcqBasicSystemPrompt 
                 : settings.mcqAdvancedSystemPrompt;
             
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            const response = await requestUrl({
+                url: 'https://openrouter.ai/api/v1/chat/completions',
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -169,20 +170,19 @@ For example:
                     ]
                 })
             });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('OpenRouter API error:', errorText);
-                throw new Error(`API request failed (${response.status}): ${errorText}`);
+
+            if (response.status !== 200) {
+                console.error('OpenRouter API error:', response.text);
+                throw new Error(`API request failed (${response.status}): ${response.text}`);
             }
-            
-            const data = await response.json();
-            
+
+            const data = response.json;
+
             if (!data.choices || !data.choices.length || !data.choices[0].message) {
                 console.error('Invalid API response format from OpenRouter:', data);
                 throw new Error('Invalid API response format from OpenRouter - missing choices');
             }
-            
+
             return data.choices[0].message.content;
         } catch (error) {
             console.error('Error in OpenRouter API request:', error);

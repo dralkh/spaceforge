@@ -1,7 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting, setIcon, TextAreaComponent } from 'obsidian'; // Added TextAreaComponent
 import SpaceforgePlugin from '../main';
 // Import ApiProvider, DEFAULT_SETTINGS, SpaceforgeSettings, and MCQQuestionAmountMode
-import { ApiProvider, DEFAULT_SETTINGS, SpaceforgeSettings, MCQQuestionAmountMode } from '../models/settings'; 
+import { ApiProvider, DEFAULT_SETTINGS, SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; 
 import { SpaceforgePluginData, DEFAULT_APP_DATA, DEFAULT_PLUGIN_STATE_DATA } from '../models/plugin-data'; // Import data structures
 
 /**
@@ -603,7 +603,6 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             openRouterModel: this.plugin.settings.openRouterModel
                         };
                         window.localStorage.setItem('spaceforge-api-settings', JSON.stringify(apiSettings));
-                        console.log("Updated API settings backup with MCQ state");
                     } catch (e) {
                         console.error("Error updating API settings backup:", e);
                     }
@@ -660,7 +659,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 // Removed sf-setting-explain class
-                apiKeyContainer.createEl('div', { text: 'Get your API key at https://openrouter.ai/keys' });
+                apiKeyContainer.createEl('div').setText('Get your API key at https://openrouter.ai/keys');
 
                 new Setting(mcqSection)
                     .setName('OpenRouter Model')
@@ -901,11 +900,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 .setName('MCQ difficulty')
                 .setDesc('Complexity level')
                 .addDropdown(dropdown => dropdown
-                    .addOption('basic', 'Basic recall')
-                    .addOption('advanced', 'Advanced understanding')
+                    .addOption(MCQDifficulty.Basic, 'Basic recall')
+                    .addOption(MCQDifficulty.Advanced, 'Advanced understanding')
                     .setValue(this.plugin.settings.mcqDifficulty)
-                    .onChange(async (value: string) => {
-                        this.plugin.settings.mcqDifficulty = value as any;
+                    .onChange(async (value: MCQDifficulty) => {
+                        this.plugin.settings.mcqDifficulty = value;
                         await this.plugin.savePluginData();
                     }));
             
@@ -1157,15 +1156,32 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             sm2List.createEl('li', { text: 'Both cases reset the repetition count to 1 and update the ease factor.' });
             
             const ratingsTable = container.createEl('table', { cls: 'sf-ratings-table' }); // Added a class for potential styling
-            ratingsTable.innerHTML = `
-                <thead><tr><th>Rating (0-5)</th><th>Description</th><th>Effect on Interval</th></tr></thead>
-                <tbody>
-                    <tr><td>0-2</td><td>Incorrect / struggled</td><td>Resets, shortest interval</td></tr>
-                    <tr><td>3</td><td>Correct with difficulty</td><td>Small increase</td></tr>
-                    <tr><td>4</td><td>Correct with hesitation</td><td>Moderate increase</td></tr>
-                    <tr><td>5</td><td>Perfect recall</td><td>Largest increase</td></tr>
-                </tbody>
-            `;
+            const thead = ratingsTable.createTHead();
+            const tbody = ratingsTable.createTBody();
+            const headerRow = thead.insertRow();
+            headerRow.createEl('th', { text: 'Rating (0-5)' });
+            headerRow.createEl('th', { text: 'Description' });
+            headerRow.createEl('th', { text: 'Effect on Interval' });
+
+            const row1 = tbody.insertRow();
+            row1.createEl('td', { text: '0-2' });
+            row1.createEl('td', { text: 'Incorrect / struggled' });
+            row1.createEl('td', { text: 'Resets, shortest interval' });
+
+            const row2 = tbody.insertRow();
+            row2.createEl('td', { text: '3' });
+            row2.createEl('td', { text: 'Correct with difficulty' });
+            row2.createEl('td', { text: 'Small increase' });
+
+            const row3 = tbody.insertRow();
+            row3.createEl('td', { text: '4' });
+            row3.createEl('td', { text: 'Correct with hesitation' });
+            row3.createEl('td', { text: 'Moderate increase' });
+
+            const row4 = tbody.insertRow();
+            row4.createEl('td', { text: '5' });
+            row4.createEl('td', { text: 'Perfect recall' });
+            row4.createEl('td', { text: 'Largest increase' });
         } else if (algorithm === 'fsrs') {
             container.createEl('h4', { text: 'About the FSRS Algorithm' });
             container.createEl('p', { 
@@ -1182,15 +1198,32 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             fsrsList.createEl('li', { text: 'Learning Steps: Initial short intervals for new cards (configurable).' });
 
             const ratingsTable = container.createEl('table', { cls: 'sf-ratings-table' });
-            ratingsTable.innerHTML = `
-                <thead><tr><th>Rating (1-4)</th><th>Description</th><th>Effect on Stability/Difficulty</th></tr></thead>
-                <tbody>
-                    <tr><td>1 (Again)</td><td>Forgot the card</td><td>Decreases stability, may increase difficulty</td></tr>
-                    <tr><td>2 (Hard)</td><td>Recalled with significant difficulty</td><td>Smaller increase in stability</td></tr>
-                    <tr><td>3 (Good)</td><td>Recalled correctly</td><td>Standard increase in stability</td></tr>
-                    <tr><td>4 (Easy)</td><td>Recalled very easily</td><td>Largest increase in stability, may decrease difficulty</td></tr>
-                </tbody>
-            `;
+            const thead = ratingsTable.createTHead();
+            const tbody = ratingsTable.createTBody();
+            const headerRow = thead.insertRow();
+            headerRow.createEl('th', { text: 'Rating (1-4)' });
+            headerRow.createEl('th', { text: 'Description' });
+            headerRow.createEl('th', { text: 'Effect on Stability/Difficulty' });
+
+            const row1 = tbody.insertRow();
+            row1.createEl('td', { text: '1 (Again)' });
+            row1.createEl('td', { text: 'Forgot the card' });
+            row1.createEl('td', { text: 'Decreases stability, may increase difficulty' });
+
+            const row2 = tbody.insertRow();
+            row2.createEl('td', { text: '2 (Hard)' });
+            row2.createEl('td', { text: 'Recalled with significant difficulty' });
+            row2.createEl('td', { text: 'Smaller increase in stability' });
+
+            const row3 = tbody.insertRow();
+            row3.createEl('td', { text: '3 (Good)' });
+            row3.createEl('td', { text: 'Recalled correctly' });
+            row3.createEl('td', { text: 'Standard increase in stability' });
+
+            const row4 = tbody.insertRow();
+            row4.createEl('td', { text: '4 (Easy)' });
+            row4.createEl('td', { text: 'Recalled very easily' });
+            row4.createEl('td', { text: 'Largest increase in stability, may decrease difficulty' });
             container.createEl('p', {text: 'FSRS parameters (weights, retention, etc.) can be tuned, but the defaults are generally effective.'});
         }
     }

@@ -164,7 +164,6 @@ export class BatchReviewModal extends Modal {
                     this.allMCQSets,
                     (results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>) => {
                         this.results = results;
-                        console.log("Consolidated MCQ review complete with results:", results);
                         this.recordAllReviews(results).then(() => {
                             this.open();
                             this.showSummary();
@@ -172,7 +171,6 @@ export class BatchReviewModal extends Modal {
                     }
                 );
                 consolidatedModal.open();
-                console.log(`Opened consolidated MCQ modal with ${this.allMCQSets.length} MCQ sets`);
             } catch (error) {
                 console.error("Error showing consolidated MCQ UI:", error);
                 new Notice("Error showing MCQ review. Falling back to manual review.");

@@ -223,24 +223,36 @@ export class MCQModal extends Modal {
         const existingAnswer = this.session.answers.find(a => a.questionIndex === questionIndex);
         if (existingAnswer && existingAnswer.attempts >= 2) {
             const skipContainer = newQuestionContainer.createDiv('mcq-skip-container');
-            skipContainer.style.marginBottom = '12px'; skipContainer.style.textAlign = 'right';
             const skipButton = skipContainer.createEl('button', { text: 'Show Answer & Continue', cls: 'mcq-skip-button' });
-            skipButton.style.backgroundColor = 'var(--text-muted)'; skipButton.style.color = 'white'; skipButton.style.padding = '4px 8px'; skipButton.style.borderRadius = '4px'; skipButton.style.cursor = 'pointer'; skipButton.style.border = 'none';
             skipButton.addEventListener('click', () => {
                 const correctIndex = question.correctAnswerIndex;
                 const correctAnswerDisplay = newQuestionContainer.createDiv('mcq-correct-answer-display');
-                correctAnswerDisplay.style.backgroundColor = 'rgba(76, 175, 80, 0.1)'; correctAnswerDisplay.style.padding = '10px'; correctAnswerDisplay.style.borderRadius = '4px'; correctAnswerDisplay.style.marginBottom = '10px'; correctAnswerDisplay.style.border = '1px solid #4caf50';
-                const correctLabel = correctAnswerDisplay.createDiv(); correctLabel.style.fontWeight = 'bold'; correctLabel.style.marginBottom = '4px'; correctLabel.setText('Correct Answer:');
-                const correctText = correctAnswerDisplay.createDiv(); correctText.style.color = '#4caf50'; correctText.setText(String.fromCharCode(65 + correctIndex) + ') ' + question.choices[correctIndex]);
+                const correctLabel = correctAnswerDisplay.createDiv();
+                correctLabel.style.fontWeight = 'bold';
+                correctLabel.style.marginBottom = '4px';
+                correctLabel.setText('Correct Answer:');
+                const correctText = correctAnswerDisplay.createDiv();
+                correctText.style.color = '#4caf50';
+                correctText.setText(String.fromCharCode(65 + correctIndex) + ') ' + question.choices[correctIndex]);
 
                 if (existingAnswer) {
-                    existingAnswer.selectedAnswerIndex = -1; existingAnswer.correct = false; existingAnswer.attempts += 1;
+                    existingAnswer.selectedAnswerIndex = -1;
+                    existingAnswer.correct = false;
+                    existingAnswer.attempts += 1;
                 } else {
-                    this.session.answers.push({ questionIndex, selectedAnswerIndex: -1, correct: false, timeToAnswer: (Date.now() - this.questionStartTime) / 1000, attempts: 3 });
+                    this.session.answers.push({
+                        questionIndex,
+                        selectedAnswerIndex: -1,
+                        correct: false,
+                        timeToAnswer: (Date.now() - this.questionStartTime) / 1000,
+                        attempts: 3
+                    });
                 }
 
-                const continueBtn = correctAnswerDisplay.createEl('button', { text: 'Continue to Next Question', cls: 'mcq-continue-button' });
-                continueBtn.style.marginTop = '10px'; continueBtn.style.backgroundColor = 'var(--interactive-accent)'; continueBtn.style.color = 'white'; continueBtn.style.padding = '6px 12px'; continueBtn.style.borderRadius = '4px'; continueBtn.style.cursor = 'pointer'; continueBtn.style.border = 'none';
+                const continueBtn = correctAnswerDisplay.createEl('button', {
+                    text: 'Continue to Next Question',
+                    cls: 'mcq-continue-button'
+                });
                 continueBtn.addEventListener('click', () => {
                     this.session.currentQuestionIndex++;
                     this.questionStartTime = Date.now();
@@ -266,7 +278,6 @@ export class MCQModal extends Modal {
             const letterLabel = choiceBtn.createSpan('mcq-choice-letter'); letterLabel.setText(String.fromCharCode(65 + index) + ') ');
             const textSpan = choiceBtn.createSpan('mcq-choice-text'); textSpan.setText(choice || '(Empty choice)');
             const shortcutHint = choiceBtn.createSpan('mcq-shortcut-hint');
-            shortcutHint.style.fontSize = '0.8em'; shortcutHint.style.color = 'var(--mcq-text-muted)'; shortcutHint.style.marginLeft = 'auto'; shortcutHint.style.paddingLeft = '10px';
             shortcutHint.setText(`${String.fromCharCode(65 + index)} or ${index + 1}`);
             choiceBtn.addEventListener('click', () => this.handleAnswer(index));
         });
@@ -286,7 +297,6 @@ export class MCQModal extends Modal {
             if (isCorrect) { answer.selectedAnswerIndex = selectedIndex; answer.correct = true; }
             answer.timeToAnswer = timeToAnswer; answer.attempts += 1;
             if (answer.attempts >= 2 && !answer.correct) {
-                console.log(`Question ${questionIndex+1} has ${answer.attempts} attempts, marking as zero points`);
                 answer.selectedAnswerIndex = -1; // Mark as failed but eventually correct
             }
         } else {
@@ -333,7 +343,7 @@ export class MCQModal extends Modal {
             this.plugin.mcqService.saveMCQSession(this.session);
             this.plugin.savePluginData(); // Persist
 
-            contentEl.createEl('h2').setText('Review Complete'); // Corrected
+            contentEl.createEl('h2', { text: 'Review Complete' });
             const scoreEl = contentEl.createDiv('mcq-score');
             const scoreTextEl = scoreEl.createDiv('mcq-score-text');
             const scorePercentage = this.session.score; // Score is 0-1
@@ -380,56 +390,52 @@ export class MCQModal extends Modal {
             if (ratingDetails) {
                 const detailsEl = scoreEl.createDiv('mcq-score-details');
                 detailsEl.setText(ratingDetails);
-                detailsEl.style.fontSize = '0.9em';
-                detailsEl.style.color = 'var(--text-muted)';
-                detailsEl.style.marginTop = '4px';
             }
 
             // Removed the old score indicator text (🎯 Excellent, etc.)
 
             const resultsEl = contentEl.createDiv('mcq-results');
-            resultsEl.createEl('h3').setText('Question Results');
+            resultsEl.createEl('h3', { text: 'Question Results' });
             if (this.session.answers.length === 0) {
-                resultsEl.createDiv('mcq-no-answers').setText('No questions were answered in this session.');
+                resultsEl.createDiv({ cls: 'mcq-no-answers', text: 'No questions were answered in this session.' });
             } else {
                 this.session.answers.forEach(answer => {
                     try {
                         const question = this.mcqSet.questions[answer.questionIndex];
                         if (!question || !question.choices) return;
                         const resultItem = resultsEl.createDiv('mcq-result-item');
-                        resultItem.createDiv('mcq-result-question').setText(question.question || 'Question text missing');
+                        resultItem.createDiv({ cls: 'mcq-result-question', text: question.question || 'Question text missing' });
                         if (answer.attempts > 1) {
                             if (answer.selectedAnswerIndex !== -1) {
                                 const yourAnswer = resultItem.createDiv('mcq-result-your-answer');
-                                yourAnswer.createSpan('mcq-result-label').setText('Your final answer (correct after multiple attempts): ');
-                                yourAnswer.createSpan('mcq-result-correct').setText(question.choices[answer.selectedAnswerIndex] || '(invalid choice)');
+                                yourAnswer.createSpan({ cls: 'mcq-result-label', text: 'Your final answer (correct after multiple attempts): ' });
+                                yourAnswer.createSpan({ cls: 'mcq-result-correct', text: question.choices[answer.selectedAnswerIndex] || '(invalid choice)' });
                             } else {
                                 const yourAnswer = resultItem.createDiv('mcq-result-your-answer');
-                                yourAnswer.createSpan('mcq-result-label').setText('Your answer: ');
-                                yourAnswer.createSpan('mcq-result-incorrect').setText('(Incorrect - used "Show Answer" option)');
+                                yourAnswer.createSpan({ cls: 'mcq-result-label', text: 'Your answer: ' });
+                                yourAnswer.createSpan({ cls: 'mcq-result-incorrect', text: '(Incorrect - used "Show Answer" option)' });
                             }
                             const correctAnswer = resultItem.createDiv('mcq-result-correct-answer');
-                            correctAnswer.createSpan('mcq-result-label').setText('Correct answer: ');
-                            correctAnswer.createSpan('mcq-result-correct').setText(question.choices[question.correctAnswerIndex] || '(invalid choice)');
+                            correctAnswer.createSpan({ cls: 'mcq-result-label', text: 'Correct answer: ' });
+                            correctAnswer.createSpan({ cls: 'mcq-result-correct', text: question.choices[question.correctAnswerIndex] || '(invalid choice)' });
                         } else {
                             const yourAnswer = resultItem.createDiv('mcq-result-your-answer');
-                            yourAnswer.createSpan('mcq-result-label').setText('Your answer: ');
-                            yourAnswer.createSpan(answer.correct ? 'mcq-result-correct' : 'mcq-result-incorrect').setText(question.choices[answer.selectedAnswerIndex] || '(invalid choice)');
+                            yourAnswer.createSpan({ cls: 'mcq-result-label', text: 'Your answer: ' });
+                            yourAnswer.createSpan({ cls: answer.correct ? 'mcq-result-correct' : 'mcq-result-incorrect', text: question.choices[answer.selectedAnswerIndex] || '(invalid choice)' });
                             if (!answer.correct) {
                                 const correctAnswer = resultItem.createDiv('mcq-result-correct-answer');
-                                correctAnswer.createSpan('mcq-result-label').setText('Correct answer: ');
-                                correctAnswer.createSpan('mcq-result-correct').setText(question.choices[question.correctAnswerIndex] || '(invalid choice)');
+                                correctAnswer.createSpan({ cls: 'mcq-result-label', text: 'Correct answer: ' });
+                                correctAnswer.createSpan({ cls: 'mcq-result-correct', text: question.choices[question.correctAnswerIndex] || '(invalid choice)' });
                             }
                         }
-                        resultItem.createDiv('mcq-result-attempts').setText(`Attempts: ${answer.attempts}`);
-                        resultItem.createDiv('mcq-result-time').setText(`Time: ${Math.round(answer.timeToAnswer)} seconds`);
+                        resultItem.createDiv({ cls: 'mcq-result-attempts', text: `Attempts: ${answer.attempts}` });
+                        resultItem.createDiv({ cls: 'mcq-result-time', text: `Time: ${Math.round(answer.timeToAnswer)} seconds` });
 
                         // FSRS/SM-2 data per question removed from here
                     } catch (error) { console.error('Error displaying answer result:', error); }
                 });
             }
-            const closeBtn = contentEl.createEl('button', { cls: 'mcq-close-btn' });
-            closeBtn.setText('Close'); 
+            const closeBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
             closeBtn.addEventListener('click', () => {
                 if (this.onCompleteCallback) {
                     // Pass the actual score and completion status
@@ -439,10 +445,9 @@ export class MCQModal extends Modal {
             });
         } catch (error) {
             console.error('Error completing MCQ session:', error);
-            contentEl.createEl('h2').setText('Error Completing Session'); // Corrected
-            contentEl.createEl('p').setText('There was an error completing the MCQ session. Please try again.'); // Corrected
-            const errorCloseBtn = contentEl.createEl('button', { cls: 'mcq-close-btn' }); 
-            errorCloseBtn.setText('Close'); // Set text separately
+            contentEl.createEl('h2', { text: 'Error Completing Session' });
+            contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' });
+            const errorCloseBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
             errorCloseBtn.addEventListener('click', () => this.close());
         }
     }

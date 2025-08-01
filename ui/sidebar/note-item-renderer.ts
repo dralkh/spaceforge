@@ -58,11 +58,9 @@ export class NoteItemRenderer {
             if (note.scheduleCategory === 'initial') {
                 const totalInitialSteps = this.plugin.settings.initialScheduleCustomIntervals.length;
                 const currentStepDisplay = note.reviewCount < totalInitialSteps ? note.reviewCount + 1 : totalInitialSteps;
-                phaseEl.innerHTML = `
-                    <div title="Initial">Initial</div>
-                    <div title="${currentStepDisplay}/${totalInitialSteps}">${currentStepDisplay}/${totalInitialSteps}</div>
-                    <div class="phase-time" title="${formattedTime}">${formattedTime}</div>
-                `;
+                phaseEl.createDiv({ title: "Initial", text: "Initial" });
+                phaseEl.createDiv({ title: `${currentStepDisplay}/${totalInitialSteps}`, text: `${currentStepDisplay}/${totalInitialSteps}` });
+                const phaseTimeEl = phaseEl.createDiv({ cls: "phase-time", title: formattedTime, text: formattedTime });
                 phaseEl.addClass("review-phase-initial");
             } else {
                 phaseEl.setText(note.scheduleCategory === 'graduated' ? "Graduated" : "Spaced");

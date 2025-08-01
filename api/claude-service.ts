@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -89,7 +89,8 @@ export class ClaudeService implements IMCQGenerationService {
         console.log(`Making API request to Claude using model: ${model} with difficulty: ${difficulty}`);
 
         try {
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
+            const response = await requestUrl({
+                url: 'https://api.anthropic.com/v1/messages',
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -106,13 +107,13 @@ export class ClaudeService implements IMCQGenerationService {
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            if (response.status !== 200) {
+                const errorData = response.json || { message: response.text };
                 console.error('Claude API error:', response.status, errorData);
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
             }
 
-            const data = await response.json();
+            const data = response.json;
             if (!data.content || !data.content.length || !data.content[0].text) {
                 console.error('Invalid API response format from Claude:', data);
                 throw new Error('Invalid API response format from Claude - missing content');

@@ -489,21 +489,11 @@ export class ReviewScheduleService {
 
          // Handle overdue or skipped items according to modified SM-2 algorithm
          if (isSkipped || daysLate > 0) {
-             // Debug log
-             console.log(`[Modified SM-2] Processing ${isSkipped ? 'skipped' : 'overdue'} item:
-             - Days late: ${daysLate}
-             - Original quality: ${qualityRating} 
-             - Current interval: ${currentInterval}
-             - Current ease: ${currentEase/100}`);
-
              // Determine effective quality rating:
              // - If explicitly skipped, reduce quality by 1 (but not below 0)
              // - If overdue, set quality to 0
              // - If both overdue and explicitly skipped, prioritize the skip logic (user choice)
              const q_eff = isSkipped ? Math.max(0, qualityRating - 1) : 0;
-
-             console.log(`[Modified SM-2] Applied penalty:
-             - Effective quality: ${q_eff}`);
 
              // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
              let ease = currentEase / 100;
@@ -521,11 +511,6 @@ export class ReviewScheduleService {
                  ease: Math.round(ease * 100), // Convert back to internal format
                  repetitionCount: 1 // Reset repetition count to 1
              };
-
-             console.log(`[Modified SM-2] Result for ${isSkipped ? 'skipped' : 'overdue'} item:
-             - New interval: ${result.interval} day(s)
-             - New ease: ${result.ease/100}
-             - New repetition count: ${result.repetitionCount}`);
 
              return result;
          }
@@ -656,7 +641,6 @@ export class ReviewScheduleService {
         const schedule = this.schedules[path];
         if (!schedule) return;
         
-        console.log(`Skipping note ${path} with algorithm ${schedule.schedulingAlgorithm}`);
         const effectiveReviewDate = currentReviewDate || Date.now();
         const reviewDateObj = new Date(effectiveReviewDate);
 
@@ -755,7 +739,6 @@ export class ReviewScheduleService {
     async advanceNote(path: string): Promise<boolean> {
         const schedule = this.schedules[path];
         if (!schedule) {
-            console.warn(`[ReviewScheduleService] Advance: Schedule not found for path ${path}`);
             return false;
         }
 
@@ -854,7 +837,6 @@ export class ReviewScheduleService {
             const content = await this.plugin.app.vault.read(file);
             return EstimationUtils.estimateReviewTime(file, content);
         } catch (error) {
-            console.error("Error estimating review time:", error);
             return 60; // Default 1 minute
         }
     }
@@ -938,7 +920,6 @@ export class ReviewScheduleService {
         // Filter out duplicate paths and ensure we only store paths that exist in our schedules
         const uniqueValidPaths = Array.from(new Set(order)).filter(path => this.schedules[path] !== undefined);
         this.customNoteOrder = uniqueValidPaths;
-        console.log(`Updated custom note order with ${this.customNoteOrder.length} unique entries`);
 
         // Data saving is now handled by main.ts after this method returns
 
@@ -1021,7 +1002,6 @@ export class ReviewScheduleService {
                 }
             }
             
-            console.log(`Handled rename from ${oldPath} to ${newPath}. Schedule updated.`);
 
             // Notify any listeners (for UI updates)
             // Data saving will be handled by the caller in main.ts
@@ -1062,7 +1042,6 @@ export class ReviewScheduleService {
                 }
             }
         }
-        console.log(`Converted ${convertedCount} SM-2 cards to FSRS.`);
         if (this.plugin.events) {
             this.plugin.events.emit('sidebar-update'); // Notify UI to refresh
         }
@@ -1096,7 +1075,6 @@ export class ReviewScheduleService {
                 }
             }
         }
-        console.log(`Converted ${convertedCount} FSRS cards to SM-2.`);
         if (this.plugin.events) {
             this.plugin.events.emit('sidebar-update'); // Notify UI to refresh
         }

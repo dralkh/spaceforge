@@ -61,14 +61,12 @@ export class MCQService {
 
             // Find the latest MCQ set for this note
             const sets = Object.values(this.mcqSets)
-                .filter(set => set && set.notePath === notePath)
+                .filter(set => set && set.notePath === notePath && set.questions && set.questions.length > 0)
                 .sort((a, b) => b.generatedAt - a.generatedAt);
 
             // Verify the set is valid before returning
-            if (sets.length > 0 && sets[0].questions && sets[0].questions.length > 0) {
+            if (sets.length > 0) {
                 return sets[0];
-            } else if (sets.length > 0) {
-                console.warn('Found MCQ set but it contains no valid questions:', sets[0]);
             }
 
             return null;
@@ -157,9 +155,7 @@ export class MCQService {
         if (mcqSet) {
             mcqSet.needsQuestionRegeneration = true;
             this.saveMCQSet(mcqSet); // Updates the in-memory reference; persistence handled by caller
-            console.log(`MCQSet for ${notePath} flagged for regeneration.`);
         } else {
-            console.log(`No MCQSet found for ${notePath} to flag for regeneration.`);
         }
     }
 }

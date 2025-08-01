@@ -120,11 +120,11 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'add-selected-file-to-review',
             name: 'Add Selected File to Review Schedule (File Explorer)',
-            hotkeys: [{ modifiers: ['Alt', 'Shift'], key: 's' }],
             callback: () => {
                 const fileExplorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
-                if (fileExplorerLeaf && fileExplorerLeaf.view && (fileExplorerLeaf.view as any).file) {
-                    const selectedFile = (fileExplorerLeaf.view as any).file;
+                const viewWithFile = fileExplorerLeaf?.view as { file?: TFile };
+                if (viewWithFile?.file) {
+                    const selectedFile = viewWithFile.file;
                     if (selectedFile instanceof TFile && selectedFile.extension === 'md') {
                         this.reviewScheduleService.scheduleNoteForReview(selectedFile.path)
                             .then(() => this.savePluginData());
@@ -233,8 +233,13 @@ export default class SpaceforgePlugin extends Plugin {
         const styleEl = document.getElementById(this.stylesheetId);
         if (styleEl) styleEl.remove();
 
-        let existingData = {};
-        try { existingData = await this.loadData() || {}; }
+        let existingData: Partial<SpaceforgePluginData> = {};
+        try { 
+            const loaded = await this.loadData();
+            if (loaded) {
+                existingData = loaded;
+            }
+        }
         catch (loadError) { console.warn("Could not load existing data during unload:", loadError); }
 
         try {
@@ -258,7 +263,6 @@ export default class SpaceforgePlugin extends Plugin {
         } catch (error) { console.error('Error saving plugin data before unload:', error); }
 
         if (this.pomodoroService) this.pomodoroService.destroy();
-        this.app.workspace.detachLeavesOfType('spaceforge-review-schedule');
     }
 
     // private async _getEffectiveDataPathFromLocalStorage(): Promise<string | null> {
@@ -364,8 +368,8 @@ export default class SpaceforgePlugin extends Plugin {
             this.pluginState = { ...DEFAULT_APP_DATA.pluginState };
             if (rawLoadedData?.pluginState) {
                 this.pluginState = { ...this.pluginState, ...rawLoadedData.pluginState };
-            } else if (rawLoadedData && !rawLoadedData.pluginState && (rawLoadedData as any).schedules) { // Legacy check
-                this.pluginState = { ...this.pluginState, ...(rawLoadedData as any) };
+            } else if (rawLoadedData && !rawLoadedData.pluginState && (rawLoadedData as Partial<PluginStateData>).schedules) { // Legacy check
+                this.pluginState = { ...this.pluginState, ...(rawLoadedData as Partial<PluginStateData>) };
             }
             
             // Ensure pomodoro state is initialized if not present in loaded data
@@ -548,7 +552,6 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'spaceforge-next-review-note',
             name: 'Next Review Note',
-            hotkeys: [{ modifiers: ['Alt', 'Shift'], key: '/' }],
             callback: () => {
                 this.navigationController.navigateToNextNote();
             },
@@ -557,7 +560,6 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'spaceforge-previous-review-note',
             name: 'Previous Review Note',
-            hotkeys: [{ modifiers: ['Alt', 'Shift'], key: '.' }],
             callback: () => {
                 this.navigationController.navigateToPreviousNote();
             },
@@ -566,7 +568,6 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'spaceforge-review-current-note',
             name: 'Review Current Note',
-            hotkeys: [{ modifiers: ['Alt', 'Shift'], key: ',' }],
             callback: () => {
                 const activeFile = this.app.workspace.getActiveFile();
                 if (activeFile && activeFile instanceof TFile && activeFile.extension === 'md') {
@@ -580,7 +581,6 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'spaceforge-add-current-note-to-review',
             name: 'Add Current Note to Review Schedule',
-            hotkeys: [{ modifiers: ['Alt', 'Shift'], key: '\\\\' }],
             callback: () => {
                 const activeFile = this.app.workspace.getActiveFile();
                 if (activeFile && activeFile instanceof TFile && activeFile.extension === 'md') {
@@ -596,7 +596,6 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'spaceforge-add-current-folder-to-review',
             name: "Add Current Note's Folder to Review Schedule",
-            hotkeys: [{ modifiers: ['Alt', 'Shift'], key: "'" }],
             callback: async () => {
                 const activeFile = this.app.workspace.getActiveFile();
                 if (activeFile && activeFile.parent && activeFile.parent instanceof TFolder) {

@@ -1234,6 +1234,7 @@ var ReviewModal = class extends import_obsidian2.Modal {
       }
     }
     const infoText = contentEl.createDiv("review-info-text");
+    infoText.empty();
     if (schedule) {
       const file = this.app.vault.getAbstractFileByPath(this.path);
       const fileName = file instanceof import_obsidian2.TFile ? file.basename : this.path;
@@ -1277,7 +1278,6 @@ var ReviewModal = class extends import_obsidian2.Modal {
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
-    console.log("Review modal closed for path: " + this.path);
   }
 };
 
@@ -1929,11 +1929,7 @@ var ConsolidatedMCQModal = class extends import_obsidian5.Modal {
     const progressPercent = Math.round((this.currentQuestionIndex + 1) / this.allQuestions.length * 100);
     contentEl.setAttribute("data-progress", progressPercent.toString());
     progressEl.setText(`Question ${this.currentQuestionIndex + 1} of ${this.allQuestions.length}`);
-    const progressCounter = contentEl.createDiv();
-    progressCounter.style.textAlign = "center";
-    progressCounter.style.marginBottom = "12px";
-    progressCounter.style.fontSize = "0.9em";
-    progressCounter.style.color = "var(--mcq-text-muted)";
+    const progressCounter = contentEl.createDiv("mcq-progress-counter");
     progressCounter.setText(`${this.allQuestions.length} questions from ${this.mcqSets.length} notes`);
     const noteInfoEl = contentEl.createDiv("mcq-note-info");
     noteInfoEl.setText(`Question from: ${this.allQuestions[this.currentQuestionIndex].fileName}`);
@@ -2178,10 +2174,7 @@ var ConsolidatedMCQModal = class extends import_obsidian5.Modal {
     this.onComplete(results);
     const { contentEl } = this;
     contentEl.empty();
-    const headerEl = contentEl.createEl("h2", { text: "MCQ Review Complete" });
-    headerEl.style.color = "var(--mcq-primary)";
-    headerEl.style.textAlign = "center";
-    headerEl.style.marginBottom = "24px";
+    const headerEl = contentEl.createEl("h2", { text: "MCQ Review Complete", cls: "mcq-review-complete-header" });
     const totalCorrectOverall = this.answers.filter((a) => a.correct && a.attempts <= 1).length;
     const totalQuestionsOverall = this.allQuestions.length;
     const overallScore = totalQuestionsOverall > 0 ? totalCorrectOverall / totalQuestionsOverall : 0;
@@ -2189,30 +2182,24 @@ var ConsolidatedMCQModal = class extends import_obsidian5.Modal {
     const scoreEl = contentEl.createDiv("mcq-score");
     const scoreTextEl = scoreEl.createDiv("mcq-score-text");
     scoreTextEl.setText(`Overall Score: ${scorePercentOverall}%`);
-    const performanceIndicator = scoreEl.createDiv();
-    performanceIndicator.style.marginTop = "8px";
-    performanceIndicator.style.fontSize = "1.1em";
+    const performanceIndicator = scoreEl.createDiv("mcq-performance-indicator");
     if (scorePercentOverall >= 90) {
       performanceIndicator.setText("\u{1F393} Excellent Performance!");
-      performanceIndicator.style.color = "var(--mcq-correct)";
+      performanceIndicator.addClass("excellent");
     } else if (scorePercentOverall >= 70) {
       performanceIndicator.setText("\u{1F44D} Good Work!");
-      performanceIndicator.style.color = "var(--mcq-primary)";
+      performanceIndicator.addClass("good");
     } else if (scorePercentOverall >= 50) {
       performanceIndicator.setText("\u{1F504} Keep Practicing");
-      performanceIndicator.style.color = "var(--mcq-warning)";
+      performanceIndicator.addClass("needs-improvement");
     } else {
       performanceIndicator.setText("\u{1F4DA} More Review Recommended");
-      performanceIndicator.style.color = "var(--mcq-text-muted)";
+      performanceIndicator.addClass("review-recommended");
     }
-    const statsEl = scoreEl.createDiv();
-    statsEl.style.marginTop = "12px";
-    statsEl.style.fontSize = "0.9em";
-    statsEl.style.color = "var(--mcq-text-muted)";
+    const statsEl = scoreEl.createDiv("mcq-stats-summary");
     statsEl.setText(`${totalCorrectOverall} correct out of ${totalQuestionsOverall} questions`);
     const noteScoresEl = contentEl.createDiv("mcq-note-scores");
-    const scoreHeading = noteScoresEl.createEl("h3", { text: "Scores by Note" });
-    scoreHeading.style.marginTop = "20px";
+    const scoreHeading = noteScoresEl.createEl("h3", { text: "Scores by Note", cls: "mcq-note-scores-heading" });
     const sortedNotes = Object.keys(noteScores).sort((a, b2) => noteScores[b2].score - noteScores[a].score);
     for (const notePath of sortedNotes) {
       const noteScore = noteScores[notePath];
@@ -2229,55 +2216,32 @@ var ConsolidatedMCQModal = class extends import_obsidian5.Modal {
         cls: "mcq-note-score-value"
       });
       if (noteScore.score >= 0.7) {
-        scoreTextValueEl.style.backgroundColor = "rgba(76, 175, 80, 0.1)";
-        scoreTextValueEl.style.color = "var(--mcq-correct)";
-        scoreTextValueEl.style.border = "1px solid var(--mcq-correct)";
+        scoreTextValueEl.addClass("high-score");
       } else if (noteScore.score >= 0.5) {
-        scoreTextValueEl.style.backgroundColor = "rgba(255, 152, 0, 0.1)";
-        scoreTextValueEl.style.color = "var(--mcq-warning)";
-        scoreTextValueEl.style.border = "1px solid var(--mcq-warning)";
+        scoreTextValueEl.addClass("medium-score");
       } else {
-        scoreTextValueEl.style.backgroundColor = "rgba(244, 67, 54, 0.1)";
-        scoreTextValueEl.style.color = "var(--mcq-incorrect)";
-        scoreTextValueEl.style.border = "1px solid var(--mcq-incorrect)";
+        scoreTextValueEl.addClass("low-score");
       }
-      const progressBar = noteScoreEl.createDiv();
-      progressBar.style.height = "4px";
-      progressBar.style.backgroundColor = "var(--background-modifier-border)";
-      progressBar.style.borderRadius = "2px";
-      progressBar.style.marginTop = "6px";
-      progressBar.style.position = "relative";
-      progressBar.style.overflow = "hidden";
-      const progressFill = progressBar.createDiv();
-      progressFill.style.position = "absolute";
-      progressFill.style.left = "0";
-      progressFill.style.top = "0";
-      progressFill.style.height = "100%";
+      const progressBar = noteScoreEl.createDiv("mcq-progress-bar");
+      const progressFill = progressBar.createDiv("mcq-progress-fill");
       progressFill.style.width = `${scorePercent}%`;
-      progressFill.style.transition = "width 0.5s ease";
       if (noteScore.score >= 0.7) {
-        progressFill.style.backgroundColor = "var(--mcq-correct)";
+        progressFill.addClass("high-score");
       } else if (noteScore.score >= 0.5) {
-        progressFill.style.backgroundColor = "var(--mcq-warning)";
+        progressFill.addClass("medium-score");
       } else {
-        progressFill.style.backgroundColor = "var(--mcq-incorrect)";
+        progressFill.addClass("low-score");
       }
     }
     const breakdownContainer = contentEl.createDiv("mcq-detailed-breakdown");
-    breakdownContainer.style.marginTop = "24px";
     breakdownContainer.createEl("h3", { text: "Detailed Question Breakdown" });
     this.allQuestions.forEach((question, index) => {
       const questionEl = breakdownContainer.createDiv("mcq-breakdown-item");
-      questionEl.style.marginBottom = "12px";
-      questionEl.style.padding = "8px";
-      questionEl.style.border = "1px solid var(--background-modifier-border)";
-      questionEl.style.borderRadius = "4px";
       const questionHeader = questionEl.createDiv();
       questionHeader.createSpan({ text: `Q${index + 1} (from ${question.fileName}): `, cls: "mcq-breakdown-q-header" });
       questionHeader.createSpan({ text: question.question });
       const userAnswer = this.answers.find((a) => a.questionIndex === index);
-      const userAnswerTextEl = questionEl.createDiv();
-      userAnswerTextEl.style.marginLeft = "10px";
+      const userAnswerTextEl = questionEl.createDiv("mcq-user-answer-text");
       let userAnswerDisplay = "Not answered";
       if (userAnswer && userAnswer.selectedAnswerIndex !== -1 && userAnswer.selectedAnswerIndex < question.choices.length) {
         userAnswerDisplay = question.choices[userAnswer.selectedAnswerIndex];
@@ -2288,29 +2252,23 @@ var ConsolidatedMCQModal = class extends import_obsidian5.Modal {
         const correctnessText = userAnswer.correct ? " (Correct)" : " (Incorrect)";
         userAnswerTextEl.createSpan({ text: "Your answer: " });
         const userAnswerSpan = userAnswerTextEl.createSpan({ text: userAnswerDisplay });
-        const correctnessSpan = userAnswerTextEl.createSpan({ text: correctnessText });
-        correctnessSpan.style.fontWeight = "bold";
+        const correctnessSpan = userAnswerTextEl.createSpan({ text: correctnessText, cls: "mcq-correctness-indicator" });
         if (userAnswer.correct) {
-          userAnswerSpan.style.color = "var(--mcq-correct)";
-          correctnessSpan.style.color = "var(--mcq-correct)";
+          userAnswerSpan.addClass("correct");
+          correctnessSpan.addClass("correct");
         } else {
-          userAnswerSpan.style.color = "var(--mcq-incorrect)";
-          correctnessSpan.style.color = "var(--mcq-incorrect)";
+          userAnswerSpan.addClass("incorrect");
+          correctnessSpan.addClass("incorrect");
         }
       } else {
         userAnswerTextEl.createSpan({ text: "Your answer: " + userAnswerDisplay });
         userAnswerTextEl.style.fontStyle = "italic";
       }
-      const correctAnswerEl = questionEl.createDiv();
-      correctAnswerEl.style.marginLeft = "10px";
+      const correctAnswerEl = questionEl.createDiv("mcq-correct-answer");
       correctAnswerEl.createSpan({ text: "Correct answer: " });
-      const correctAnswerSpan = correctAnswerEl.createSpan({ text: question.choices[question.correctAnswerIndex] });
-      correctAnswerSpan.style.color = "var(--mcq-correct-answer-text)";
-      correctAnswerSpan.style.fontWeight = "bold";
+      correctAnswerEl.createSpan({ text: question.choices[question.correctAnswerIndex], cls: "mcq-correct-answer-text" });
     });
-    const closeBtn = contentEl.createEl("button", "mcq-close-btn");
-    closeBtn.setText("Close");
-    closeBtn.style.marginTop = "24px";
+    const closeBtn = contentEl.createEl("button", { cls: "mcq-close-btn", text: "Close" });
     closeBtn.addEventListener("click", () => {
       this.close();
     });
@@ -2469,7 +2427,6 @@ var BatchReviewModal = class extends import_obsidian6.Modal {
           this.allMCQSets,
           (results) => {
             this.results = results;
-            console.log("Consolidated MCQ review complete with results:", results);
             this.recordAllReviews(results).then(() => {
               this.open();
               this.showSummary();
@@ -2477,7 +2434,6 @@ var BatchReviewModal = class extends import_obsidian6.Modal {
           }
         );
         consolidatedModal.open();
-        console.log(`Opened consolidated MCQ modal with ${this.allMCQSets.length} MCQ sets`);
       } catch (error) {
         console.error("Error showing consolidated MCQ UI:", error);
         new import_obsidian6.Notice("Error showing MCQ review. Falling back to manual review.");
@@ -3041,23 +2997,10 @@ var MCQModal = class extends import_obsidian8.Modal {
     const existingAnswer = this.session.answers.find((a) => a.questionIndex === questionIndex);
     if (existingAnswer && existingAnswer.attempts >= 2) {
       const skipContainer = newQuestionContainer.createDiv("mcq-skip-container");
-      skipContainer.style.marginBottom = "12px";
-      skipContainer.style.textAlign = "right";
       const skipButton = skipContainer.createEl("button", { text: "Show Answer & Continue", cls: "mcq-skip-button" });
-      skipButton.style.backgroundColor = "var(--text-muted)";
-      skipButton.style.color = "white";
-      skipButton.style.padding = "4px 8px";
-      skipButton.style.borderRadius = "4px";
-      skipButton.style.cursor = "pointer";
-      skipButton.style.border = "none";
       skipButton.addEventListener("click", () => {
         const correctIndex = question.correctAnswerIndex;
         const correctAnswerDisplay = newQuestionContainer.createDiv("mcq-correct-answer-display");
-        correctAnswerDisplay.style.backgroundColor = "rgba(76, 175, 80, 0.1)";
-        correctAnswerDisplay.style.padding = "10px";
-        correctAnswerDisplay.style.borderRadius = "4px";
-        correctAnswerDisplay.style.marginBottom = "10px";
-        correctAnswerDisplay.style.border = "1px solid #4caf50";
         const correctLabel = correctAnswerDisplay.createDiv();
         correctLabel.style.fontWeight = "bold";
         correctLabel.style.marginBottom = "4px";
@@ -3070,16 +3013,18 @@ var MCQModal = class extends import_obsidian8.Modal {
           existingAnswer.correct = false;
           existingAnswer.attempts += 1;
         } else {
-          this.session.answers.push({ questionIndex, selectedAnswerIndex: -1, correct: false, timeToAnswer: (Date.now() - this.questionStartTime) / 1e3, attempts: 3 });
+          this.session.answers.push({
+            questionIndex,
+            selectedAnswerIndex: -1,
+            correct: false,
+            timeToAnswer: (Date.now() - this.questionStartTime) / 1e3,
+            attempts: 3
+          });
         }
-        const continueBtn = correctAnswerDisplay.createEl("button", { text: "Continue to Next Question", cls: "mcq-continue-button" });
-        continueBtn.style.marginTop = "10px";
-        continueBtn.style.backgroundColor = "var(--interactive-accent)";
-        continueBtn.style.color = "white";
-        continueBtn.style.padding = "6px 12px";
-        continueBtn.style.borderRadius = "4px";
-        continueBtn.style.cursor = "pointer";
-        continueBtn.style.border = "none";
+        const continueBtn = correctAnswerDisplay.createEl("button", {
+          text: "Continue to Next Question",
+          cls: "mcq-continue-button"
+        });
         continueBtn.addEventListener("click", () => {
           this.session.currentQuestionIndex++;
           this.questionStartTime = Date.now();
@@ -3108,10 +3053,6 @@ var MCQModal = class extends import_obsidian8.Modal {
       const textSpan = choiceBtn.createSpan("mcq-choice-text");
       textSpan.setText(choice || "(Empty choice)");
       const shortcutHint = choiceBtn.createSpan("mcq-shortcut-hint");
-      shortcutHint.style.fontSize = "0.8em";
-      shortcutHint.style.color = "var(--mcq-text-muted)";
-      shortcutHint.style.marginLeft = "auto";
-      shortcutHint.style.paddingLeft = "10px";
       shortcutHint.setText(`${String.fromCharCode(65 + index)} or ${index + 1}`);
       choiceBtn.addEventListener("click", () => this.handleAnswer(index));
     });
@@ -3133,7 +3074,6 @@ var MCQModal = class extends import_obsidian8.Modal {
       answer.timeToAnswer = timeToAnswer;
       answer.attempts += 1;
       if (answer.attempts >= 2 && !answer.correct) {
-        console.log(`Question ${questionIndex + 1} has ${answer.attempts} attempts, marking as zero points`);
         answer.selectedAnswerIndex = -1;
       }
     } else {
@@ -3176,7 +3116,7 @@ var MCQModal = class extends import_obsidian8.Modal {
       this.session.completedAt = Date.now();
       this.plugin.mcqService.saveMCQSession(this.session);
       this.plugin.savePluginData();
-      contentEl.createEl("h2").setText("Review Complete");
+      contentEl.createEl("h2", { text: "Review Complete" });
       const scoreEl = contentEl.createDiv("mcq-score");
       const scoreTextEl = scoreEl.createDiv("mcq-score-text");
       const scorePercentage = this.session.score;
@@ -3226,14 +3166,11 @@ var MCQModal = class extends import_obsidian8.Modal {
       if (ratingDetails) {
         const detailsEl = scoreEl.createDiv("mcq-score-details");
         detailsEl.setText(ratingDetails);
-        detailsEl.style.fontSize = "0.9em";
-        detailsEl.style.color = "var(--text-muted)";
-        detailsEl.style.marginTop = "4px";
       }
       const resultsEl = contentEl.createDiv("mcq-results");
-      resultsEl.createEl("h3").setText("Question Results");
+      resultsEl.createEl("h3", { text: "Question Results" });
       if (this.session.answers.length === 0) {
-        resultsEl.createDiv("mcq-no-answers").setText("No questions were answered in this session.");
+        resultsEl.createDiv({ cls: "mcq-no-answers", text: "No questions were answered in this session." });
       } else {
         this.session.answers.forEach((answer) => {
           try {
@@ -3241,39 +3178,38 @@ var MCQModal = class extends import_obsidian8.Modal {
             if (!question || !question.choices)
               return;
             const resultItem = resultsEl.createDiv("mcq-result-item");
-            resultItem.createDiv("mcq-result-question").setText(question.question || "Question text missing");
+            resultItem.createDiv({ cls: "mcq-result-question", text: question.question || "Question text missing" });
             if (answer.attempts > 1) {
               if (answer.selectedAnswerIndex !== -1) {
                 const yourAnswer = resultItem.createDiv("mcq-result-your-answer");
-                yourAnswer.createSpan("mcq-result-label").setText("Your final answer (correct after multiple attempts): ");
-                yourAnswer.createSpan("mcq-result-correct").setText(question.choices[answer.selectedAnswerIndex] || "(invalid choice)");
+                yourAnswer.createSpan({ cls: "mcq-result-label", text: "Your final answer (correct after multiple attempts): " });
+                yourAnswer.createSpan({ cls: "mcq-result-correct", text: question.choices[answer.selectedAnswerIndex] || "(invalid choice)" });
               } else {
                 const yourAnswer = resultItem.createDiv("mcq-result-your-answer");
-                yourAnswer.createSpan("mcq-result-label").setText("Your answer: ");
-                yourAnswer.createSpan("mcq-result-incorrect").setText('(Incorrect - used "Show Answer" option)');
+                yourAnswer.createSpan({ cls: "mcq-result-label", text: "Your answer: " });
+                yourAnswer.createSpan({ cls: "mcq-result-incorrect", text: '(Incorrect - used "Show Answer" option)' });
               }
               const correctAnswer = resultItem.createDiv("mcq-result-correct-answer");
-              correctAnswer.createSpan("mcq-result-label").setText("Correct answer: ");
-              correctAnswer.createSpan("mcq-result-correct").setText(question.choices[question.correctAnswerIndex] || "(invalid choice)");
+              correctAnswer.createSpan({ cls: "mcq-result-label", text: "Correct answer: " });
+              correctAnswer.createSpan({ cls: "mcq-result-correct", text: question.choices[question.correctAnswerIndex] || "(invalid choice)" });
             } else {
               const yourAnswer = resultItem.createDiv("mcq-result-your-answer");
-              yourAnswer.createSpan("mcq-result-label").setText("Your answer: ");
-              yourAnswer.createSpan(answer.correct ? "mcq-result-correct" : "mcq-result-incorrect").setText(question.choices[answer.selectedAnswerIndex] || "(invalid choice)");
+              yourAnswer.createSpan({ cls: "mcq-result-label", text: "Your answer: " });
+              yourAnswer.createSpan({ cls: answer.correct ? "mcq-result-correct" : "mcq-result-incorrect", text: question.choices[answer.selectedAnswerIndex] || "(invalid choice)" });
               if (!answer.correct) {
                 const correctAnswer = resultItem.createDiv("mcq-result-correct-answer");
-                correctAnswer.createSpan("mcq-result-label").setText("Correct answer: ");
-                correctAnswer.createSpan("mcq-result-correct").setText(question.choices[question.correctAnswerIndex] || "(invalid choice)");
+                correctAnswer.createSpan({ cls: "mcq-result-label", text: "Correct answer: " });
+                correctAnswer.createSpan({ cls: "mcq-result-correct", text: question.choices[question.correctAnswerIndex] || "(invalid choice)" });
               }
             }
-            resultItem.createDiv("mcq-result-attempts").setText(`Attempts: ${answer.attempts}`);
-            resultItem.createDiv("mcq-result-time").setText(`Time: ${Math.round(answer.timeToAnswer)} seconds`);
+            resultItem.createDiv({ cls: "mcq-result-attempts", text: `Attempts: ${answer.attempts}` });
+            resultItem.createDiv({ cls: "mcq-result-time", text: `Time: ${Math.round(answer.timeToAnswer)} seconds` });
           } catch (error) {
             console.error("Error displaying answer result:", error);
           }
         });
       }
-      const closeBtn = contentEl.createEl("button", { cls: "mcq-close-btn" });
-      closeBtn.setText("Close");
+      const closeBtn = contentEl.createEl("button", { cls: "mcq-close-btn", text: "Close" });
       closeBtn.addEventListener("click", () => {
         if (this.onCompleteCallback) {
           this.onCompleteCallback(this.notePath, this.session.score, true);
@@ -3282,10 +3218,9 @@ var MCQModal = class extends import_obsidian8.Modal {
       });
     } catch (error) {
       console.error("Error completing MCQ session:", error);
-      contentEl.createEl("h2").setText("Error Completing Session");
-      contentEl.createEl("p").setText("There was an error completing the MCQ session. Please try again.");
-      const errorCloseBtn = contentEl.createEl("button", { cls: "mcq-close-btn" });
-      errorCloseBtn.setText("Close");
+      contentEl.createEl("h2", { text: "Error Completing Session" });
+      contentEl.createEl("p", { text: "There was an error completing the MCQ session. Please try again." });
+      const errorCloseBtn = contentEl.createEl("button", { cls: "mcq-close-btn", text: "Close" });
       errorCloseBtn.addEventListener("click", () => this.close());
     }
   }
@@ -3987,9 +3922,7 @@ var LinkAnalyzer = class {
    */
   static findStartingNode(nodes) {
     var _a, _b, _c, _d;
-    console.log("LinkAnalyzer: Starting node selection process...");
     if (Object.keys(nodes).length === 0) {
-      console.log("LinkAnalyzer: No nodes found, returning empty array.");
       return [];
     }
     const folderNodes = {};
@@ -4003,35 +3936,25 @@ var LinkAnalyzer = class {
     for (const folderPath in folderNodes) {
       const folderName = ((_a = folderPath.split("/").pop()) == null ? void 0 : _a.toLowerCase()) || "";
       const filesInFolder = folderNodes[folderPath];
-      console.log(`LinkAnalyzer: Checking for exact match with folder name "${folderName}" in folder "${folderPath}"...`);
       for (const path of filesInFolder) {
-        const fileName = ((_b = path.split("/").pop()) == null ? void 0 : _b.toLowerCase()) || "";
-        const fileNameWithoutExt = fileName.replace(/\.md$/, "");
-        if (fileNameWithoutExt === folderName) {
-          console.log(`LinkAnalyzer: Selected main file with exact folder name match: ${path}`);
+        const fileName = ((_b = path.split("/").pop()) == null ? void 0 : _b.toLowerCase().replace(/\.md$/, "")) || "";
+        if (fileName === folderName) {
           return [path];
         }
       }
-      console.log(`LinkAnalyzer: Checking for partial match with folder name "${folderName}"...`);
       for (const path of filesInFolder) {
-        const fileName = ((_c = path.split("/").pop()) == null ? void 0 : _c.toLowerCase()) || "";
-        const fileNameWithoutExt = fileName.replace(/\.md$/, "");
-        if (fileNameWithoutExt.includes(folderName) || folderName.includes(fileNameWithoutExt)) {
-          console.log(`LinkAnalyzer: Selected main file with partial folder name match: ${path}`);
+        const fileName = ((_c = path.split("/").pop()) == null ? void 0 : _c.toLowerCase().replace(/\.md$/, "")) || "";
+        if (fileName.includes(folderName) || folderName.includes(fileName)) {
           return [path];
         }
       }
-      console.log("LinkAnalyzer: Checking for common index or main file patterns...");
       for (const path of filesInFolder) {
-        const fileName = ((_d = path.split("/").pop()) == null ? void 0 : _d.toLowerCase()) || "";
-        const fileNameWithoutExt = fileName.replace(/\.md$/, "");
-        if (fileNameWithoutExt === "index" || fileNameWithoutExt === "main" || fileNameWithoutExt.includes("index") || fileNameWithoutExt.includes("readme") || fileNameWithoutExt.includes("main")) {
-          console.log(`LinkAnalyzer: Selected main file by standard name pattern: ${path}`);
+        const fileName = ((_d = path.split("/").pop()) == null ? void 0 : _d.toLowerCase().replace(/\.md$/, "")) || "";
+        if (fileName === "index" || fileName === "main" || fileName.includes("index") || fileName.includes("readme") || fileName.includes("main")) {
           return [path];
         }
       }
     }
-    console.log("LinkAnalyzer: Checking for files with the most outgoing links...");
     const sortedNodes = Object.values(nodes).sort((a, b2) => {
       const regularLinkDiff = b2.regularLinks.length - a.regularLinks.length;
       if (regularLinkDiff !== 0) {
@@ -4040,10 +3963,8 @@ var LinkAnalyzer = class {
       return b2.outgoingLinks.length - a.outgoingLinks.length;
     });
     if (sortedNodes.length > 0 && (sortedNodes[0].regularLinks.length > 0 || sortedNodes[0].outgoingLinks.length > 0)) {
-      console.log(`LinkAnalyzer: Selected main file by link count: ${sortedNodes[0].path} with ${sortedNodes[0].regularLinks.length} regular links`);
       return [sortedNodes[0].path];
     }
-    console.log(`LinkAnalyzer: No clear main file identified, using first file as root node`);
     return Object.keys(nodes).length > 0 ? [Object.keys(nodes)[0]] : [];
   }
   /**
@@ -4072,10 +3993,8 @@ var LinkAnalyzer = class {
       fileFolders.set(path, folderPath);
     }
     const mainFolder = fileFolders.get(startNodePath) || "";
-    console.log(`LinkAnalyzer: Starting ordered traversal from: ${startNodePath} in main folder: ${mainFolder || "vault root"}`);
     const traverse = (currentNodePath, currentDepth = 0, currentMainFolder) => {
       if (visited.has(currentNodePath)) {
-        console.log(`${"  ".repeat(currentDepth)}LinkAnalyzer: Already visited: ${currentNodePath}`);
         return;
       }
       const node = nodes[currentNodePath];
@@ -4083,26 +4002,21 @@ var LinkAnalyzer = class {
         console.warn(`${"  ".repeat(currentDepth)}LinkAnalyzer: Node not found for path: ${currentNodePath}`);
         return;
       }
-      console.log(`${"  ".repeat(currentDepth)}LinkAnalyzer: Traversing: ${currentNodePath}`);
       visited.add(currentNodePath);
       traversalOrder.push(currentNodePath);
       const currentNodeFolder = fileFolders.get(currentNodePath) || "";
       const linksToFollow = node.regularLinks.length > 0 ? node.regularLinks : node.outgoingLinks;
       for (const linkedPath of linksToFollow) {
         if (!nodes[linkedPath]) {
-          console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Skipping unknown linked path: ${linkedPath}`);
           continue;
         }
         const linkedNodeFolder = fileFolders.get(linkedPath) || "";
         if (nodes[linkedPath] && linkedNodeFolder.startsWith(currentMainFolder)) {
           if (!visited.has(linkedPath)) {
-            console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Following link within main hierarchy to: ${linkedPath}`);
             traverse(linkedPath, currentDepth + 1, currentMainFolder);
           } else {
-            console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Link to already visited node in main hierarchy: ${linkedPath}`);
           }
         } else {
-          console.log(`${"  ".repeat(currentDepth + 1)}LinkAnalyzer: Ignoring link outside main hierarchy or unknown node: ${linkedPath} (from ${currentNodeFolder} to ${linkedNodeFolder})`);
         }
       }
     };
@@ -4111,7 +4025,6 @@ var LinkAnalyzer = class {
     } else {
       console.warn(`LinkAnalyzer: Start node ${startNodePath} not found in nodes. Traversal order might be empty or incomplete.`);
     }
-    console.log(`LinkAnalyzer: Final traversal order from ${startNodePath} (in folder '${mainFolder || "vault root"}') has ${traversalOrder.length} files: ${traversalOrder.join(" -> ")}`);
     return traversalOrder;
   }
   /**
@@ -4180,7 +4093,6 @@ var LinkAnalyzer = class {
           seenLinks.add(resolvedPath);
         }
       }
-      console.log(`LinkAnalyzer: Analyzed links in ${filePath}, found ${resolvedLinks.length} unique links in order`);
       return resolvedLinks;
     } catch (error) {
       console.error(`LinkAnalyzer: Error analyzing links in ${filePath}:`, error);
@@ -4285,7 +4197,6 @@ var ContextMenuHandler = class {
     this.plugin.registerEvent(
       this.plugin.app.workspace.on("file-menu", this.handleFileMenuEvent.bind(this))
     );
-    console.log("Unified context menu handler registered for 'file-menu'.");
   }
   /**
    * Handles the 'file-menu' event for TAbstractFile (could be TFile or TFolder).
@@ -4295,10 +4206,8 @@ var ContextMenuHandler = class {
    */
   handleFileMenuEvent(menu, abstractFile) {
     if (abstractFile instanceof import_obsidian11.TFolder) {
-      console.log("Folder right-clicked:", abstractFile.path);
       this.addFolderMenuItems(menu, abstractFile);
     } else if (abstractFile instanceof import_obsidian11.TFile && abstractFile.extension === "md") {
-      console.log("Markdown file right-clicked:", abstractFile.path);
       this.addFileMenuItems(menu, abstractFile);
     }
   }
@@ -4350,15 +4259,12 @@ var ContextMenuHandler = class {
    * @param folder Target folder
    */
   addFolderMenuItems(menu, folder) {
-    console.log("Adding menu items for folder:", folder.path);
     try {
       menu.addItem((item) => {
         item.setTitle("Add folder to review").setIcon("calendar-plus").onClick(() => {
-          console.log("Context menu: Adding folder to review:", folder.path);
           this.addFolderToReview(folder);
         });
       });
-      console.log("Menu items added successfully for folder:", folder.path);
     } catch (error) {
       console.error("Error adding folder menu items:", error);
     }
@@ -4369,7 +4275,6 @@ var ContextMenuHandler = class {
    * @param folder Target folder
    */
   async addFolderToReview(folder) {
-    console.log("Processing folder:", folder.path);
     new import_obsidian11.Notice(`Analyzing folder structure for "${folder.name}"...`);
     try {
       const allFiles = this.plugin.app.vault.getMarkdownFiles().filter((file) => {
@@ -4392,7 +4297,6 @@ var ContextMenuHandler = class {
         const folderName = folder.name.toLowerCase();
         if (fileName === folderName) {
           mainFilePath = file.path;
-          console.log(`Found main file with exact folder name match: ${mainFilePath}`);
           break;
         }
       }
@@ -4402,7 +4306,6 @@ var ContextMenuHandler = class {
           const folderName = folder.name.toLowerCase();
           if (fileName.includes(folderName) || folderName.includes(fileName) || fileName === "index" || fileName === "main" || fileName.includes("index") || fileName.includes("main")) {
             mainFilePath = file.path;
-            console.log(`Found main file by partial name match: ${mainFilePath}`);
             break;
           }
         }
@@ -4411,7 +4314,6 @@ var ContextMenuHandler = class {
         const activeFile = this.plugin.app.workspace.getActiveFile();
         if (activeFile && activeFile.extension === "md" && allFiles.some((f) => f.path === activeFile.path)) {
           mainFilePath = activeFile.path;
-          console.log(`Using active note as main file: ${mainFilePath}`);
         }
       }
       let traversalOrder = [];
@@ -4443,17 +4345,14 @@ var ContextMenuHandler = class {
         }
       };
       if (mainFilePath) {
-        console.log(`Starting traversal from identified main file: ${mainFilePath}`);
         await processLinksRecursively(mainFilePath);
       }
       const sortedAllFiles = [...allFiles].sort((a, b2) => a.path.localeCompare(b2.path));
       for (const file of sortedAllFiles) {
         if (!visited.has(file.path)) {
-          console.log(`Processing new branch or unlinked file: ${file.path}`);
           await processLinksRecursively(file.path);
         }
       }
-      console.log(`Final traversal order determined with ${traversalOrder.length} files.`);
       const count = await this.plugin.reviewScheduleService.scheduleNotesInOrder(traversalOrder);
       if (count > 0) {
         await this.plugin.savePluginData();
@@ -5062,11 +4961,9 @@ var NoteItemRenderer = class {
       if (note.scheduleCategory === "initial") {
         const totalInitialSteps = this.plugin.settings.initialScheduleCustomIntervals.length;
         const currentStepDisplay = note.reviewCount < totalInitialSteps ? note.reviewCount + 1 : totalInitialSteps;
-        phaseEl.innerHTML = `
-                    <div title="Initial">Initial</div>
-                    <div title="${currentStepDisplay}/${totalInitialSteps}">${currentStepDisplay}/${totalInitialSteps}</div>
-                    <div class="phase-time" title="${formattedTime}">${formattedTime}</div>
-                `;
+        phaseEl.createDiv({ title: "Initial", text: "Initial" });
+        phaseEl.createDiv({ title: `${currentStepDisplay}/${totalInitialSteps}`, text: `${currentStepDisplay}/${totalInitialSteps}` });
+        const phaseTimeEl = phaseEl.createDiv({ cls: "phase-time", title: formattedTime, text: formattedTime });
         phaseEl.addClass("review-phase-initial");
       } else {
         phaseEl.setText(note.scheduleCategory === "graduated" ? "Graduated" : "Spaced");
@@ -6204,6 +6101,8 @@ var ReviewSidebarView = class extends import_obsidian16.ItemView {
     this.lastSelectedNotePath = null;
     this.lastScrollPosition = 0;
     this.expandedUpcomingDayKey = null;
+    // State for upcoming section
+    this.resizeObserver = null;
     this.listViewRenderer = null;
     // Persistent UI elements
     this.mainContainer = null;
@@ -6238,7 +6137,7 @@ var ReviewSidebarView = class extends import_obsidian16.ItemView {
     this.plugin.events.off("sidebar-update", this.refresh.bind(this));
   }
   ensureBaseStructure() {
-    const contentEl = this.containerEl || this.contentEl;
+    const contentEl = this.containerEl;
     if (!contentEl)
       return;
     if (!this.mainContainer) {
@@ -6503,7 +6402,7 @@ var ReviewSidebarView = class extends import_obsidian16.ItemView {
       sidebarViewType: this.plugin.settings.sidebarViewType
     };
   }
-  async setViewState(state, e) {
+  async setViewState(state) {
     var _a, _b, _c;
     if (!state)
       return;
@@ -7006,7 +6905,6 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           openRouterModel: this.plugin.settings.openRouterModel
         };
         window.localStorage.setItem("spaceforge-api-settings", JSON.stringify(apiSettings));
-        console.log("Updated API settings backup with MCQ state");
       } catch (e) {
         console.error("Error updating API settings backup:", e);
       }
@@ -7030,7 +6928,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           this.plugin.settings.openRouterApiKey = value;
           await this.plugin.savePluginData();
         }));
-        apiKeyContainer.createEl("div", { text: "Get your API key at https://openrouter.ai/keys" });
+        apiKeyContainer.createEl("div").setText("Get your API key at https://openrouter.ai/keys");
         new import_obsidian17.Setting(mcqSection).setName("OpenRouter Model").setDesc("Model identifier from OpenRouter (e.g., openai/gpt-4.1-mini)").addText((text) => text.setPlaceholder("Enter OpenRouter model identifier").setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
           this.plugin.settings.openRouterModel = value;
           await this.plugin.savePluginData();
@@ -7120,7 +7018,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
         await this.plugin.savePluginData();
       }));
       const difficultyContainer = mcqFormattingGrid.createEl("div");
-      new import_obsidian17.Setting(difficultyContainer).setName("MCQ difficulty").setDesc("Complexity level").addDropdown((dropdown) => dropdown.addOption("basic", "Basic recall").addOption("advanced", "Advanced understanding").setValue(this.plugin.settings.mcqDifficulty).onChange(async (value) => {
+      new import_obsidian17.Setting(difficultyContainer).setName("MCQ difficulty").setDesc("Complexity level").addDropdown((dropdown) => dropdown.addOption("basic" /* Basic */, "Basic recall").addOption("advanced" /* Advanced */, "Advanced understanding").setValue(this.plugin.settings.mcqDifficulty).onChange(async (value) => {
         this.plugin.settings.mcqDifficulty = value;
         await this.plugin.savePluginData();
       }));
@@ -7259,15 +7157,28 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       sm2List.createEl("li", { text: "Postponed items: Explicitly moved to tomorrow with a one-step quality penalty." });
       sm2List.createEl("li", { text: "Both cases reset the repetition count to 1 and update the ease factor." });
       const ratingsTable = container.createEl("table", { cls: "sf-ratings-table" });
-      ratingsTable.innerHTML = `
-                <thead><tr><th>Rating (0-5)</th><th>Description</th><th>Effect on Interval</th></tr></thead>
-                <tbody>
-                    <tr><td>0-2</td><td>Incorrect / struggled</td><td>Resets, shortest interval</td></tr>
-                    <tr><td>3</td><td>Correct with difficulty</td><td>Small increase</td></tr>
-                    <tr><td>4</td><td>Correct with hesitation</td><td>Moderate increase</td></tr>
-                    <tr><td>5</td><td>Perfect recall</td><td>Largest increase</td></tr>
-                </tbody>
-            `;
+      const thead = ratingsTable.createTHead();
+      const tbody = ratingsTable.createTBody();
+      const headerRow = thead.insertRow();
+      headerRow.createEl("th", { text: "Rating (0-5)" });
+      headerRow.createEl("th", { text: "Description" });
+      headerRow.createEl("th", { text: "Effect on Interval" });
+      const row1 = tbody.insertRow();
+      row1.createEl("td", { text: "0-2" });
+      row1.createEl("td", { text: "Incorrect / struggled" });
+      row1.createEl("td", { text: "Resets, shortest interval" });
+      const row2 = tbody.insertRow();
+      row2.createEl("td", { text: "3" });
+      row2.createEl("td", { text: "Correct with difficulty" });
+      row2.createEl("td", { text: "Small increase" });
+      const row3 = tbody.insertRow();
+      row3.createEl("td", { text: "4" });
+      row3.createEl("td", { text: "Correct with hesitation" });
+      row3.createEl("td", { text: "Moderate increase" });
+      const row4 = tbody.insertRow();
+      row4.createEl("td", { text: "5" });
+      row4.createEl("td", { text: "Perfect recall" });
+      row4.createEl("td", { text: "Largest increase" });
     } else if (algorithm === "fsrs") {
       container.createEl("h4", { text: "About the FSRS Algorithm" });
       container.createEl("p", {
@@ -7282,15 +7193,28 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       fsrsList.createEl("li", { text: "Retention: The probability of recalling a card at the time of review." });
       fsrsList.createEl("li", { text: "Learning Steps: Initial short intervals for new cards (configurable)." });
       const ratingsTable = container.createEl("table", { cls: "sf-ratings-table" });
-      ratingsTable.innerHTML = `
-                <thead><tr><th>Rating (1-4)</th><th>Description</th><th>Effect on Stability/Difficulty</th></tr></thead>
-                <tbody>
-                    <tr><td>1 (Again)</td><td>Forgot the card</td><td>Decreases stability, may increase difficulty</td></tr>
-                    <tr><td>2 (Hard)</td><td>Recalled with significant difficulty</td><td>Smaller increase in stability</td></tr>
-                    <tr><td>3 (Good)</td><td>Recalled correctly</td><td>Standard increase in stability</td></tr>
-                    <tr><td>4 (Easy)</td><td>Recalled very easily</td><td>Largest increase in stability, may decrease difficulty</td></tr>
-                </tbody>
-            `;
+      const thead = ratingsTable.createTHead();
+      const tbody = ratingsTable.createTBody();
+      const headerRow = thead.insertRow();
+      headerRow.createEl("th", { text: "Rating (1-4)" });
+      headerRow.createEl("th", { text: "Description" });
+      headerRow.createEl("th", { text: "Effect on Stability/Difficulty" });
+      const row1 = tbody.insertRow();
+      row1.createEl("td", { text: "1 (Again)" });
+      row1.createEl("td", { text: "Forgot the card" });
+      row1.createEl("td", { text: "Decreases stability, may increase difficulty" });
+      const row2 = tbody.insertRow();
+      row2.createEl("td", { text: "2 (Hard)" });
+      row2.createEl("td", { text: "Recalled with significant difficulty" });
+      row2.createEl("td", { text: "Smaller increase in stability" });
+      const row3 = tbody.insertRow();
+      row3.createEl("td", { text: "3 (Good)" });
+      row3.createEl("td", { text: "Recalled correctly" });
+      row3.createEl("td", { text: "Standard increase in stability" });
+      const row4 = tbody.insertRow();
+      row4.createEl("td", { text: "4 (Easy)" });
+      row4.createEl("td", { text: "Recalled very easily" });
+      row4.createEl("td", { text: "Largest increase in stability, may decrease difficulty" });
       container.createEl("p", { text: "FSRS parameters (weights, retention, etc.) can be tuned, but the defaults are generally effective." });
     }
   }
@@ -7405,7 +7329,8 @@ ${noteContent}`;
     try {
       console.log(`Making API request to OpenRouter using model: ${model} with difficulty: ${difficulty}`);
       const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await (0, import_obsidian18.requestUrl)({
+        url: "https://openrouter.ai/api/v1/chat/completions",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -7429,12 +7354,11 @@ ${noteContent}`;
           ]
         })
       });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("OpenRouter API error:", errorText);
-        throw new Error(`API request failed (${response.status}): ${errorText}`);
+      if (response.status !== 200) {
+        console.error("OpenRouter API error:", response.text);
+        throw new Error(`API request failed (${response.status}): ${response.text}`);
       }
-      const data = await response.json();
+      const data = response.json;
       if (!data.choices || !data.choices.length || !data.choices[0].message) {
         console.error("Invalid API response format from OpenRouter:", data);
         throw new Error("Invalid API response format from OpenRouter - missing choices");
@@ -7618,7 +7542,8 @@ ${noteContent}`;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     console.log(`Making API request to OpenAI using model: ${model} with difficulty: ${difficulty}`);
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await (0, import_obsidian19.requestUrl)({
+        url: "https://api.openai.com/v1/chat/completions",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -7632,12 +7557,12 @@ ${noteContent}`;
           ]
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      if (response.status !== 200) {
+        const errorData = response.json || { message: response.text };
         console.error("OpenAI API error:", response.status, errorData);
         throw new Error(`API request failed (${response.status}): ${((_a = errorData.error) == null ? void 0 : _a.message) || errorData.message || "Unknown error"}`);
       }
-      const data = await response.json();
+      const data = response.json;
       if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
         console.error("Invalid API response format from OpenAI:", data);
         throw new Error("Invalid API response format from OpenAI - missing content");
@@ -7794,8 +7719,8 @@ ${noteContent}`;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     console.log(`Making API request to Ollama at ${apiUrl} using model: ${model} with difficulty: ${difficulty}`);
     try {
-      const response = await fetch(`${apiUrl}/api/chat`, {
-        // Common Ollama chat endpoint
+      const response = await (0, import_obsidian20.requestUrl)({
+        url: `${apiUrl}/api/chat`,
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -7810,12 +7735,12 @@ ${noteContent}`;
           // Ensure we get the full response, not a stream
         })
       });
-      if (!response.ok) {
-        const errorText = await response.text();
+      if (response.status !== 200) {
+        const errorText = response.text;
         console.error("Ollama API error:", response.status, errorText);
         throw new Error(`API request failed (${response.status}): ${errorText}`);
       }
-      const data = await response.json();
+      const data = response.json;
       if (!data.message || !data.message.content) {
         console.error("Invalid API response format from Ollama:", data);
         throw new Error("Invalid API response format from Ollama - missing message content");
@@ -7968,7 +7893,8 @@ ${noteContent}`;
     console.log(`Making API request to Gemini using model: ${model}`);
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     try {
-      const response = await fetch(apiUrl, {
+      const response = await (0, import_obsidian21.requestUrl)({
+        url: apiUrl,
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -7983,13 +7909,13 @@ ${noteContent}`;
           // }
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      if (response.status !== 200) {
+        const errorData = response.json;
         console.error("Gemini API error:", response.status, errorData);
         const errorMessage = ((_a = errorData == null ? void 0 : errorData.error) == null ? void 0 : _a.message) || (errorData == null ? void 0 : errorData.message) || "Unknown error";
         throw new Error(`API request failed (${response.status}): ${errorMessage}`);
       }
-      const data = await response.json();
+      const data = response.json;
       if (!data.candidates || !data.candidates.length || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts.length || !data.candidates[0].content.parts[0].text) {
         console.error("Invalid API response format from Gemini:", data);
         throw new Error("Invalid API response format from Gemini - missing content");
@@ -8147,7 +8073,8 @@ ${noteContent}`;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     console.log(`Making API request to Claude using model: ${model} with difficulty: ${difficulty}`);
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await (0, import_obsidian22.requestUrl)({
+        url: "https://api.anthropic.com/v1/messages",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -8164,12 +8091,12 @@ ${noteContent}`;
           ]
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      if (response.status !== 200) {
+        const errorData = response.json || { message: response.text };
         console.error("Claude API error:", response.status, errorData);
         throw new Error(`API request failed (${response.status}): ${((_a = errorData.error) == null ? void 0 : _a.message) || errorData.message || "Unknown error"}`);
       }
-      const data = await response.json();
+      const data = response.json;
       if (!data.content || !data.content.length || !data.content[0].text) {
         console.error("Invalid API response format from Claude:", data);
         throw new Error("Invalid API response format from Claude - missing content");
@@ -8353,7 +8280,8 @@ ${noteContent}`;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     console.log(`Making API request to Together AI using model: ${model} with difficulty: ${difficulty}`);
     try {
-      const response = await fetch("https://api.together.xyz/v1/chat/completions", {
+      const response = await (0, import_obsidian23.requestUrl)({
+        url: "https://api.together.xyz/v1/chat/completions",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -8369,12 +8297,12 @@ ${noteContent}`;
           ]
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      if (response.status !== 200) {
+        const errorData = response.json || { message: response.text };
         console.error("Together AI API error:", response.status, errorData);
         throw new Error(`API request failed (${response.status}): ${((_a = errorData.error) == null ? void 0 : _a.message) || errorData.message || "Unknown error"}`);
       }
-      const data = await response.json();
+      const data = response.json;
       if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
         console.error("Invalid API response format from Together AI:", data);
         throw new Error("Invalid API response format from Together AI - missing content");
@@ -8921,14 +8849,7 @@ var ReviewScheduleService = class {
    */
   calculateSM2Schedule(currentInterval, currentEase, qualityRating, repetitionCount = 0, daysLate = 0, isSkipped = false) {
     if (isSkipped || daysLate > 0) {
-      console.log(`[Modified SM-2] Processing ${isSkipped ? "skipped" : "overdue"} item:
-             - Days late: ${daysLate}
-             - Original quality: ${qualityRating} 
-             - Current interval: ${currentInterval}
-             - Current ease: ${currentEase / 100}`);
       const q_eff = isSkipped ? Math.max(0, qualityRating - 1) : 0;
-      console.log(`[Modified SM-2] Applied penalty:
-             - Effective quality: ${q_eff}`);
       let ease2 = currentEase / 100;
       ease2 = ease2 + (0.1 - (5 - q_eff) * (0.08 + (5 - q_eff) * 0.02));
       ease2 = Math.max(1.3, ease2);
@@ -8940,10 +8861,6 @@ var ReviewScheduleService = class {
         repetitionCount: 1
         // Reset repetition count to 1
       };
-      console.log(`[Modified SM-2] Result for ${isSkipped ? "skipped" : "overdue"} item:
-             - New interval: ${result.interval} day(s)
-             - New ease: ${result.ease / 100}
-             - New repetition count: ${result.repetitionCount}`);
       return result;
     }
     let ease = currentEase / 100;
@@ -9031,7 +8948,6 @@ var ReviewScheduleService = class {
     const schedule = this.schedules[path];
     if (!schedule)
       return;
-    console.log(`Skipping note ${path} with algorithm ${schedule.schedulingAlgorithm}`);
     const effectiveReviewDate = currentReviewDate || Date.now();
     const reviewDateObj = new Date(effectiveReviewDate);
     if (schedule.schedulingAlgorithm === "fsrs") {
@@ -9120,7 +9036,6 @@ var ReviewScheduleService = class {
   async advanceNote(path) {
     const schedule = this.schedules[path];
     if (!schedule) {
-      console.warn(`[ReviewScheduleService] Advance: Schedule not found for path ${path}`);
       return false;
     }
     const todayUTCMidnight = DateUtils.startOfUTCDay(/* @__PURE__ */ new Date());
@@ -9184,7 +9099,6 @@ var ReviewScheduleService = class {
       const content = await this.plugin.app.vault.read(file);
       return EstimationUtils.estimateReviewTime(file, content);
     } catch (error) {
-      console.error("Error estimating review time:", error);
       return 60;
     }
   }
@@ -9268,7 +9182,6 @@ var ReviewScheduleService = class {
   async updateCustomNoteOrder(order) {
     const uniqueValidPaths = Array.from(new Set(order)).filter((path) => this.schedules[path] !== void 0);
     this.customNoteOrder = uniqueValidPaths;
-    console.log(`Updated custom note order with ${this.customNoteOrder.length} unique entries`);
     if (this.plugin.events) {
       this.plugin.events.emit("sidebar-update");
     }
@@ -9326,7 +9239,6 @@ var ReviewScheduleService = class {
           this.customNoteOrder.push(newPath);
         }
       }
-      console.log(`Handled rename from ${oldPath} to ${newPath}. Schedule updated.`);
       if (this.plugin.events) {
         this.plugin.events.emit("sidebar-update");
       }
@@ -9359,7 +9271,6 @@ var ReviewScheduleService = class {
         }
       }
     }
-    console.log(`Converted ${convertedCount} SM-2 cards to FSRS.`);
     if (this.plugin.events) {
       this.plugin.events.emit("sidebar-update");
     }
@@ -9389,7 +9300,6 @@ var ReviewScheduleService = class {
         }
       }
     }
-    console.log(`Converted ${convertedCount} FSRS cards to SM-2.`);
     if (this.plugin.events) {
       this.plugin.events.emit("sidebar-update");
     }
@@ -9642,11 +9552,9 @@ var MCQService = class {
         this.mcqSets = {};
         return null;
       }
-      const sets = Object.values(this.mcqSets).filter((set) => set && set.notePath === notePath).sort((a, b2) => b2.generatedAt - a.generatedAt);
-      if (sets.length > 0 && sets[0].questions && sets[0].questions.length > 0) {
+      const sets = Object.values(this.mcqSets).filter((set) => set && set.notePath === notePath && set.questions && set.questions.length > 0).sort((a, b2) => b2.generatedAt - a.generatedAt);
+      if (sets.length > 0) {
         return sets[0];
-      } else if (sets.length > 0) {
-        console.warn("Found MCQ set but it contains no valid questions:", sets[0]);
       }
       return null;
     } catch (error) {
@@ -9717,9 +9625,7 @@ var MCQService = class {
     if (mcqSet) {
       mcqSet.needsQuestionRegeneration = true;
       this.saveMCQSet(mcqSet);
-      console.log(`MCQSet for ${notePath} flagged for regeneration.`);
     } else {
-      console.log(`No MCQSet found for ${notePath} to flag for regeneration.`);
     }
   }
 };
@@ -9941,7 +9847,6 @@ var PomodoroService = class {
       const remainingMs = this.state.pomodoroEndTimeMs - now;
       this.state.pomodoroTimeLeftInSeconds = Math.max(0, Math.round(remainingMs / 1e3));
       if (remainingMs <= 0) {
-        console.log("Pomodoro timer ended while inactive. Handling potential transition.");
         this.handleTimerEnd(true);
       }
     } else if (!this.state.pomodoroIsRunning) {
@@ -10024,11 +9929,11 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     this.addCommand({
       id: "add-selected-file-to-review",
       name: "Add Selected File to Review Schedule (File Explorer)",
-      hotkeys: [{ modifiers: ["Alt", "Shift"], key: "s" }],
       callback: () => {
         const fileExplorerLeaf = this.app.workspace.getLeavesOfType("file-explorer")[0];
-        if (fileExplorerLeaf && fileExplorerLeaf.view && fileExplorerLeaf.view.file) {
-          const selectedFile = fileExplorerLeaf.view.file;
+        const viewWithFile = fileExplorerLeaf == null ? void 0 : fileExplorerLeaf.view;
+        if (viewWithFile == null ? void 0 : viewWithFile.file) {
+          const selectedFile = viewWithFile.file;
           if (selectedFile instanceof import_obsidian26.TFile && selectedFile.extension === "md") {
             this.reviewScheduleService.scheduleNoteForReview(selectedFile.path).then(() => this.savePluginData());
             new import_obsidian26.Notice(`Added "${selectedFile.path}" to review schedule.`);
@@ -10136,7 +10041,10 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
       styleEl.remove();
     let existingData = {};
     try {
-      existingData = await this.loadData() || {};
+      const loaded = await this.loadData();
+      if (loaded) {
+        existingData = loaded;
+      }
     } catch (loadError) {
       console.warn("Could not load existing data during unload:", loadError);
     }
@@ -10164,7 +10072,6 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     }
     if (this.pomodoroService)
       this.pomodoroService.destroy();
-    this.app.workspace.detachLeavesOfType("spaceforge-review-schedule");
   }
   // private async _getEffectiveDataPathFromLocalStorage(): Promise<string | null> {
   //     const customPath = await this.app.loadLocalStorage('spaceforgeCustomDataPath');
@@ -10389,7 +10296,6 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     this.addCommand({
       id: "spaceforge-next-review-note",
       name: "Next Review Note",
-      hotkeys: [{ modifiers: ["Alt", "Shift"], key: "/" }],
       callback: () => {
         this.navigationController.navigateToNextNote();
       }
@@ -10397,7 +10303,6 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     this.addCommand({
       id: "spaceforge-previous-review-note",
       name: "Previous Review Note",
-      hotkeys: [{ modifiers: ["Alt", "Shift"], key: "." }],
       callback: () => {
         this.navigationController.navigateToPreviousNote();
       }
@@ -10405,7 +10310,6 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     this.addCommand({
       id: "spaceforge-review-current-note",
       name: "Review Current Note",
-      hotkeys: [{ modifiers: ["Alt", "Shift"], key: "," }],
       callback: () => {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile instanceof import_obsidian26.TFile && activeFile.extension === "md") {
@@ -10418,7 +10322,6 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     this.addCommand({
       id: "spaceforge-add-current-note-to-review",
       name: "Add Current Note to Review Schedule",
-      hotkeys: [{ modifiers: ["Alt", "Shift"], key: "\\\\" }],
       callback: () => {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile instanceof import_obsidian26.TFile && activeFile.extension === "md") {
@@ -10432,7 +10335,6 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     this.addCommand({
       id: "spaceforge-add-current-folder-to-review",
       name: "Add Current Note's Folder to Review Schedule",
-      hotkeys: [{ modifiers: ["Alt", "Shift"], key: "'" }],
       callback: async () => {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.parent && activeFile.parent instanceof import_obsidian26.TFolder) {
