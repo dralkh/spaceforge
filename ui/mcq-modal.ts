@@ -456,10 +456,26 @@ export class MCQModal extends Modal {
         let totalScore = 0;
         this.session.answers.forEach(answer => {
             let questionScore = 0;
-            if (answer.correct && answer.selectedAnswerIndex !== -1) {
-                if (answer.attempts === 1) questionScore = 1.0;
-                else if (answer.attempts === 2) questionScore = 0.5;
+
+            if (this.plugin.settings.mcqDeductFullMarkOnFirstFailure) {
+                // With this setting, you only get points if you're correct on the first try.
+                if (answer.attempts === 1 && answer.correct) {
+                    questionScore = 1.0;
+                } else {
+                    questionScore = 0; // 0 for multiple attempts or for a single incorrect attempt.
+                }
+            } else {
+                // Original scoring logic
+                if (answer.correct && answer.selectedAnswerIndex !== -1) {
+                    if (answer.attempts === 1) {
+                        questionScore = 1.0;
+                    } else if (answer.attempts === 2) {
+                        questionScore = 0.5;
+                    }
+                }
             }
+
+            // Apply time deduction only if points were scored.
             if (questionScore > 0 && answer.timeToAnswer > this.plugin.settings.mcqTimeDeductionSeconds) {
                 questionScore -= this.plugin.settings.mcqTimeDeductionAmount;
                 questionScore = Math.max(0, questionScore);

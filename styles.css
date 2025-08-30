@@ -1494,8 +1494,6 @@ button.disabled:hover {
   border-radius: var(--radius-m, 8px);
   box-shadow: var(--sf-shadow-md);
 }
-.is-collapsed .calendar-container-wrapper {
-}
 .is-collapsed .calendar-container {
   padding: var(--sf-space-sm);
 }
@@ -2369,6 +2367,10 @@ button.disabled:hover {
   color: var(--sf-danger);
   font-weight: 500;
 }
+.mcq-result-final-correct {
+  color: var(--sf-warning);
+  font-weight: 500;
+}
 .mcq-result-attempts,
 .mcq-result-time {
   font-size: 0.9em;
@@ -2709,35 +2711,6 @@ button.disabled:hover {
   padding: 2px 6px !important;
   border-radius: 4px !important;
 }
-.review-time-short,
-.review-time-medium,
-.review-time-long,
-.sm2-info,
-.sm2-ratings-title,
-.sm2-ratings-desc,
-.sm2-ratings-table,
-.sm2-ratings-table th,
-.sm2-ratings-table td,
-.prompt-setting,
-.prompt-textarea,
-.sf-settings-section,
-.sf-settings-section-header,
-.sf-settings-icon,
-.sf-settings-section-header h3,
-.sf-settings-collapse-indicator,
-.sf-settings-section-content,
-.sf-settings-subsection,
-.sf-setting-explain,
-.sf-setting-highlight,
-.sf-setting-grid,
-.sf-settings-actions,
-.sf-info-box,
-.sf-prompt-label,
-.sf-system-prompts-container,
-.sf-danger-zone,
-.mcq-shortcut-hint,
-.hidden {
-}
 .mcq-choice-selected {
   border-color: var(--interactive-accent) !important;
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.5), 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -2816,8 +2789,6 @@ button.disabled:hover {
 .mcq-breakdown-item div > span:first-child {
   font-weight: 500;
   color: var(--text-faint);
-}
-.mcq-breakdown-item .user-answer-text {
 }
 .mcq-breakdown-item .correctness-indicator {
   font-weight: bold;
@@ -3004,8 +2975,6 @@ button.disabled:hover {
 }
 .pomodoro-quick-save-btn {
   display: none;
-}
-.pomodoro-quick-save-btn:hover {
 }
 .pomodoro-quick-calculate-btn {
   background-color: var(--background-modifier-border);

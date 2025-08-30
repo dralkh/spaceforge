@@ -937,6 +937,16 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         this.plugin.settings.mcqTimeDeductionSeconds = value;
                         await this.plugin.savePluginData();
                     }));
+
+            new Setting(mcqSection)
+                .setName('Deduct full mark on first failure')
+                .setDesc('If enabled, the score for a question will be 0 if the first attempt is incorrect.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.mcqDeductFullMarkOnFirstFailure)
+                    .onChange(async (value: boolean) => {
+                        this.plugin.settings.mcqDeductFullMarkOnFirstFailure = value;
+                        await this.plugin.savePluginData();
+                    }));
             
             // Add collapsible section for system prompts
             const systemPromptsContainer = mcqSection.createEl('details', { cls: 'sf-system-prompts-container' });

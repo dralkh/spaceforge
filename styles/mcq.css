@@ -486,6 +486,10 @@
   color: var(--sf-danger);
   font-weight: 500;
 }
+.mcq-result-final-correct {
+  color: var(--sf-warning);
+  font-weight: 500;
+}
 
 .mcq-result-attempts,
 .mcq-result-time {
@@ -889,14 +893,6 @@
 }
 
 /* Preserve legacy class function while improving appearance */
-.review-time-short, .review-time-medium, .review-time-long,
-.sm2-info, .sm2-ratings-title, .sm2-ratings-desc, .sm2-ratings-table, .sm2-ratings-table th, .sm2-ratings-table td,
-.prompt-setting, .prompt-textarea, .sf-settings-section, .sf-settings-section-header, .sf-settings-icon,
-.sf-settings-section-header h3, .sf-settings-collapse-indicator, .sf-settings-section-content, .sf-settings-subsection,
-.sf-setting-explain, .sf-setting-highlight, .sf-setting-grid, .sf-settings-actions, .sf-info-box, .sf-prompt-label,
-.sf-system-prompts-container, .sf-danger-zone, .mcq-shortcut-hint, .hidden {
-  /* Preserve the classes for compatibility */
-}
 
 /* Style for the selected answer using keyboard navigation */
 .mcq-choice-selected {
@@ -999,9 +995,6 @@
 }
 
 /* Specific styling for the user's answer text and correctness indicator */
-.mcq-breakdown-item .user-answer-text { /* Class to be added in JS if needed for more specific targeting */
-  /* (color is set dynamically in JS) */
-}
 
 .mcq-breakdown-item .correctness-indicator { /* Class to be added in JS */
   font-weight: bold;

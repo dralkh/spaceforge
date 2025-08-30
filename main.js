@@ -3228,11 +3228,20 @@ var MCQModal = class extends import_obsidian8.Modal {
     let totalScore = 0;
     this.session.answers.forEach((answer) => {
       let questionScore = 0;
-      if (answer.correct && answer.selectedAnswerIndex !== -1) {
-        if (answer.attempts === 1)
+      if (this.plugin.settings.mcqDeductFullMarkOnFirstFailure) {
+        if (answer.attempts === 1 && answer.correct) {
           questionScore = 1;
-        else if (answer.attempts === 2)
-          questionScore = 0.5;
+        } else {
+          questionScore = 0;
+        }
+      } else {
+        if (answer.correct && answer.selectedAnswerIndex !== -1) {
+          if (answer.attempts === 1) {
+            questionScore = 1;
+          } else if (answer.attempts === 2) {
+            questionScore = 0.5;
+          }
+        }
       }
       if (questionScore > 0 && answer.timeToAnswer > this.plugin.settings.mcqTimeDeductionSeconds) {
         questionScore -= this.plugin.settings.mcqTimeDeductionAmount;
@@ -6465,6 +6474,7 @@ var DEFAULT_SETTINGS = {
   mcqTimeDeductionAmount: 0.5,
   mcqTimeDeductionSeconds: 90,
   mcqDifficulty: "advanced" /* Advanced */,
+  mcqDeductFullMarkOnFirstFailure: false,
   mcqBasicSystemPrompt: "You are a tutor who creates clear, straightforward multiple-choice questions to test basic understanding of the given content. Focus on key concepts and important facts. Make questions simple and direct, with one clearly correct answer. Always mark the correct answer with [CORRECT] at the end of the line.",
   mcqAdvancedSystemPrompt: "You are an expert tutor who creates challenging but fair multiple-choice questions to test deep understanding of the given content. Generate questions that assess comprehension, application, and analysis, not just memorization. Make incorrect choices plausible to encourage critical thinking. Always mark the correct answer with [CORRECT] at the end of the line.",
   // Pomodoro Timer Defaults
@@ -7029,6 +7039,10 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       }));
       new import_obsidian17.Setting(mcqSection).setName("Time deduction threshold").setDesc("Apply penalty after this many seconds").addSlider((slider) => slider.setLimits(10, 120, 5).setValue(this.plugin.settings.mcqTimeDeductionSeconds).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.mcqTimeDeductionSeconds = value;
+        await this.plugin.savePluginData();
+      }));
+      new import_obsidian17.Setting(mcqSection).setName("Deduct full mark on first failure").setDesc("If enabled, the score for a question will be 0 if the first attempt is incorrect.").addToggle((toggle) => toggle.setValue(this.plugin.settings.mcqDeductFullMarkOnFirstFailure).onChange(async (value) => {
+        this.plugin.settings.mcqDeductFullMarkOnFirstFailure = value;
         await this.plugin.savePluginData();
       }));
       const systemPromptsContainer = mcqSection.createEl("details", { cls: "sf-system-prompts-container" });

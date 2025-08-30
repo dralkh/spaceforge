@@ -180,6 +180,12 @@ export interface SpaceforgeSettings {
     mcqDifficulty: MCQDifficulty;
 
     /**
+     * Deduct full mark for a question if the first attempt is a failure.
+     * Default: false
+     */
+    mcqDeductFullMarkOnFirstFailure: boolean;
+
+    /**
      * API Provider for MCQ generation
      * Default: 'openrouter'
      */
@@ -351,6 +357,7 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     mcqTimeDeductionAmount: 0.5,
     mcqTimeDeductionSeconds: 90,
     mcqDifficulty: MCQDifficulty.Advanced,
+    mcqDeductFullMarkOnFirstFailure: true,
     mcqBasicSystemPrompt: 'You are a tutor who creates clear, straightforward multiple-choice questions to test basic understanding of the given content. Focus on key concepts and important facts. Make questions simple and direct, with one clearly correct answer. Always mark the correct answer with [CORRECT] at the end of the line.',
     mcqAdvancedSystemPrompt: 'You are an expert tutor who creates challenging but fair multiple-choice questions to test deep understanding of the given content. Generate questions that assess comprehension, application, and analysis, not just memorization. Make incorrect choices plausible to encourage critical thinking. Always mark the correct answer with [CORRECT] at the end of the line.',
 
