@@ -29,10 +29,8 @@ export class OpenAIService implements IMCQGenerationService {
             if (settings.mcqQuestionAmountMode === MCQQuestionAmountMode.WordsPerQuestion) {
                 const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
                 numQuestionsToGenerate = Math.max(1, Math.ceil(wordCount / settings.mcqWordsPerQuestion));
-                console.log(`OpenAI: Calculated ${numQuestionsToGenerate} questions based on ${wordCount} words and ${settings.mcqWordsPerQuestion} words/question setting.`);
             } else { // Fixed mode
                 numQuestionsToGenerate = settings.mcqQuestionsPerNote;
-                console.log(`OpenAI: Using fixed number of questions: ${numQuestionsToGenerate}`);
             }
 
             const prompt = this.generatePrompt(noteContent, settings, numQuestionsToGenerate);
@@ -50,7 +48,6 @@ export class OpenAIService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch (error) {
-            console.error('Error generating MCQs with OpenAI:', error);
             new Notice('Failed to generate MCQs with OpenAI. Please check console for details.');
             return null;
         }
@@ -86,8 +83,6 @@ export class OpenAIService implements IMCQGenerationService {
             ? settings.mcqBasicSystemPrompt 
             : settings.mcqAdvancedSystemPrompt;
 
-        console.log(`Making API request to OpenAI using model: ${model} with difficulty: ${difficulty}`);
-
         try {
             const response = await requestUrl({
                 url: 'https://api.openai.com/v1/chat/completions',
@@ -107,18 +102,15 @@ export class OpenAIService implements IMCQGenerationService {
 
             if (response.status !== 200) {
                 const errorData = response.json || { message: response.text };
-                console.error('OpenAI API error:', response.status, errorData);
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
             }
 
             const data = response.json;
             if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
-                console.error('Invalid API response format from OpenAI:', data);
                 throw new Error('Invalid API response format from OpenAI - missing content');
             }
             return data.choices[0].message.content;
         } catch (error) {
-            console.error('Error in OpenAI API request:', error);
             new Notice(`OpenAI API error: ${error.message}`);
             throw error;
         }
@@ -127,7 +119,6 @@ export class OpenAIService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            console.log('Raw AI response from OpenAI:', response);
             let questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
 
             if (questionBlocks.length === 0) {
@@ -144,7 +135,6 @@ export class OpenAIService implements IMCQGenerationService {
                 if (currentQuestion) questionBlocks.push(currentQuestion);
             }
 
-            console.log(`Found ${questionBlocks.length} question blocks from OpenAI`);
             for (const block of questionBlocks) {
                 const lines = block.split('\n').filter(line => line.trim().length > 0);
                 if (lines.length < 2) continue;
@@ -178,10 +168,8 @@ export class OpenAIService implements IMCQGenerationService {
                     questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
-            console.log(`Successfully parsed ${questions.length} MCQ questions from OpenAI`);
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch (error) {
-            console.error('Error parsing MCQ response from OpenAI:', error);
             new Notice('Error parsing MCQ response from OpenAI. Please try again.');
             return [];
         }

@@ -63,7 +63,6 @@ export class ReviewControllerCore implements IReviewController {
      */
     public async setReviewDateOverride(date: number | null): Promise<void> {
         this.currentReviewDateOverride = date;
-        console.log(`Review date override set to: ${date ? new Date(date).toISOString() : 'null (use current time)'}`);
         await this.updateTodayNotes(); // Ensure notes are updated when the override changes
     }
 
@@ -106,9 +105,7 @@ export class ReviewControllerCore implements IReviewController {
         // Ensure index is within bounds
         if (index >= 0 && index < this.todayNotes.length) {
             this.currentNoteIndex = index;
-            console.log(`Set currentNoteIndex to: ${index}`);
         } else {
-            console.warn(`Attempted to set invalid currentNoteIndex: ${index}. Max index is ${this.todayNotes.length - 1}`);
             // Optionally clamp the index or handle the error differently
             this.currentNoteIndex = Math.max(0, Math.min(index, this.todayNotes.length - 1));
         }
@@ -181,7 +178,6 @@ export class ReviewControllerCore implements IReviewController {
             this.currentNoteIndex = Math.min(Math.max(0, newIndex), this.todayNotes.length - 1);
         }
 
-        console.log(`Updated today's notes list with ${this.todayNotes.length} notes.`);
     }
 
     /**
@@ -238,9 +234,7 @@ export class ReviewControllerCore implements IReviewController {
         await this.handleNotePostponed(path);
 
         // Refresh the sidebar view if available
-        if (this.plugin.sidebarView) {
-            this.plugin.sidebarView.refresh();
-        }
+        this.plugin.getSidebarView()?.refresh();
         // Notice is handled by the service for postponeNote
     }
 
@@ -256,9 +250,7 @@ export class ReviewControllerCore implements IReviewController {
             await this.plugin.savePluginData();
             await this.handleNoteAdvanced(path); // New handler for advancing
 
-            if (this.plugin.sidebarView) {
-                this.plugin.sidebarView.refresh();
-            }
+            this.plugin.getSidebarView()?.refresh();
             new Notice(`Note advanced.`); // Controller handles notice for advance
         } else {
             new Notice(`Note is not eligible to be advanced.`);
@@ -272,14 +264,11 @@ export class ReviewControllerCore implements IReviewController {
      * @param path Path to the advanced note
      */
     async handleNoteAdvanced(path: string): Promise<void> {
-        console.log(`Handling advanced note: ${path}`);
         // Re-fetch and re-sort today's notes, preserving current selection if possible.
         // updateTodayNotes(true) should correctly place the advanced note
         // if it's now due, or remove it if it was advanced from future to still future.
         // It also updates traversalOrder and currentNoteIndex.
-        await this.updateTodayNotes(true); 
-        console.log(`After advance - todayNotes: ${this.todayNotes.length}, traversalOrder: ${this.traversalOrder.length}`);
-        console.log(`Current note after advance update: ${this.todayNotes[this.currentNoteIndex]?.path}, index: ${this.currentNoteIndex}`);
+        await this.updateTodayNotes(true);
     }
     
     /**
@@ -288,13 +277,11 @@ export class ReviewControllerCore implements IReviewController {
      * @param path Path to the postponed note
      */
     async handleNotePostponed(path: string): Promise<void> {
-        console.log(`Handling postponed note: ${path}`);
 
         if (this.todayNotes.length === 0) return;
 
         const postponedIndex = this.todayNotes.findIndex(note => note.path === path);
         if (postponedIndex === -1) {
-            console.log(`Note ${path} not found in today's notes`);
             return;
         }
 
@@ -302,8 +289,6 @@ export class ReviewControllerCore implements IReviewController {
         const currentNotePath = this.currentNoteIndex < this.todayNotes.length
             ? this.todayNotes[this.currentNoteIndex].path
             : null;
-
-        console.log(`Current note before update: ${currentNotePath}, index: ${this.currentNoteIndex}`);
 
         // Remove from traversal order first
         this.traversalOrder = this.traversalOrder.filter(p => p !== path);
@@ -324,36 +309,28 @@ export class ReviewControllerCore implements IReviewController {
         }
 
         // Update custom order in storage
-        await this.plugin.dataStorage.reviewScheduleService.updateCustomNoteOrder(this.traversalOrder); 
+        await this.plugin.dataStorage.reviewScheduleService.updateCustomNoteOrder(this.traversalOrder);
         // Removed redundant savePluginData() here; postponeNote already saves.
-
-        console.log(`After postpone - todayNotes: ${this.todayNotes.length}, traversalOrder: ${this.traversalOrder.length}`);
 
         // If the postponed note was the current one, select a new note
         if (wasCurrentNote) {
-            console.log(`Postponed note was the current note, selecting new current note`);
             // Keep the current index, but make sure it's valid
             this.currentNoteIndex = Math.min(this.currentNoteIndex, this.todayNotes.length - 1);
         } else if (currentNotePath) {
             // If we were viewing a different note, try to keep that selected
             const newIndex = this.todayNotes.findIndex(note => note.path === currentNotePath);
             if (newIndex !== -1) {
-                console.log(`Keeping previously selected note: ${currentNotePath}`);
                 this.currentNoteIndex = newIndex;
             } else {
                 // If the current note is no longer in the list, adjust the index
-                console.log(`Previously selected note no longer in list, adjusting index`);
                 this.currentNoteIndex = Math.min(this.currentNoteIndex, this.todayNotes.length - 1);
             }
         } else {
             // Adjust current index if necessary to prevent out-of-bounds
-            console.log(`Adjusting index to remain in bounds`);
             if (this.currentNoteIndex >= this.todayNotes.length) {
                 this.currentNoteIndex = Math.max(0, this.todayNotes.length - 1);
             }
         }
-
-        console.log(`Current note after update: ${this.todayNotes[this.currentNoteIndex]?.path}, index: ${this.currentNoteIndex}`);
     }
 
     /**
@@ -380,9 +357,7 @@ export class ReviewControllerCore implements IReviewController {
         new Notice("Review postponed to tomorrow. Note will be easier to recover with a small penalty applied.");
 
         // Refresh the sidebar view if available
-        if (this.plugin.sidebarView) {
-            this.plugin.sidebarView.refresh();
-        }
+        this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after skipping the review
         await this.updateTodayNotes(true);
@@ -443,13 +418,11 @@ export class ReviewControllerCore implements IReviewController {
                 // FSRS: response is FsrsRating (1-4), setting is minFsrsRatingForQuestionRegeneration (1-4)
                 if (response >= this.plugin.settings.minFsrsRatingForQuestionRegeneration) {
                     triggerRegeneration = true;
-                    console.log(`FSRS Rating ${response} met/exceeded threshold (${this.plugin.settings.minFsrsRatingForQuestionRegeneration}) for MCQ regeneration for note ${path}.`);
                 }
             } else { // SM-2
                 // SM-2: response is ReviewResponse (0-5), setting is minSm2RatingForQuestionRegeneration (0-5)
                 if (response >= this.plugin.settings.minSm2RatingForQuestionRegeneration) {
                     triggerRegeneration = true;
-                    console.log(`SM-2 Rating ${response} met/exceeded threshold (${this.plugin.settings.minSm2RatingForQuestionRegeneration}) for MCQ regeneration for note ${path}.`);
                 }
             }
         }
@@ -487,9 +460,7 @@ export class ReviewControllerCore implements IReviewController {
         new Notice(`Note review recorded: ${responseText}`);
 
         // Refresh the sidebar view if available
-        if (this.plugin.sidebarView) {
-            this.plugin.sidebarView.refresh();
-        }
+        this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after recording the review (preserve the index since we're in the middle of navigation)
         await this.updateTodayNotes(true);
@@ -516,39 +487,29 @@ export class ReviewControllerCore implements IReviewController {
         // If not in a session, automatically go to the next note and show review modal
         else if (this.todayNotes.length > 0) {
             // Log the current state for debugging
-            console.log("Before navigation - Current Index:", this.currentNoteIndex);
-            console.log("Before navigation - Current Note:", this.todayNotes[this.currentNoteIndex]?.path);
-            console.log("Before navigation - Traversal Order:", this.traversalOrder);
 
             // Simply move to the next note in today's notes list (which maintains user's custom order)
             this.currentNoteIndex = (this.currentNoteIndex + 1) % this.todayNotes.length;
-            console.log(`Moving to next note in sidebar order at index ${this.currentNoteIndex}`);
 
             // Check if we've reviewed all notes (in case we've come full circle)
             const currentPath = this.todayNotes[this.currentNoteIndex].path;
             if (currentPath === path) {
-                console.log("All notes have been reviewed");
                 new Notice("All caught up! No more notes due for review.");
                 return;
             }
 
             // Log the new state after determining next note
-            console.log("After navigation - Current Index:", this.currentNoteIndex);
-            console.log("After navigation - Current Note:", this.todayNotes[this.currentNoteIndex]?.path);
 
             // After finding the next note, show the review modal
             if (this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length) {
                 const nextNotePath = this.todayNotes[this.currentNoteIndex].path;
-                console.log("Opening review modal for:", nextNotePath);
                 if (this.plugin.navigationController) {
                     await this.plugin.navigationController.openNoteWithoutReview(nextNotePath);
                     this.showReviewModal(nextNotePath);
                 } else {
-                    console.log("No navigation controller available");
                     new Notice("All caught up! No more notes due for review.");
                 }
             } else {
-                console.log("No more notes to review - reached the end");
                 new Notice("All caught up! No more notes due for review.");
             }
         } else {

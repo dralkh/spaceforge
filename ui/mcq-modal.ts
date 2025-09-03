@@ -1,4 +1,4 @@
-import { Modal, Notice, setIcon, TFile } from 'obsidian'; // Ensure TFile is imported
+import { Modal, Notice, setIcon, TFile, Setting } from 'obsidian'; // Ensure TFile is imported, Added Setting
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet, MCQAnswer, MCQSession } from '../models/mcq';
 
@@ -45,7 +45,7 @@ export class MCQModal extends Modal {
         contentEl.empty();
         contentEl.addClass('spaceforge-mcq-modal');
         const headerContainer = contentEl.createDiv('mcq-header-container');
-        headerContainer.createEl('h2', { text: 'Multiple Choice Review' });
+        new Setting(headerContainer).setName('Multiple Choice Review').setHeading();
 
         if (!this.isFreshGeneration) {
             const refreshBtn = headerContainer.createDiv('mcq-refresh-btn');
@@ -203,7 +203,6 @@ export class MCQModal extends Modal {
         }
         const question = this.mcqSet.questions[questionIndex];
         if (!question || !question.choices || question.choices.length < 2) {
-            console.error('Invalid question data:', question);
             new Notice('Error: Invalid question data. Moving to next question.');
             this.session.currentQuestionIndex++;
             if (this.session.currentQuestionIndex < this.mcqSet.questions.length) {
@@ -227,12 +226,9 @@ export class MCQModal extends Modal {
             skipButton.addEventListener('click', () => {
                 const correctIndex = question.correctAnswerIndex;
                 const correctAnswerDisplay = newQuestionContainer.createDiv('mcq-correct-answer-display');
-                const correctLabel = correctAnswerDisplay.createDiv();
-                correctLabel.style.fontWeight = 'bold';
-                correctLabel.style.marginBottom = '4px';
+                const correctLabel = correctAnswerDisplay.createDiv({ cls: 'sf-mcq-correct-label' });
                 correctLabel.setText('Correct Answer:');
-                const correctText = correctAnswerDisplay.createDiv();
-                correctText.style.color = '#4caf50';
+                const correctText = correctAnswerDisplay.createDiv({ cls: 'sf-mcq-correct-text' });
                 correctText.setText(String.fromCharCode(65 + correctIndex) + ') ' + question.choices[correctIndex]);
 
                 if (existingAnswer) {
@@ -266,8 +262,8 @@ export class MCQModal extends Modal {
                     }
                 });
                 const choicesContainer = this.contentEl.querySelector('.mcq-choices-container'); // Use this.contentEl
-                if (choicesContainer instanceof HTMLElement) choicesContainer.style.display = 'none';
-                skipButton.style.display = 'none';
+                if (choicesContainer instanceof HTMLElement) choicesContainer.style.display = 'none'; // Keep display:none for dynamic hiding
+                skipButton.style.display = 'none'; // Keep display:none for dynamic hiding
             });
         }
 
@@ -343,7 +339,7 @@ export class MCQModal extends Modal {
             this.plugin.mcqService.saveMCQSession(this.session);
             this.plugin.savePluginData(); // Persist
 
-            contentEl.createEl('h2', { text: 'Review Complete' });
+            new Setting(contentEl).setName('Review Complete').setHeading();
             const scoreEl = contentEl.createDiv('mcq-score');
             const scoreTextEl = scoreEl.createDiv('mcq-score-text');
             const scorePercentage = this.session.score; // Score is 0-1
@@ -432,7 +428,7 @@ export class MCQModal extends Modal {
                         resultItem.createDiv({ cls: 'mcq-result-time', text: `Time: ${Math.round(answer.timeToAnswer)} seconds` });
 
                         // FSRS/SM-2 data per question removed from here
-                    } catch (error) { console.error('Error displaying answer result:', error); }
+                    } catch (error) { /* Error displaying answer result: ${error} */ }
                 });
             }
             const closeBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
@@ -444,8 +440,7 @@ export class MCQModal extends Modal {
                 this.close();
             });
         } catch (error) {
-            console.error('Error completing MCQ session:', error);
-            contentEl.createEl('h2', { text: 'Error Completing Session' });
+            new Setting(contentEl).setName('Error Completing Session').setHeading();
             contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' });
             const errorCloseBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
             errorCloseBtn.addEventListener('click', () => this.close());

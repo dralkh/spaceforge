@@ -48,13 +48,11 @@ export class MCQService {
         try {
             // Verify parameters
             if (!notePath) {
-                console.error('Invalid notePath provided to getMCQSetForNote');
                 return null;
             }
 
             // Make sure we have mcqSets initialized
             if (!this.mcqSets) {
-                console.warn('mcqSets not initialized');
                 this.mcqSets = {};
                 return null;
             }
@@ -71,7 +69,6 @@ export class MCQService {
 
             return null;
         } catch (error) {
-            console.error('Error in getMCQSetForNote:', error);
             return null;
         }
     }
@@ -85,7 +82,6 @@ export class MCQService {
         try {
             // Validate session
             if (!session || !session.notePath || !session.mcqSetId) {
-                console.error('Invalid MCQ session data:', session);
                 return;
             }
 
@@ -117,7 +113,6 @@ export class MCQService {
 
             // Data saving is now handled by main.ts after this method returns
         } catch (error) {
-            console.error('Error saving MCQ session:', error);
         }
     }
 

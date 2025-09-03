@@ -302,6 +302,14 @@ export interface SpaceforgeSettings {
         learning_steps?: number[]; // In minutes
         enable_short_term?: boolean; // Added for FSRSParameters requirement
     };
+
+    // --- Navigation Command Settings ---
+    enableNavigationCommands: boolean;
+    navigationCommand: {
+        modifiers: string[];
+        key: string | null;
+    };
+    navigationCommandDelay: number; // in milliseconds
 }
 
 /**
@@ -387,4 +395,12 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
         learning_steps: [1, 10], // 1 minute, 10 minutes
         enable_short_term: false, // Default for enable_short_term
     },
+
+    // Navigation Command Defaults
+    enableNavigationCommands: false,
+    navigationCommand: {
+        modifiers: [],
+        key: null,
+    },
+    navigationCommandDelay: 500,
 };

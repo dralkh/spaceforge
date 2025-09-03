@@ -48,10 +48,8 @@ export class OpenRouterService implements IMCQGenerationService {
                 // Ensure at least 1 question, and use ceiling to round up slightly
                 numQuestionsToGenerate = Math.max(1, Math.ceil(wordCount / settings.mcqWordsPerQuestion)); 
                 // Optional: Add a reasonable upper limit if desired, e.g., Math.min(numQuestionsToGenerate, 15);
-                console.log(`OpenRouter: Calculated ${numQuestionsToGenerate} questions based on ${wordCount} words and ${settings.mcqWordsPerQuestion} words/question setting.`);
             } else { // Fixed mode
                 numQuestionsToGenerate = settings.mcqQuestionsPerNote;
-                console.log(`OpenRouter: Using fixed number of questions: ${numQuestionsToGenerate}`);
             }
             
             // Generate prompt based on settings and calculated question count
@@ -78,7 +76,6 @@ export class OpenRouterService implements IMCQGenerationService {
             
             return mcqSet;
         } catch (error) {
-            console.error('Error generating MCQs with OpenRouter:', error);
             new Notice('Failed to generate MCQs with OpenRouter. Please check console for details.');
             return null;
         }
@@ -140,8 +137,6 @@ For example:
         const difficulty = settings.mcqDifficulty;
         
         try {
-            console.log(`Making API request to OpenRouter using model: ${model} with difficulty: ${difficulty}`);
-            
             // Get the appropriate system prompt based on difficulty
             const systemPrompt = difficulty === 'basic' 
                 ? settings.mcqBasicSystemPrompt 
@@ -172,20 +167,17 @@ For example:
             });
 
             if (response.status !== 200) {
-                console.error('OpenRouter API error:', response.text);
                 throw new Error(`API request failed (${response.status}): ${response.text}`);
             }
 
             const data = response.json;
 
             if (!data.choices || !data.choices.length || !data.choices[0].message) {
-                console.error('Invalid API response format from OpenRouter:', data);
                 throw new Error('Invalid API response format from OpenRouter - missing choices');
             }
 
             return data.choices[0].message.content;
         } catch (error) {
-            console.error('Error in OpenRouter API request:', error);
             new Notice(`OpenRouter API error: ${error.message}`);
             throw error;
         }
@@ -204,8 +196,6 @@ For example:
         
         try {
             // Log the raw response for debugging
-            console.log('Raw AI response from OpenRouter:', response);
-            
             // Check for common response formats
             let questionBlocks: string[] = [];
             
@@ -234,13 +224,10 @@ For example:
                 }
             }
             
-            console.log(`Found ${questionBlocks.length} question blocks from OpenRouter`);
-            
             for (const block of questionBlocks) {
                 // Extract the question text and choices
                 const lines = block.split('\n').filter(line => line.trim().length > 0);
                 if (lines.length < 2) {
-                    console.log('Skipping block with insufficient lines (OpenRouter):', block);
                     continue;
                 }
                 
@@ -252,9 +239,6 @@ For example:
                 let correctAnswerIndex = -1;
                 
                 // Debug the question
-                console.log('Processing question (OpenRouter):', questionText);
-                console.log('Found choices (OpenRouter):', lines.slice(1));
-                
                 // Extract choices and identify the correct answer
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
@@ -270,7 +254,6 @@ For example:
                     
                     if (isCorrect) {
                         correctAnswerIndex = choices.length - 1;
-                        console.log(`Found correct answer at index ${correctAnswerIndex} (OpenRouter): ${cleanedLine}`);
                     }
                 }
                 
@@ -284,7 +267,6 @@ For example:
                             lines[i+1].includes('✔️')
                         )) {
                             correctAnswerIndex = i;
-                            console.log(`Found correct answer with alternative marker at index ${i} (OpenRouter): ${choices[i]}`);
                             break;
                         }
                     }
@@ -293,7 +275,6 @@ For example:
                 // If still no correct answer found, default to the first answer as a fallback
                 if (correctAnswerIndex === -1 && choices.length > 0) {
                     correctAnswerIndex = 0;
-                    console.log(`No correct answer marker found, defaulting to first choice (OpenRouter): ${choices[0]}`);
                 }
                 
                 // Only add if we found a valid question with choices
@@ -304,18 +285,14 @@ For example:
                         correctAnswerIndex
                     });
                 } else {
-                    console.log('Skipping invalid question (OpenRouter):', { questionText, choicesLength: choices.length });
                 }
             }
             
             // Log the parsed questions
-            console.log(`Successfully parsed ${questions.length} MCQ questions from OpenRouter`);
-            
             // Limit to the target number of questions calculated earlier
             // Use numQuestionsToGenerate instead of settings.mcqQuestionsPerNote
             return questions.slice(0, numQuestionsToGenerate); 
         } catch (error) {
-            console.error('Error parsing MCQ response from OpenRouter:', error);
             new Notice('Error parsing MCQ response from OpenRouter. Please try again.');
             return [];
         }

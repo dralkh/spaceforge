@@ -144,7 +144,6 @@ export class MCQController {
             // Pass the new internal callback to the modal constructor
             new MCQModal(this.plugin, notePath, mcqSet, internalOnComplete).open(); 
         } catch (error) {
-            console.error('Error starting MCQ review:', error);
             new Notice('Error starting MCQ review. Please check console for details.');
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
         }
@@ -303,7 +302,6 @@ export class MCQController {
                      // If score is undefined, it might mean the note had no questions or wasn't processed.
                      // We could use the 'response' from ConsolidatedMCQModal if it's meaningful without a score.
                      // For now, we only process if a score is present.
-                    console.warn(`MCQ result for ${result.path} did not have a score. Review not recorded via MCQ.`);
                 }
             }
             if (reviewsProcessed > 0) {

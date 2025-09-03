@@ -34,10 +34,8 @@ export class GeminiService implements IMCQGenerationService {
             if (settings.mcqQuestionAmountMode === MCQQuestionAmountMode.WordsPerQuestion) {
                 const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
                 numQuestionsToGenerate = Math.max(1, Math.ceil(wordCount / settings.mcqWordsPerQuestion));
-                console.log(`Gemini: Calculated ${numQuestionsToGenerate} questions based on ${wordCount} words and ${settings.mcqWordsPerQuestion} words/question setting.`);
             } else { // Fixed mode
                 numQuestionsToGenerate = settings.mcqQuestionsPerNote;
-                console.log(`Gemini: Using fixed number of questions: ${numQuestionsToGenerate}`);
             }
 
             const prompt = this.generatePrompt(noteContent, settings, numQuestionsToGenerate);
@@ -55,7 +53,6 @@ export class GeminiService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch (error) {
-            console.error('Error generating MCQs with Gemini:', error);
             new Notice('Failed to generate MCQs with Gemini. Please check console for details.');
             return null;
         }
@@ -88,7 +85,6 @@ export class GeminiService implements IMCQGenerationService {
         const apiKey = settings.geminiApiKey;
         const model = settings.geminiModel; // e.g., 'gemini-pro'
 
-        console.log(`Making API request to Gemini using model: ${model}`);
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         try {
@@ -111,7 +107,6 @@ export class GeminiService implements IMCQGenerationService {
 
             if (response.status !== 200) {
                 const errorData = response.json;
-                console.error('Gemini API error:', response.status, errorData);
                 const errorMessage = errorData?.error?.message || errorData?.message || 'Unknown error';
                 throw new Error(`API request failed (${response.status}): ${errorMessage}`);
             }
@@ -119,12 +114,10 @@ export class GeminiService implements IMCQGenerationService {
             const data = response.json;
             // Gemini response structure: data.candidates[0].content.parts[0].text
             if (!data.candidates || !data.candidates.length || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts.length || !data.candidates[0].content.parts[0].text) {
-                console.error('Invalid API response format from Gemini:', data);
                 throw new Error('Invalid API response format from Gemini - missing content');
             }
             return data.candidates[0].content.parts[0].text;
         } catch (error) {
-            console.error('Error in Gemini API request:', error);
             new Notice(`Gemini API error: ${error.message}`);
             throw error;
         }
@@ -133,7 +126,6 @@ export class GeminiService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            console.log('Raw AI response from Gemini:', response);
             let questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
 
             if (questionBlocks.length === 0) {
@@ -150,7 +142,6 @@ export class GeminiService implements IMCQGenerationService {
                 if (currentQuestion) questionBlocks.push(currentQuestion);
             }
 
-            console.log(`Found ${questionBlocks.length} question blocks from Gemini`);
             for (const block of questionBlocks) {
                 const lines = block.split('\n').filter(line => line.trim().length > 0);
                 if (lines.length < 2) continue;
@@ -184,10 +175,8 @@ export class GeminiService implements IMCQGenerationService {
                     questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
-            console.log(`Successfully parsed ${questions.length} MCQ questions from Gemini`);
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch (error) {
-            console.error('Error parsing MCQ response from Gemini:', error);
             new Notice('Error parsing MCQ response from Gemini. Please try again.');
             return [];
         }

@@ -14,9 +14,6 @@
 }
 
 /* Styles for collapsed sidebar */
-.is-collapsed .calendar-container-wrapper {
-  /* Adjust styles for a narrower container */
-}
 
 .is-collapsed .calendar-container {
   padding: var(--sf-space-sm); /* Reduced padding */

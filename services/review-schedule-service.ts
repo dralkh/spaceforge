@@ -576,32 +576,20 @@ export class ReviewScheduleService {
      * @returns Array of due note schedules sorted by due date
      */
     getDueNotes(date: number = Date.now(), matchExactDate: boolean = false): ReviewSchedule[] {
-        // 'date' is the reference point (e.g., effectiveReviewDate from controller, which is a UTC timestamp)
-        // For FSRS, nextReviewDate is an exact UTC timestamp.
-        // For SM-2, nextReviewDate is a UTC midnight timestamp.
-        const targetUTCDayStartForSM2 = DateUtils.startOfUTCDay(new Date(date));
-        const targetUTCDayEndForFSRS = DateUtils.endOfUTCDay(new Date(date)); // Added for FSRS date coincidence
+        const targetDate = new Date(date);
+        const targetUTCDayStart = DateUtils.startOfUTCDay(targetDate);
+        const targetUTCDayEnd = DateUtils.endOfUTCDay(targetDate);
 
         return Object.values(this.schedules)
             .filter(schedule => {
-                if (schedule.schedulingAlgorithm === 'fsrs') {
-                    if (matchExactDate) {
-                        // FSRS notes are due if their nextReviewDate falls within the same UTC day as 'date'
-                        // This considers date coincidence rather than exact time
-                        return schedule.nextReviewDate >= targetUTCDayStartForSM2 && 
-                               schedule.nextReviewDate <= targetUTCDayEndForFSRS;
-                    } else {
-                        // FSRS notes are due if their nextReviewDate is on or before the end of the UTC day of 'date'
-                        return schedule.nextReviewDate <= targetUTCDayEndForFSRS;
-                    }
-                } else { // SM-2
-                    // SM-2 notes are due if their nextReviewDate (UTC midnight) is on or before the UTC midnight of 'date'.
-                    if (matchExactDate) {
-                        // Due if the note's UTC midnight due date IS the target UTC midnight.
-                        return schedule.nextReviewDate === targetUTCDayStartForSM2;
-                    }
-                    // Due if the note's UTC midnight due date is on or before the target UTC midnight.
-                    return schedule.nextReviewDate <= targetUTCDayStartForSM2;
+                if (matchExactDate) {
+                    // For all algorithms, a note is due on an exact date if its next review
+                    // timestamp falls anywhere within that UTC day.
+                    return schedule.nextReviewDate >= targetUTCDayStart && schedule.nextReviewDate <= targetUTCDayEnd;
+                } else {
+                    // For all algorithms, a note is due "today" (or on/before a date) if its
+                    // next review timestamp is anytime up to the end of that UTC day.
+                    return schedule.nextReviewDate <= targetUTCDayEnd;
                 }
             })
             .sort((a, b) => a.nextReviewDate - b.nextReviewDate);

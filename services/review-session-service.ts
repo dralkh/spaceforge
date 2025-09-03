@@ -79,7 +79,6 @@ export class ReviewSessionService {
 
             return session;
         } catch (error) {
-            console.error("Error creating review session:", error);
             new Notice("Failed to create review session");
             return null;
         }
@@ -200,7 +199,6 @@ export class ReviewSessionService {
 
         // Access ReviewScheduleService via plugin reference
         if (!this.plugin.reviewScheduleService) {
-             console.error("ReviewScheduleService not available on plugin instance.");
              return 0;
         }
 

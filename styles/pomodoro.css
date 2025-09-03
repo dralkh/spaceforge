@@ -195,14 +195,6 @@
   -moz-appearance: none;
   text-align: center; /* Fallback text alignment */
 }
-.pomodoro-quick-save-btn {
-  /* background-color: var(--interactive-accent); */
-  /* color: var(--text-on-accent); */
-  display: none; /* Hide the save button */
-}
-.pomodoro-quick-save-btn:hover {
-  /* background-color: var(--interactive-accent-hover); */ /* Use existing variable if available */
-}
 .pomodoro-quick-calculate-btn {
   background-color: var(--background-modifier-border);
   color: var(--text-normal);

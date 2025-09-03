@@ -20,6 +20,13 @@
     ]
   },
   "include": [
-    "**/*.ts"
+    "main.ts",
+    "api/**/*.ts",
+    "controllers/**/*.ts",
+    "models/**/*.ts",
+    "services/**/*.ts",
+    "ui/**/*.ts",
+    "utils/**/*.ts",
+    "types/**/*.d.ts"
   ]
 }

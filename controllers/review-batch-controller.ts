@@ -39,7 +39,6 @@ export class ReviewBatchController implements IReviewBatchController {
             return;
         }
 
-        console.log("Review All Notes - Today's Notes Order:", todayNotes.map(n => n.path));
 
         // Always start with first note in current order
         // We need to update the core controller's state
@@ -48,7 +47,6 @@ export class ReviewBatchController implements IReviewBatchController {
             await reviewController.updateTodayNotes(false);
             
             const note = todayNotes[0];
-            console.log(`Review All: Starting with note at index 0: ${note.path}`);
 
             // Start the review with the selected note
             await reviewController.reviewNote(note.path);
@@ -114,9 +112,6 @@ export class ReviewBatchController implements IReviewBatchController {
         // Use notes directly from todayNotes - they're already in the correct order
         // Custom order is already applied by updateTodayNotes if available
         const orderedNotes = [...todayNotes];
-
-        console.log("Review All with MCQ: Using sidebar order for consistent navigation");
-        console.log("Ordered notes:", orderedNotes.map(n => n.path));
 
         // Create a new batch review modal with the ordered notes
         const modal = new BatchReviewModal(this.plugin.app, this.plugin, orderedNotes, useMCQ);
@@ -185,9 +180,7 @@ export class ReviewBatchController implements IReviewBatchController {
         await this.plugin.savePluginData(); // Add save call after loop
 
         // Refresh the sidebar view if available
-        if (this.plugin.sidebarView) {
-            this.plugin.sidebarView.refresh();
-        }
+        this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after postponing
         await reviewController.updateTodayNotes(true);
@@ -223,9 +216,7 @@ export class ReviewBatchController implements IReviewBatchController {
             await this.plugin.savePluginData(); // Save once after all operations
 
             // Refresh the sidebar view if available
-            if (this.plugin.sidebarView) {
-                this.plugin.sidebarView.refresh();
-            }
+            this.plugin.getSidebarView()?.refresh();
             // Update today's notes after advancing
             await reviewController.updateTodayNotes(true);
             new Notice(`Advanced ${advancedCount} note(s).`);
@@ -257,9 +248,7 @@ export class ReviewBatchController implements IReviewBatchController {
         await this.plugin.savePluginData(); // Add save call after loop
 
         // Refresh the sidebar view if available
-        if (this.plugin.sidebarView) {
-            this.plugin.sidebarView.refresh();
-        }
+        this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after removing
         await reviewController.updateTodayNotes(true);

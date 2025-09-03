@@ -29,10 +29,8 @@ export class ClaudeService implements IMCQGenerationService {
             if (settings.mcqQuestionAmountMode === MCQQuestionAmountMode.WordsPerQuestion) {
                 const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
                 numQuestionsToGenerate = Math.max(1, Math.ceil(wordCount / settings.mcqWordsPerQuestion));
-                console.log(`Claude: Calculated ${numQuestionsToGenerate} questions based on ${wordCount} words and ${settings.mcqWordsPerQuestion} words/question setting.`);
             } else { // Fixed mode
                 numQuestionsToGenerate = settings.mcqQuestionsPerNote;
-                console.log(`Claude: Using fixed number of questions: ${numQuestionsToGenerate}`);
             }
 
             const prompt = this.generatePrompt(noteContent, settings, numQuestionsToGenerate);
@@ -50,7 +48,6 @@ export class ClaudeService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch (error) {
-            console.error('Error generating MCQs with Claude:', error);
             new Notice('Failed to generate MCQs with Claude. Please check console for details.');
             return null;
         }
@@ -86,8 +83,6 @@ export class ClaudeService implements IMCQGenerationService {
             ? settings.mcqBasicSystemPrompt 
             : settings.mcqAdvancedSystemPrompt;
 
-        console.log(`Making API request to Claude using model: ${model} with difficulty: ${difficulty}`);
-
         try {
             const response = await requestUrl({
                 url: 'https://api.anthropic.com/v1/messages',
@@ -109,18 +104,15 @@ export class ClaudeService implements IMCQGenerationService {
 
             if (response.status !== 200) {
                 const errorData = response.json || { message: response.text };
-                console.error('Claude API error:', response.status, errorData);
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
             }
 
             const data = response.json;
             if (!data.content || !data.content.length || !data.content[0].text) {
-                console.error('Invalid API response format from Claude:', data);
                 throw new Error('Invalid API response format from Claude - missing content');
             }
             return data.content[0].text;
         } catch (error) {
-            console.error('Error in Claude API request:', error);
             new Notice(`Claude API error: ${error.message}`);
             throw error;
         }
@@ -129,7 +121,6 @@ export class ClaudeService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            console.log('Raw AI response from Claude:', response);
             // Claude might not start with "1. ", so we adjust the split logic if needed.
             // The current logic tries to split by number then newline, which might be robust enough.
             let questionBlocks: string[] = response.split(/\n\d+\.\s+/).filter(block => block.trim().length > 0);
@@ -183,7 +174,6 @@ export class ClaudeService implements IMCQGenerationService {
             }
 
 
-            console.log(`Found ${questionBlocks.length} question blocks from Claude`);
             for (const block of questionBlocks) {
                 const lines = block.split('\n').filter(line => line.trim().length > 0);
                 if (lines.length < 2) continue; // Need at least a question and one choice
@@ -230,10 +220,8 @@ export class ClaudeService implements IMCQGenerationService {
                      questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
-            console.log(`Successfully parsed ${questions.length} MCQ questions from Claude`);
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch (error) {
-            console.error('Error parsing MCQ response from Claude:', error);
             new Notice('Error parsing MCQ response from Claude. Please try again.');
             return [];
         }

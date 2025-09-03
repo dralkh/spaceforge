@@ -57,7 +57,6 @@ export class ReviewController implements IReviewController {
         } else {
              // Handle case where service might not be initialized (e.g., MCQ disabled)
              // Depending on usage, might need null checks later or ensure it's always initialized when enabled.
-             console.warn("MCQ Generation Service not available during ReviewController initialization.");
              // this.mcqController = undefined; // Or handle appropriately
         }
         this.batchController = new ReviewBatchController(plugin); // Initialize batch controller
@@ -238,7 +237,6 @@ export class ReviewController implements IReviewController {
         if (this.mcqController) {
             await this.mcqController.startMCQReview(notePath, onComplete); // Pass the callback here as MCQController expects it
         } else {
-            console.error("MCQ Controller not initialized when calling startMCQReview");
             // Optionally call the callback with failure if provided
             if (onComplete) {
                 onComplete(notePath, false);

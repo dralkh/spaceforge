@@ -29,10 +29,8 @@ export class OllamaService implements IMCQGenerationService {
             if (settings.mcqQuestionAmountMode === MCQQuestionAmountMode.WordsPerQuestion) {
                 const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
                 numQuestionsToGenerate = Math.max(1, Math.ceil(wordCount / settings.mcqWordsPerQuestion));
-                console.log(`Ollama: Calculated ${numQuestionsToGenerate} questions based on ${wordCount} words and ${settings.mcqWordsPerQuestion} words/question setting.`);
             } else { // Fixed mode
                 numQuestionsToGenerate = settings.mcqQuestionsPerNote;
-                console.log(`Ollama: Using fixed number of questions: ${numQuestionsToGenerate}`);
             }
 
             const prompt = this.generatePrompt(noteContent, settings, numQuestionsToGenerate);
@@ -50,7 +48,6 @@ export class OllamaService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch (error) {
-            console.error('Error generating MCQs with Ollama:', error);
             new Notice('Failed to generate MCQs with Ollama. Please check console for details.');
             return null;
         }
@@ -86,8 +83,6 @@ export class OllamaService implements IMCQGenerationService {
             ? settings.mcqBasicSystemPrompt 
             : settings.mcqAdvancedSystemPrompt;
 
-        console.log(`Making API request to Ollama at ${apiUrl} using model: ${model} with difficulty: ${difficulty}`);
-
         try {
             const response = await requestUrl({
                 url: `${apiUrl}/api/chat`,
@@ -107,19 +102,16 @@ export class OllamaService implements IMCQGenerationService {
 
             if (response.status !== 200) {
                 const errorText = response.text;
-                console.error('Ollama API error:', response.status, errorText);
                 throw new Error(`API request failed (${response.status}): ${errorText}`);
             }
 
             const data = response.json;
             // Ollama's non-streaming chat response structure is typically { model, created_at, message: { role, content }, done }
             if (!data.message || !data.message.content) {
-                console.error('Invalid API response format from Ollama:', data);
                 throw new Error('Invalid API response format from Ollama - missing message content');
             }
             return data.message.content;
         } catch (error) {
-            console.error('Error in Ollama API request:', error);
             new Notice(`Ollama API error: ${error.message}`);
             throw error;
         }
@@ -128,7 +120,6 @@ export class OllamaService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            console.log('Raw AI response from Ollama:', response);
             let questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
 
             if (questionBlocks.length === 0) {
@@ -145,7 +136,6 @@ export class OllamaService implements IMCQGenerationService {
                 if (currentQuestion) questionBlocks.push(currentQuestion);
             }
 
-            console.log(`Found ${questionBlocks.length} question blocks from Ollama`);
             for (const block of questionBlocks) {
                 const lines = block.split('\n').filter(line => line.trim().length > 0);
                 if (lines.length < 2) continue;
@@ -179,10 +169,8 @@ export class OllamaService implements IMCQGenerationService {
                     questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
-            console.log(`Successfully parsed ${questions.length} MCQ questions from Ollama`);
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch (error) {
-            console.error('Error parsing MCQ response from Ollama:', error);
             new Notice('Error parsing MCQ response from Ollama. Please try again.');
             return [];
         }

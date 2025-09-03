@@ -42,6 +42,7 @@ export default class SpaceforgePlugin extends Plugin {
     private readonly stylesheetId: string = "spaceforge-styles";
     private lastStylesModTime: number | null = null;
     private cssHotReloadIntervalId: number | null = null;
+    private beforeUnloadHandler: (event: Event) => void; // Declared as a class property
 
     reviewController: ReviewController;
     navigationController: ReviewNavigationController;
@@ -50,12 +51,11 @@ export default class SpaceforgePlugin extends Plugin {
     mcqController: MCQController | undefined;
     mcqGenerationService: IMCQGenerationService | undefined; // Changed from openRouterService
     contextMenuHandler: ContextMenuHandler;
-    sidebarView: ReviewSidebarView;
+    // sidebarView: ReviewSidebarView; // Avoid storing direct references to views
     public clickedDateFromCalendar: Date | null = null;
     events: EventEmitter;
 
     async onload(): Promise<void> {
-        console.log('Loading Spaceforge plugin (version ' + this.manifest.version + ')');
         this.events = new EventEmitter();
 
         // Initialize settings with defaults FIRST
@@ -89,7 +89,7 @@ export default class SpaceforgePlugin extends Plugin {
 
         this.registerView(
             'spaceforge-review-schedule',
-            (leaf) => (this.sidebarView = new ReviewSidebarView(leaf, this))
+            (leaf) => new ReviewSidebarView(leaf, this)
         );
 
         this.dataStorage = new DataStorage(
@@ -120,14 +120,14 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'add-selected-file-to-review',
             name: 'Add Selected File to Review Schedule (File Explorer)',
-            callback: () => {
+            callback: async () => {
                 const fileExplorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
                 const viewWithFile = fileExplorerLeaf?.view as { file?: TFile };
                 if (viewWithFile?.file) {
                     const selectedFile = viewWithFile.file;
                     if (selectedFile instanceof TFile && selectedFile.extension === 'md') {
-                        this.reviewScheduleService.scheduleNoteForReview(selectedFile.path)
-                            .then(() => this.savePluginData());
+                        await this.reviewScheduleService.scheduleNoteForReview(selectedFile.path);
+                        await this.savePluginData();
                         new Notice(`Added "${selectedFile.path}" to review schedule.`);
                     } else {
                         new Notice("Selected item is not a markdown file.");
@@ -144,18 +144,18 @@ export default class SpaceforgePlugin extends Plugin {
                 await this.reviewScheduleService.removeFromReview(file.path);
                 await this.savePluginData();
             }
-            if (this.sidebarView) this.sidebarView.refresh();
+            this.getSidebarView()?.refresh();
         }));
         this.registerEvent(this.app.vault.on('rename', async (file, oldPath) => {
             if (file instanceof TFile && file.extension === "md") {
                 this.reviewScheduleService.handleNoteRename(oldPath, file.path);
                 await this.savePluginData();
             }
-            if (this.sidebarView) this.sidebarView.refresh();
+            this.getSidebarView()?.refresh();
         }));
 
         this.registerInterval(window.setInterval(() => {
-            if (this.sidebarView) this.sidebarView.refresh();
+            this.getSidebarView()?.refresh();
         }, 60 * 1000));
 
         this.app.workspace.onLayoutReady(() => this.activateSidebarView());
@@ -167,10 +167,9 @@ export default class SpaceforgePlugin extends Plugin {
                     const stats = await this.app.vault.adapter.stat(this.stylesheetPath);
                     if (stats && (this.lastStylesModTime === null || this.lastStylesModTime < stats.mtime)) {
                         this.lastStylesModTime = stats.mtime;
-                        console.log("Detected styles.css change, reloading stylesheet...");
                         this.addStylesheet();
                     }
-                } catch (error) { /* console.warn("Error checking stylesheet modification time:", error); */ }
+                } catch (error) { /* handle error */ }
             }, 1000);
             this.registerInterval(this.cssHotReloadIntervalId);
         }
@@ -180,22 +179,19 @@ export default class SpaceforgePlugin extends Plugin {
         }
 
         this.registerInterval(window.setInterval(async () => {
-            console.log("Auto-saving data...");
             await this.savePluginData();
             // Removed specific openRouterApiKey backup from here, handled by general settings save.
         }, 5 * 60 * 1000));
 
-        window.addEventListener('beforeunload', (event) => {
-            console.log("Window closing, saving data immediately...");
+        this.beforeUnloadHandler = (event) => {
             let existingData = {};
             try {
                 const loadedData = this.loadData();
                  if (loadedData && !(loadedData instanceof Promise)) {
                      existingData = loadedData;
                  } else if (loadedData instanceof Promise) {
-                     console.warn("Synchronous loadData not available in beforeunload.");
                  }
-            } catch (loadError) { console.warn("Could not load existing data during unload:", loadError); }
+            } catch (loadError) { /* handle error */ }
 
             try {
                 const reviewData = {
@@ -211,27 +207,33 @@ export default class SpaceforgePlugin extends Plugin {
                 const combinedData = { ...existingData, reviewData };
                 let backupStr = JSON.stringify(combinedData);
                 window.localStorage.setItem('spaceforge-backup', backupStr);
-                console.log(`Saved emergency backup to localStorage (${Math.round(backupStr.length/1024)}KB)`);
-                // Removed specific openRouterApiKey backup from here.
-                this.savePluginData().catch(e => console.error("Error saving to Obsidian storage during unload:", e));
+                (async () => {
+                    try {
+                        await this.savePluginData();
+                    } catch (e) { /* handle error */ }
+                })();
             } catch (error) {
-                console.error("Emergency data backup failed:", error);
                 try {
                     const minimalBackup = JSON.stringify({ settings: this.settings, reviewData: { schedules: this.reviewScheduleService.schedules || {}, customNoteOrder: this.reviewScheduleService.customNoteOrder || [], lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp, version: this.manifest.version }});
                     window.localStorage.setItem('spaceforge-minimal-backup', minimalBackup);
-                } catch (minimalError) { console.error("Even minimal backup failed:", minimalError); }
+                } catch (minimalError) { /* handle error */ }
             }
-        });
+        }; // Removed the extra closing parenthesis and semicolon, and moved the declaration.
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
     }
 
     async onunload(): Promise<void> {
-        console.log('Unloading Spaceforge plugin');
         if (this.cssHotReloadIntervalId !== null) {
             window.clearInterval(this.cssHotReloadIntervalId);
             this.cssHotReloadIntervalId = null;
         }
         const styleEl = document.getElementById(this.stylesheetId);
         if (styleEl) styleEl.remove();
+
+        // Explicitly remove the global event listener
+        if (this.beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+        }
 
         let existingData: Partial<SpaceforgePluginData> = {};
         try { 
@@ -240,7 +242,7 @@ export default class SpaceforgePlugin extends Plugin {
                 existingData = loaded;
             }
         }
-        catch (loadError) { console.warn("Could not load existing data during unload:", loadError); }
+        catch (loadError) { /* handle error */ }
 
         try {
             const reviewData = {
@@ -256,11 +258,11 @@ export default class SpaceforgePlugin extends Plugin {
             const combinedData = { ...existingData, reviewData };
             const backupStr = JSON.stringify(combinedData);
             window.localStorage.setItem('spaceforge-backup', backupStr);
-        } catch (backupError) { console.error("Failed to create emergency backup before unload:", backupError); }
+        } catch (backupError) { /* handle error */ }
 
         try {
             await this.savePluginData();
-        } catch (error) { console.error('Error saving plugin data before unload:', error); }
+        } catch (error) { /* handle error */ }
 
         if (this.pomodoroService) this.pomodoroService.destroy();
     }
@@ -321,25 +323,24 @@ export default class SpaceforgePlugin extends Plugin {
         try {
             if (effectivePath) {
                 // Using custom path
-                if (await this.app.vault.adapter.exists(effectivePath)) {
-                    const jsonData = await this.app.vault.adapter.read(effectivePath);
+                const file = this.app.vault.getAbstractFileByPath(effectivePath);
+                if (file instanceof TFile) {
+                    const jsonData = await this.app.vault.read(file);
                     if (jsonData) rawLoadedData = JSON.parse(jsonData);
                     new Notice(`Spaceforge: Loaded data from custom path: ${effectivePath}`, 3000);
                 } else {
                     // Custom path specified but file doesn't exist.
                     // Check if old default data.json exists for migration.
-                    if (await this.app.vault.adapter.exists(defaultPluginDataPath)) {
+                    const oldFile = this.app.vault.getAbstractFileByPath(defaultPluginDataPath);
+                    if (oldFile instanceof TFile) {
                         new Notice(`Spaceforge: Custom data file not found at ${effectivePath}. Attempting to migrate from default location.`, 5000);
                         try {
-                            const oldJsonData = await this.app.vault.adapter.read(defaultPluginDataPath);
+                            const oldJsonData = await this.app.vault.read(oldFile);
                             if (oldJsonData) {
                                 rawLoadedData = JSON.parse(oldJsonData);
                                 // Data will be saved to new path by savePluginData later
-                                console.log(`Spaceforge: Data from default location will be migrated to ${effectivePath} on next save.`);
                             }
-                        } catch (migrationReadError) {
-                            console.error(`Spaceforge: Error reading data from default location for migration:`, migrationReadError);
-                        }
+                        } catch (migrationReadError) { /* handle error */ }
                     }
                     if (!rawLoadedData) {
                          new Notice(`Spaceforge: No data file found at custom path ${effectivePath}. New data file will be created on save.`, 3000);
@@ -414,11 +415,9 @@ export default class SpaceforgePlugin extends Plugin {
             this.reviewScheduleService.lastLinkAnalysisTimestamp = typeof this.pluginState.lastLinkAnalysisTimestamp === 'number' ? this.pluginState.lastLinkAnalysisTimestamp : null;
             
         } catch (error) {
-            console.error("Error loading plugin data:", error);
             // Fallback to complete defaults if any error during loading sequence
-            console.warn("Spaceforge: loadPluginData caught an error. Re-initializing settings and pluginState to defaults.");
-            this.settings = { ...DEFAULT_SETTINGS }; 
-            this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA }; 
+            this.settings = { ...DEFAULT_SETTINGS };
+            this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA };
             
             // Repopulate services with these fresh defaults
             this.reviewScheduleService.schedules = this.pluginState.schedules || {};
@@ -441,7 +440,6 @@ export default class SpaceforgePlugin extends Plugin {
         try {
             // Ensure settings object exists and is valid, applying defaults if necessary
             if (!this.settings || typeof this.settings !== 'object') {
-                console.warn("Spaceforge: Settings object was invalid, resetting to defaults before save.");
                 this.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
             } else {
                 // Ensure all default keys are present
@@ -450,7 +448,6 @@ export default class SpaceforgePlugin extends Plugin {
 
             // Ensure pluginState object exists
             if (!this.pluginState) {
-                console.warn("Spaceforge: pluginState was undefined, initializing to default before save.");
                 this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA };
             }
             
@@ -470,7 +467,6 @@ export default class SpaceforgePlugin extends Plugin {
                 version: this.manifest.version,
             };
             this.pluginState = currentPluginState; // Update the live pluginState
-
             const dataToSave: SpaceforgePluginData = {
                 settings: this.settings, // Use the already prepared this.settings
                 pluginState: this.pluginState,
@@ -483,32 +479,36 @@ export default class SpaceforgePlugin extends Plugin {
                 // Saving to custom path
                 try {
                     const dirPathOnly = effectiveSavePath.substring(0, effectiveSavePath.lastIndexOf('/'));
-                    if (dirPathOnly && !(await this.app.vault.adapter.exists(dirPathOnly))) {
-                        await this.app.vault.adapter.mkdir(dirPathOnly);
+                    if (dirPathOnly && !this.app.vault.getAbstractFileByPath(dirPathOnly)) {
+                        await this.app.vault.createFolder(dirPathOnly);
                         new Notice(`Spaceforge: Created directory for custom data: ${dirPathOnly}`, 3000);
                     }
-                    await this.app.vault.adapter.write(effectiveSavePath, JSON.stringify(dataToSave, null, 2));
+                    
+                    const file = this.app.vault.getAbstractFileByPath(effectiveSavePath);
+                    if (file instanceof TFile) {
+                        await this.app.vault.modify(file, JSON.stringify(dataToSave, null, 2));
+                    } else {
+                        await this.app.vault.create(effectiveSavePath, JSON.stringify(dataToSave, null, 2));
+                    }
                     // new Notice(`Spaceforge: Data saved to custom path: ${effectiveSavePath}`, 3000); // Removed notice
 
                     // Migration/Cleanup: If we just successfully saved to a custom path,
                     // and the old default data.json exists, remove it.
-                    if (await this.app.vault.adapter.exists(defaultPluginDataPath)) {
+                    const oldFile = this.app.vault.getAbstractFileByPath(defaultPluginDataPath);
+                    if (oldFile instanceof TFile) {
                         // Check if this is a migration scenario (old data was loaded and new path was empty)
                         // This check is a bit implicit. A more robust way would be a flag.
                         // For now, if custom path is active and default exists, assume it's post-migration or user switched.
-                        await this.app.vault.adapter.remove(defaultPluginDataPath);
+                        await this.app.vault.delete(oldFile);
                         new Notice(`Spaceforge: Removed old data file from default plugin folder as custom path is active.`, 5000);
-                        console.log(`Spaceforge: Removed old data file at ${defaultPluginDataPath}`);
                     }
                 } catch (writeError) {
-                    console.error(`Error saving data to custom path ${effectiveSavePath}:`, writeError);
                     new Notice(`Error saving data to custom path ${effectiveSavePath}: ${writeError.message}. Falling back to default path for this save.`, 10000);
                     // Fallback save to default location if custom path write fails
                     try {
                         await this.saveData(dataToSave); // Plugin's internal save
                         new Notice(`Spaceforge: Data saved to default plugin folder due to error with custom path.`, 5000);
                     } catch (fallbackError) {
-                        console.error(`Error saving data to default location after custom path failed:`, fallbackError);
                         new Notice(`CRITICAL: Spaceforge failed to save data to both custom and default locations.`, 10000);
                     }
                 }
@@ -522,7 +522,6 @@ export default class SpaceforgePlugin extends Plugin {
             // If user wants to backup settings, they can use the export feature.
 
         } catch (error) {
-            console.error("General error in savePluginData:", error);
             new Notice("Error saving Spaceforge data. Check console for details.", 5000);
         }
     }
@@ -542,7 +541,6 @@ export default class SpaceforgePlugin extends Plugin {
                 });
                 this.app.workspace.revealLeaf(leaf); // Reveal the newly created leaf
             } else {
-                console.error("Spaceforge: Could not get a leaf to activate the sidebar view.");
                 new Notice("Spaceforge: Could not open sidebar view.");
             }
         }
@@ -581,11 +579,11 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'spaceforge-add-current-note-to-review',
             name: 'Add Current Note to Review Schedule',
-            callback: () => {
+            callback: async () => {
                 const activeFile = this.app.workspace.getActiveFile();
                 if (activeFile && activeFile instanceof TFile && activeFile.extension === 'md') {
-                    this.reviewScheduleService.scheduleNoteForReview(activeFile.path)
-                        .then(() => this.savePluginData());
+                    await this.reviewScheduleService.scheduleNoteForReview(activeFile.path);
+                    await this.savePluginData();
                     new Notice(`Added "${activeFile.path}" to review schedule.`);
                 } else {
                     new Notice('No active markdown file to add to review.');
@@ -616,14 +614,12 @@ export default class SpaceforgePlugin extends Plugin {
         this.mcqController = undefined;
 
         if (this.settings.enableMCQ) {
-            console.log('Initializing MCQ components for provider:', this.settings.mcqApiProvider);
             this.mcqGenerationService = this.createMcqGenerationService();
             if (this.mcqGenerationService) {
                 // Pass the mcqService for data management, and the new mcqGenerationService for API calls
                 this.mcqController = new MCQController(this, this.mcqService, this.mcqGenerationService);
             } else {
                 new Notice('MCQ Generation Service could not be initialized. Check API provider settings in Spaceforge settings.');
-                console.warn(`Failed to create MCQ generation service for provider: ${this.settings.mcqApiProvider}`);
             }
         }
     }
@@ -671,7 +667,6 @@ export default class SpaceforgePlugin extends Plugin {
                 // This could happen if settings data is corrupted or from an older version.
                 // const exhaustiveCheck: never = this.settings.mcqApiProvider; // This will cause a type error now, which is good!
                 new Notice(`Unsupported MCQ API provider selected: ${this.settings.mcqApiProvider}`);
-                console.error(`Unsupported MCQ API provider: ${this.settings.mcqApiProvider}`);
                 return undefined;
         }
     }
@@ -680,4 +675,15 @@ export default class SpaceforgePlugin extends Plugin {
     private addStylesheet(): void { /* ... */ }
     async exportPluginData(): Promise<void> { /* ... */ }
     async importPluginData(fileContent: string): Promise<void> { /* ... */ }
+
+    getSidebarView(): ReviewSidebarView | null {
+        const leaves = this.app.workspace.getLeavesOfType('spaceforge-review-schedule');
+        if (leaves.length > 0) {
+            const view = leaves[0].view;
+            if (view instanceof ReviewSidebarView) {
+                return view;
+            }
+        }
+        return null;
+    }
 }

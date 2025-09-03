@@ -74,8 +74,6 @@ export class ReviewNavigationController implements IReviewNavigationController {
         const nextNote = todayNotes[nextIndex];
         const nextPath = nextNote.path;
 
-        console.log(`Navigating to next note: ${nextIndex + 1}/${todayNotes.length} (${nextPath})`);
-
         // Check the traversal order structure
         // Display appropriate message
         let messageType = "next note";
@@ -109,6 +107,10 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         if (this.plugin.settings.showNavigationNotifications) {
             new Notice(`Navigated to ${messageType} (${nextIndex + 1}/${todayNotes.length})`);
+        }
+
+        if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
+            setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
         }
     }
 
@@ -164,8 +166,6 @@ export class ReviewNavigationController implements IReviewNavigationController {
         const prevNote = todayNotes[prevIndex];
         const prevPath = prevNote.path;
 
-        console.log(`Navigating to previous note: ${prevIndex + 1}/${todayNotes.length} (${prevPath})`);
-
         // Update core controller current index
         if (this.plugin.reviewController) {
             // Set the index directly in the core controller
@@ -177,6 +177,10 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         if (this.plugin.settings.showNavigationNotifications) {
             new Notice(`Navigated to previous note (${prevIndex + 1}/${todayNotes.length})`);
+        }
+
+        if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
+            setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
         }
     }
 
@@ -231,6 +235,23 @@ export class ReviewNavigationController implements IReviewNavigationController {
         await reviewController.updateTodayNotes(true);
 
         // Debug log
-        console.log(`Swapped notes: ${path1} and ${path2}`);
+    }
+    private executeCommand(): void {
+        const command = this.plugin.settings.navigationCommand;
+        if (!command || !command.key) return;
+
+        const eventOptions: KeyboardEventInit = {
+            key: command.key,
+            ctrlKey: command.modifiers.includes('Ctrl'),
+            altKey: command.modifiers.includes('Alt'),
+            shiftKey: command.modifiers.includes('Shift'),
+            metaKey: command.modifiers.includes('Meta'),
+            bubbles: true,
+            cancelable: true,
+        };
+
+        const event = new KeyboardEvent('keydown', eventOptions);
+        window.dispatchEvent(event);
+
     }
 }

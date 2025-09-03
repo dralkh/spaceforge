@@ -137,16 +137,11 @@ export class DataStorage {
      * @returns true if data is valid, false if it needed to be fixed
      */
     public verifyDataIntegrity(): boolean {
-        console.log("Verifying data integrity...");
         let isValid = true;
-
-        // Check schedules (using service data)
         if (!this.reviewScheduleService.schedules || typeof this.reviewScheduleService.schedules !== 'object') {
-            console.warn("Invalid schedules data structure");
             this.reviewScheduleService.schedules = {};
             isValid = false;
         } else {
-            // Check each schedule for required properties
             let invalidCount = 0;
             for (const path in this.reviewScheduleService.schedules) {
                 const schedule = this.reviewScheduleService.schedules[path];
@@ -156,8 +151,6 @@ export class DataStorage {
                     isValid = false;
                     continue;
                 }
-
-                // Use a type assertion to check properties safely
                 const s = schedule as Record<string, any>;
                 if (!('path' in s) || typeof s.path !== 'string' ||
                     !('lastReviewDate' in s) || (s.lastReviewDate !== null && typeof s.lastReviewDate !== 'number') ||
@@ -169,188 +162,110 @@ export class DataStorage {
                     isValid = false;
                 }
             }
-
-            if (invalidCount > 0) {
-                console.warn(`Removed ${invalidCount} invalid schedules`);
-            }
         }
-
-        // Check history (using service data)
         if (!Array.isArray(this.reviewHistoryService.history)) {
-            console.warn("Invalid history data structure");
             this.reviewHistoryService.history = [];
             isValid = false;
         }
-
-        // Check review sessions (using service data)
         if (!this.reviewSessionService.reviewSessions ||
             typeof this.reviewSessionService.reviewSessions !== 'object' ||
             !this.reviewSessionService.reviewSessions.sessions ||
             typeof this.reviewSessionService.reviewSessions.sessions !== 'object') {
 
-            console.warn("Invalid review sessions data structure");
             this.reviewSessionService.reviewSessions = {
                 sessions: {},
                 activeSessionId: null
             };
             isValid = false;
         }
-
-        // Check MCQ sets (using service data)
         if (!this.mcqService.mcqSets || typeof this.mcqService.mcqSets !== 'object') {
-            console.warn("Invalid MCQ sets data structure");
             this.mcqService.mcqSets = {};
             isValid = false;
         }
-
-        // Check MCQ sessions (using service data)
         if (!this.mcqService.mcqSessions || typeof this.mcqService.mcqSessions !== 'object') {
-            console.warn("Invalid MCQ sessions data structure");
             this.mcqService.mcqSessions = {};
             isValid = false;
         }
-
-        // Check custom note order (using service data)
         if (!Array.isArray(this.reviewScheduleService.customNoteOrder)) {
-            console.warn("Invalid custom note order data structure");
             this.reviewScheduleService.customNoteOrder = [];
             isValid = false;
         }
-
-        // Check last link analysis timestamp (using service data)
         if (this.reviewScheduleService.lastLinkAnalysisTimestamp !== null && typeof this.reviewScheduleService.lastLinkAnalysisTimestamp !== 'number') {
-            console.warn("Invalid last link analysis timestamp data structure");
             this.reviewScheduleService.lastLinkAnalysisTimestamp = null;
             isValid = false;
         }
-
-        // Check if data is suspiciously empty (using service data)
         const noSchedules = Object.keys(this.reviewScheduleService.schedules).length === 0;
         const hasMCQs = Object.keys(this.mcqService.mcqSets).length > 0;
 
         if (noSchedules && hasMCQs) {
-            console.warn("WARNING: No schedules found but MCQ data exists - possible data inconsistency");
-            // Removed localStorage check here as it's deprecated
         }
-
-        // Log final data state (using service data)
-        console.log("Data integrity check complete:", {
-            isValid,
-            schedules: Object.keys(this.reviewScheduleService.schedules).length,
-            history: this.reviewHistoryService.history.length,
-            reviewSessions: Object.keys(this.reviewSessionService.reviewSessions.sessions).length,
-            mcqSets: Object.keys(this.mcqService.mcqSets).length,
-            mcqSessions: Object.keys(this.mcqService.mcqSessions).length
-        });
-
-        return isValid; // Returns true if valid, false if fixes were needed
+        return isValid;
     }
 
-
-    /**
-     * Verify data integrity and remove schedules for files that no longer exist
-     * @returns {Promise<boolean>} True if any cleanup was performed, false otherwise.
-     */
     public async cleanupNonExistentFiles(): Promise<boolean> {
-        console.log("Verifying data integrity and cleaning up non-existent files...");
-        let changesMade = false; // Track if any cleanup occurred
-
-        // First, check that we have valid data structures (using service data)
+        let changesMade = false;
         if (!this.reviewScheduleService.schedules || typeof this.reviewScheduleService.schedules !== 'object') {
-            console.warn("Schedules is not a valid object, resetting it");
             this.reviewScheduleService.schedules = {};
-            changesMade = true; // Resetting counts as a change
+            changesMade = true;
         }
-
         if (!Array.isArray(this.reviewHistoryService.history)) {
-            console.warn("History is not a valid array, resetting it");
             this.reviewHistoryService.history = [];
             changesMade = true;
         }
-
         if (!this.reviewSessionService.reviewSessions || typeof this.reviewSessionService.reviewSessions !== 'object' || !this.reviewSessionService.reviewSessions.sessions) {
-            console.warn("Review sessions is not a valid object, resetting it");
             this.reviewSessionService.reviewSessions = {
                 sessions: {},
                 activeSessionId: null
             };
             changesMade = true;
         }
-
-        // Then, remove schedules for files that no longer exist (using service data)
         let cleanupCount = 0;
         const beforeCount = Object.keys(this.reviewScheduleService.schedules).length;
-
-        // CRITICAL FIX: Add a safeguard to prevent removing all schedules
         const safetyCheck = {
             totalSchedules: beforeCount,
             checkedSchedules: 0,
             missingSchedules: 0,
             preserved: false
         };
-
         try {
-            const allSchedules = {...this.reviewScheduleService.schedules}; // Create a copy
+            const allSchedules = {...this.reviewScheduleService.schedules};
             const allFiles = new Set<string>();
-
-            // Preload all markdown files
             try {
                 const mdFiles = this.plugin.app.vault.getMarkdownFiles();
                 mdFiles.forEach(file => allFiles.add(file.path));
-                console.log(`Preloaded ${allFiles.size} markdown files for checking`);
             } catch (listError) {
-                console.error("Error listing markdown files:", listError);
-                return changesMade; // Return current state if file listing fails
+                return changesMade;
             }
-
-            // Safety check: If no files found but schedules exist
             if (allFiles.size === 0 && beforeCount > 0) {
-                console.warn("No files found in vault but schedules exist - preserving schedules");
                 safetyCheck.preserved = true;
-                return changesMade; // No cleanup performed, return current state
+                return changesMade;
             }
-
             for (const path in allSchedules) {
                 try {
                     safetyCheck.checkedSchedules++;
-
-                    if (allFiles.has(path)) continue; // File exists
-
-                    // Double-check with direct vault access
+                    if (allFiles.has(path)) continue;
                     const file = this.plugin.app.vault.getAbstractFileByPath(path);
                     if (!file) {
                         safetyCheck.missingSchedules++;
-                        delete this.reviewScheduleService.schedules[path]; // Delete from service data
+                        delete this.reviewScheduleService.schedules[path];
                         cleanupCount++;
-                        changesMade = true; // Mark that changes were made
+                        changesMade = true;
                     }
                 } catch (checkError) {
-                    console.warn(`Error checking file at path ${path}:`, checkError);
                 }
-
-                // SAFETY CHECK: Abort if removing too many
                 if (safetyCheck.missingSchedules > 0 &&
                     safetyCheck.missingSchedules === safetyCheck.checkedSchedules &&
                     safetyCheck.checkedSchedules >= 5) {
 
-                    console.warn(`SAFETY ALERT: Preventing removal of all schedules (${safetyCheck.missingSchedules}/${safetyCheck.totalSchedules} would be removed)`);
-                    this.reviewScheduleService.schedules = allSchedules; // Restore service data
+                    this.reviewScheduleService.schedules = allSchedules;
                     cleanupCount = 0;
-                    changesMade = false; // Revert changesMade flag
+                    changesMade = false;
                     safetyCheck.preserved = true;
                     break;
                 }
             }
-
-            console.log(`Cleanup complete: ${beforeCount} schedules before, ${Object.keys(this.reviewScheduleService.schedules).length} after (${cleanupCount} removed)`);
-            console.log(`Safety check: ${safetyCheck.checkedSchedules} checked, ${safetyCheck.missingSchedules} missing, preserved: ${safetyCheck.preserved}`);
-
-            // Removed the saveData call from here
             if (cleanupCount > 0 && !safetyCheck.preserved) {
-                console.log(`Spaceforge: Cleaned up ${cleanupCount} non-existent files from schedules. Data needs saving.`);
             }
-
-            // Log final state after potential cleanup
             const dataState = {
                 schedules: Object.keys(this.reviewScheduleService.schedules).length,
                 history: this.reviewHistoryService.history.length,
@@ -358,14 +273,9 @@ export class DataStorage {
                 mcqSets: Object.keys(this.mcqService.mcqSets || {}).length,
                 mcqSessions: Object.keys(this.mcqService.mcqSessions || {}).length
             };
-            console.log("Final data state after cleanup check:", dataState);
-
             if (dataState.schedules === 0 && (dataState.history > 0 || dataState.reviewSessions > 0 || dataState.mcqSets > 0)) {
-                console.warn("WARNING: No schedules found but other data exists - possible data inconsistency");
             }
-
         } catch (error) {
-            console.error("Error during cleanup:", error);
         }
 
         return changesMade; // Return whether cleanup occurred
@@ -429,7 +339,6 @@ export class DataStorage {
             const content = await this.plugin.app.vault.read(file);
             return EstimationUtils.estimateReviewTime(file, content);
         } catch (error) {
-            console.error("Error estimating review time:", error);
             return 60; // Default 1 minute
         }
     }

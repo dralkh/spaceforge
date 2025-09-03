@@ -1,3 +1,4 @@
+
 import { App, Notice, PluginSettingTab, Setting, setIcon, TextAreaComponent } from 'obsidian'; // Added TextAreaComponent
 import SpaceforgePlugin from '../main';
 // Import ApiProvider, DEFAULT_SETTINGS, SpaceforgeSettings, and MCQQuestionAmountMode
@@ -31,7 +32,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         
-        containerEl.createEl('h2', { text: 'Spaceforge Settings' });
+        // containerEl.createEl('h2', { text: 'Spaceforge Settings' }); // Avoid top-level headings
         
         // Add a utility for creating collapsible sections
         const createCollapsible = (title: string, iconName: string, defaultOpen = true) => {
@@ -81,7 +82,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             const actionsContainer = containerEl.createEl('div', { cls: 'sf-settings-actions' });
             
             // Export all data button
-            const exportBtn = actionsContainer.createEl('button', { text: 'Export All Data' });
+            const exportBtn = actionsContainer.createEl('button', { text: 'Export all data' });
             exportBtn.addEventListener('click', () => {
                 // Construct the full plugin data for export
                 const pluginStateToExport = {
@@ -118,7 +119,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             });
             
             // Import all data button
-            const importBtn = actionsContainer.createEl('button', { text: 'Import All Data' });
+            const importBtn = actionsContainer.createEl('button', { text: 'Import all data' });
             importBtn.addEventListener('click', () => {
                 const input = document.createElement('input');
                 input.type = 'file';
@@ -164,7 +165,6 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             
                             new Notice('All plugin data imported successfully. Plugin may require a reload for all changes to take effect.');
                         } catch (error) {
-                            console.error('Failed to import data:', error);
                             new Notice(`Failed to import data: ${error.message}`);
                         }
                     }
@@ -173,7 +173,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             });
             
             // Reset to defaults button
-            const resetBtn = actionsContainer.createEl('button', { text: 'Reset to Defaults' });
+            const resetBtn = actionsContainer.createEl('button', { text: 'Reset to defaults' });
             resetBtn.addEventListener('click', async () => {
                 const confirmed = confirm('Are you sure you want to reset all plugin data (settings and state) to defaults? This cannot be undone.');
                 
@@ -208,7 +208,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             // Clear Schedule Data button
             const clearScheduleBtn = actionsContainer.createEl('button', { 
-                text: 'Clear All Schedule Data', 
+                text: 'Clear all schedule data',
                 cls: 'sf-button-danger' // Optional: Add a class for dangerous actions
             });
             clearScheduleBtn.addEventListener('click', async () => {
@@ -252,12 +252,9 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
                         // Then refresh UI elements
                         this.display(); // Refresh settings UI
-                        if (this.plugin.sidebarView) {
-                            this.plugin.sidebarView.refresh();
-                        }
+                        this.plugin.getSidebarView()?.refresh();
 
                     } catch (error) {
-                        console.error('Failed to clear schedule data:', error);
                         new Notice('Failed to clear schedule data. Check console for details.');
                     }
                 }
@@ -267,11 +264,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         };
         
         // ========= SPACED REPETITION SECTION =========
-        const spacedRepSection = createCollapsible('Spaced Repetition', 'calendar-clock', true);
+        const spacedRepSection = createCollapsible('Spaced repetition', 'calendar-clock', true);
 
         // --- Algorithm Selection ---
         // Changed to h3 and removed sf-settings-subsection class for potentially better contrast
-        spacedRepSection.createEl('h3', { text: 'Algorithm Configuration' });
+        new Setting(spacedRepSection).setName('Algorithm configuration').setHeading();
 
         const algoSelectionSetting = new Setting(spacedRepSection)
             .setName('Default scheduling algorithm')
@@ -294,7 +291,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const sm2ParamsContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const sm2Summary = sm2ParamsContainer.createEl('summary');
         // Changed to h3
-        sm2Summary.createEl('h3', { text: 'SM-2 Parameters' });
+        sm2Summary.setText('SM-2 parameters');
         sm2ParamsContainer.open = false; // Initially closed
 
 
@@ -366,11 +363,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const fsrsParamsContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const fsrsSummary = fsrsParamsContainer.createEl('summary');
         // Changed to h3
-        fsrsSummary.createEl('h3', { text: 'FSRS Parameters' });
+        fsrsSummary.setText('FSRS parameters');
         fsrsParamsContainer.open = false; // Initially closed
 
         new Setting(fsrsParamsContainer)
-            .setName('Request Retention')
+            .setName('Request retention')
             .setDesc('Desired recall probability (0.7-0.99, default: 0.9). Higher values mean more frequent reviews.')
             .addText(text => text
                 .setValue(this.plugin.settings.fsrsParameters?.request_retention?.toString() ?? DEFAULT_SETTINGS.fsrsParameters.request_retention!.toString())
@@ -386,7 +383,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(fsrsParamsContainer)
-            .setName('Maximum Interval (days)')
+            .setName('Maximum interval (days)')
             .setDesc('Longest possible interval FSRS will schedule.')
             .addText(text => text
                 .setValue(this.plugin.settings.fsrsParameters?.maximum_interval?.toString() ?? DEFAULT_SETTINGS.fsrsParameters.maximum_interval!.toString())
@@ -402,7 +399,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(fsrsParamsContainer)
-            .setName('Learning Steps (minutes)')
+            .setName('Learning steps (minutes)')
             .setDesc('Comma-separated initial learning intervals in minutes (e.g., 1,10 for 1m, 10m).')
             .addText(text => text
                 .setValue(this.plugin.settings.fsrsParameters?.learning_steps?.join(',') ?? DEFAULT_SETTINGS.fsrsParameters.learning_steps!.join(','))
@@ -420,9 +417,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         new Notice("FSRS Learning Steps must be valid comma-separated numbers > 0, or empty.");
                     }
                 }));
-
         new Setting(fsrsParamsContainer)
-            .setName('Enable Fuzz')
+            .setName('Enable fuzz')
             .setDesc('Add slight randomness to FSRS intervals (recommended).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.fsrsParameters?.enable_fuzz ?? DEFAULT_SETTINGS.fsrsParameters.enable_fuzz!)
@@ -431,9 +427,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     await this.plugin.savePluginData();
                     this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                 }));
-
         new Setting(fsrsParamsContainer)
-            .setName('Enable Short Term Scheduling')
+            .setName('Enable short term scheduling')
             .setDesc('Use FSRS short-term memory model (affects initial learning steps).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.fsrsParameters?.enable_short_term ?? DEFAULT_SETTINGS.fsrsParameters.enable_short_term!)
@@ -442,13 +437,12 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     await this.plugin.savePluginData();
                     this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                 }));
-        
         new Setting(fsrsParamsContainer)
-            .setName('Weights (W)')
+            .setName('Weights (w)')
             .setDesc('FSRS algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.')
             .addTextArea(text => {
                 text.inputEl.rows = 3;
-                text.inputEl.style.width = "100%"; // Ensure it takes full width
+                text.inputEl.addClass('sf-full-width-textarea');
                 text.setValue(this.plugin.settings.fsrsParameters?.w?.join(',') ?? DEFAULT_SETTINGS.fsrsParameters.w!.join(','))
                     .onChange(async (value) => {
                         const weights = value.split(',').map(s => parseFloat(s.trim()));
@@ -466,7 +460,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const conversionContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const conversionSummary = conversionContainer.createEl('summary');
         // Changed to h3
-        conversionSummary.createEl('h3', { text: 'Card Conversion Utilities' });
+        conversionSummary.setText('Card conversion utilities');
         conversionContainer.open = false; // Initially closed
 
         new Setting(conversionContainer)
@@ -504,10 +498,10 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
         
         // ========= INTERFACE SECTION =========
-        const interfaceSection = createCollapsible('Interface & Behavior', 'settings', false); // Closed by default
+        const interfaceSection = createCollapsible('Interface & behavior', 'settings', false); // Closed by default
         
         new Setting(interfaceSection)
-            .setName("Display Settings")
+            .setName("Display")
             .setHeading()
             .setClass("sf-settings-subsection-header"); // Add a class for potential specific styling
 
@@ -521,9 +515,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 .onChange(async (value: 'list' | 'calendar') => {
                     this.plugin.settings.sidebarViewType = value;
                     await this.plugin.savePluginData();
-                    if (this.plugin.sidebarView) {
-                        this.plugin.sidebarView.refresh();
-                    }
+                    this.plugin.getSidebarView()?.refresh();
                 }));
         
         new Setting(interfaceSection)
@@ -537,7 +529,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(interfaceSection)
-            .setName("Review Behavior")
+            .setName("Review behavior")
             .setHeading()
             .setClass("sf-settings-subsection-header");
 
@@ -579,9 +571,71 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         interfaceSection.createEl('div', { cls: 'sf-setting-explain', 
             text: 'Average adults read 200-250 WPM for regular content, 100-150 WPM for technical content' 
         });
+
+        new Setting(interfaceSection)
+            .setName("Navigation command")
+            .setHeading()
+            .setClass("sf-settings-subsection-header");
+
+        new Setting(interfaceSection)
+            .setName('Enable navigation command')
+            .setDesc('Execute a command with a slight delay after navigating to the next or previous note.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableNavigationCommands)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.enableNavigationCommands = value;
+                    await this.plugin.savePluginData();
+                    this.display(); // Refresh to show/hide dependent settings
+                }));
+        
+        if (this.plugin.settings.enableNavigationCommands) {
+            new Setting(interfaceSection)
+                .setName('Command to execute')
+                .setDesc('Click the button and press the desired hotkey.')
+                .addButton(button => {
+                    const command = this.plugin.settings.navigationCommand;
+                    const hotkeyText = command.key ? [...command.modifiers, command.key].join(' + ') : 'Click to set';
+                    button.setButtonText(hotkeyText)
+                        .onClick(() => {
+                            button.setButtonText('...');
+                            const keydownHandler = (e: KeyboardEvent) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const modifiers = [];
+                                if (e.ctrlKey) modifiers.push('Ctrl');
+                                if (e.metaKey) modifiers.push('Meta');
+                                if (e.altKey) modifiers.push('Alt');
+                                if (e.shiftKey) modifiers.push('Shift');
+                                let key = e.key;
+                                if (key === ' ') key = 'Space';
+                                if (!['Control', 'Shift', 'Alt', 'Meta'].includes(key)) {
+                                    this.plugin.settings.navigationCommand = {
+                                        modifiers,
+                                        key,
+                                    };
+                                    this.plugin.savePluginData();
+                                    document.removeEventListener('keydown', keydownHandler, { capture: true });
+                                    this.display();
+                                }
+                            };
+                            document.addEventListener('keydown', keydownHandler, { capture: true });
+                        });
+                });
+            new Setting(interfaceSection)
+                .setName('Command execution delay (ms)')
+                .setDesc('How long to wait before executing the command after navigation.')
+                .addSlider(slider => slider
+                    .setLimits(0, 2000, 100)
+                    .setValue(this.plugin.settings.navigationCommandDelay)
+                    .setDynamicTooltip()
+                    .onChange(async (value: number) => {
+                        this.plugin.settings.navigationCommandDelay = value;
+                        await this.plugin.savePluginData();
+                    }));
+        }
         
         // ========= MCQ SECTION =========
-        const mcqSection = createCollapsible('Multiple Choice Questions', 'newspaper', false); // Closed by default
+        const mcqSection = createCollapsible('Multiple choice questions', 'newspaper', false); // Closed by default
         
         new Setting(mcqSection)
             .setName('Enable MCQ feature')
@@ -604,7 +658,6 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         };
                         window.localStorage.setItem('spaceforge-api-settings', JSON.stringify(apiSettings));
                     } catch (e) {
-                        console.error("Error updating API settings backup:", e);
                     }
                     
                     // Refresh the MCQ settings visibility
@@ -614,13 +667,13 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         // Only show other MCQ settings if the feature is enabled
         if (this.plugin.settings.enableMCQ) {
             new Setting(mcqSection)
-                .setName("API Configuration")
+                .setName("API configuration")
                 .setHeading()
                 .setClass("sf-settings-subsection-header");
 
             // API Provider Dropdown
             new Setting(mcqSection)
-                .setName('API Provider')
+                .setName('API provider')
                 .setDesc('Select the API provider for generating MCQs.')
                 .addDropdown(dropdown => {
                     dropdown
@@ -644,12 +697,12 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             if (provider === ApiProvider.OpenRouter) {
                 new Setting(mcqSection)
-                    .setName("OpenRouter Configuration")
+                    .setName("OpenRouter configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 const apiKeyContainer = mcqSection.createEl('div', { cls: 'sf-setting-highlight' });
                 new Setting(apiKeyContainer)
-                    .setName('OpenRouter API Key')
+                    .setName('OpenRouter API key')
                     .setDesc('Required for generating MCQs via OpenRouter.')
                     .addText(text => text
                         .setPlaceholder('Enter your OpenRouter API key')
@@ -662,7 +715,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 apiKeyContainer.createEl('div').setText('Get your API key at https://openrouter.ai/keys');
 
                 new Setting(mcqSection)
-                    .setName('OpenRouter Model')
+                    .setName('OpenRouter model')
                     .setDesc('Model identifier from OpenRouter (e.g., openai/gpt-4.1-mini)')
                     .addText(text => text
                         .setPlaceholder('Enter OpenRouter model identifier')
@@ -674,11 +727,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
             } else if (provider === ApiProvider.OpenAI) {
                 new Setting(mcqSection)
-                    .setName("OpenAI Configuration")
+                    .setName("OpenAI configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('OpenAI API Key')
+                    .setName('OpenAI API key')
                     .setDesc('Your OpenAI API key.')
                     .addText(text => text
                         .setPlaceholder('Enter your OpenAI API key (sk-...)')
@@ -688,7 +741,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('OpenAI Model')
+                    .setName('OpenAI model')
                     .setDesc('Model name (e.g., gpt-3.5-turbo, gpt-4)')
                     .addText(text => text
                         .setPlaceholder('Enter OpenAI model name')
@@ -699,7 +752,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
             } else if (provider === ApiProvider.Ollama) {
                 new Setting(mcqSection)
-                    .setName("Ollama Configuration")
+                    .setName("Ollama configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
@@ -713,7 +766,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Ollama Model')
+                    .setName('Ollama model')
                     .setDesc('Name of the Ollama model to use (e.g., llama3, mistral)')
                     .addText(text => text
                         .setPlaceholder('Enter Ollama model name')
@@ -724,11 +777,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
             } else if (provider === ApiProvider.Gemini) {
                 new Setting(mcqSection)
-                    .setName("Gemini Configuration")
+                    .setName("Gemini configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                  new Setting(mcqSection)
-                    .setName('Gemini API Key')
+                    .setName('Gemini API key')
                     .setDesc('Your Google AI Gemini API key.')
                     .addText(text => text
                         .setPlaceholder('Enter your Gemini API key')
@@ -738,7 +791,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Gemini Model')
+                    .setName('Gemini model')
                     .setDesc('Model name (e.g., gemini-pro)')
                     .addText(text => text
                         .setPlaceholder('Enter Gemini model name')
@@ -749,11 +802,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
             } else if (provider === ApiProvider.Claude) {
                 new Setting(mcqSection)
-                    .setName("Claude Configuration")
+                    .setName("Claude configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('Claude API Key')
+                    .setName('Claude API key')
                     .setDesc('Your Anthropic Claude API key.')
                     .addText(text => text
                         .setPlaceholder('Enter your Claude API key')
@@ -763,7 +816,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Claude Model')
+                    .setName('Claude model')
                     .setDesc('Model name (e.g., claude-3-opus-20240229, claude-3-sonnet-20240229)')
                     .addText(text => text
                         .setPlaceholder('Enter Claude model name')
@@ -774,11 +827,11 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
             } else if (provider === ApiProvider.Together) {
                 new Setting(mcqSection)
-                    .setName("Together AI Configuration")
+                    .setName("Together AI configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('Together AI API Key')
+                    .setName('Together AI API key')
                     .setDesc('Your Together AI API key.')
                     .addText(text => text
                         .setPlaceholder('Enter your Together AI API key')
@@ -788,7 +841,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Together AI Model')
+                    .setName('Together AI model')
                     .setDesc('Model identifier from Together AI (e.g., meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)')
                     .addText(text => text
                         .setPlaceholder('Enter Together AI model identifier')
@@ -801,7 +854,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             
             // Question generation settings (common to all providers)
             new Setting(mcqSection)
-                .setName("Question Generation (Common)")
+                .setName("Question generation (common)")
                 .setHeading()
                 .setClass("sf-settings-subsection-header");
 
@@ -910,7 +963,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             
             // Scoring settings
             new Setting(mcqSection)
-                .setName("Scoring Settings")
+                .setName("Scoring")
                 .setHeading()
                 .setClass("sf-settings-subsection-header");
             
@@ -937,7 +990,6 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         this.plugin.settings.mcqTimeDeductionSeconds = value;
                         await this.plugin.savePluginData();
                     }));
-
             new Setting(mcqSection)
                 .setName('Deduct full mark on first failure')
                 .setDesc('If enabled, the score for a question will be 0 if the first attempt is incorrect.')
@@ -950,10 +1002,10 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             
             // Add collapsible section for system prompts
             const systemPromptsContainer = mcqSection.createEl('details', { cls: 'sf-system-prompts-container' });
-            systemPromptsContainer.createEl('summary', { text: 'System Prompts (Advanced)', cls: 'sf-settings-subsection' });
+            systemPromptsContainer.createEl('summary', { text: 'System prompts (advanced)', cls: 'sf-settings-subsection' });
             
             // Basic prompt textarea
-            systemPromptsContainer.createEl('div', { text: 'Basic Difficulty Prompt', cls: 'sf-prompt-label' });
+            systemPromptsContainer.createEl('div', { text: 'Basic difficulty prompt', cls: 'sf-prompt-label' });
             const basicTextarea = systemPromptsContainer.createEl('textarea', {
                 attr: {
                     placeholder: 'Enter system prompt for basic difficulty',
@@ -970,7 +1022,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             });
             
             // Advanced prompt textarea
-            systemPromptsContainer.createEl('div', { text: 'Advanced Difficulty Prompt', cls: 'sf-prompt-label' });
+            systemPromptsContainer.createEl('div', { text: 'Advanced difficulty prompt', cls: 'sf-prompt-label' });
             const advancedTextarea = systemPromptsContainer.createEl('textarea', {
                 attr: {
                     placeholder: 'Enter system prompt for advanced difficulty',
@@ -988,7 +1040,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             // Advanced Question Behavior subsection
             new Setting(mcqSection)
-                .setName("Advanced Question Behavior")
+                .setName("Advanced question behavior")
                 .setHeading()
                 .setClass("sf-settings-subsection-header");
 
@@ -1034,15 +1086,15 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // If MCQ is disabled, show a message about enabling it
             const mcqDisabledMessage = mcqSection.createEl('div', { cls: 'sf-info-box' });
             mcqDisabledMessage.createEl('p', { 
-                text: 'Multiple Choice Questions are currently disabled. Enable them to generate AI-powered quizzes that test your understanding of notes.'
+                text: 'Multiple Choice Questions are currently disabled. Enable it to configure durations and notifications.'
             });
         }
         
         // ========= POMODORO TIMER SECTION =========
-        const pomodoroSection = createCollapsible('Pomodoro Timer', 'timer', false); // Added timer icon
+        const pomodoroSection = createCollapsible('Pomodoro timer', 'timer', false); // Added timer icon
 
         new Setting(pomodoroSection)
-            .setName('Enable Pomodoro Timer')
+            .setName('Enable pomodoro timer')
             .setDesc('Show the Pomodoro timer in the sidebar.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.pomodoroEnabled)
@@ -1051,19 +1103,19 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     await this.plugin.savePluginData();
                     // Notify the service and refresh UI elements
                     this.plugin.pomodoroService?.onSettingsChanged(); 
-                    this.plugin.sidebarView?.refresh(); // Refresh sidebar to show/hide timer
+                    this.plugin.getSidebarView()?.refresh(); // Refresh sidebar to show/hide timer
                     this.display(); // Refresh settings tab to show/hide dependent settings
                 }));
 
         // Only show other Pomodoro settings if the feature is enabled
         if (this.plugin.settings.pomodoroEnabled) {
             new Setting(pomodoroSection)
-                .setName("Timer Durations (minutes)")
+                .setName("Timer durations (minutes)")
                 .setHeading()
                 .setClass("sf-settings-subsection-header");
 
             new Setting(pomodoroSection)
-                .setName('Work Duration')
+                .setName('Work duration')
                 .setDesc('Length of a work session.')
                 .addText(text => text
                     .setPlaceholder('25')
@@ -1078,7 +1130,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     }));
             
             new Setting(pomodoroSection)
-                .setName('Short Break Duration')
+                .setName('Short break duration')
                 .setDesc('Length of a short break.')
                 .addText(text => text
                     .setPlaceholder('5')
@@ -1093,7 +1145,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     }));
 
             new Setting(pomodoroSection)
-                .setName('Long Break Duration')
+                .setName('Long break duration')
                 .setDesc('Length of a long break.')
                 .addText(text => text
                     .setPlaceholder('15')
@@ -1108,7 +1160,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     }));
 
             new Setting(pomodoroSection)
-                .setName('Sessions Until Long Break')
+                .setName('Sessions until long break')
                 .setDesc('Number of work sessions before a long break starts.')
                 .addText(text => text
                     .setPlaceholder('4')
@@ -1128,7 +1180,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 .setClass("sf-settings-subsection-header");
 
             new Setting(pomodoroSection)
-                .setName('Enable Sound Notifications')
+                .setName('Enable sound notifications')
                 .setDesc('Play a sound at the end of each work/break session.')
                 .addToggle(toggle => toggle
                     .setValue(this.plugin.settings.pomodoroSoundEnabled)
@@ -1144,7 +1196,6 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         }
 
         // Add global action buttons at the bottom
-        containerEl.createEl('h2', { text: 'Manage Plugin Data' });
         createActionButtons();
     }
 
@@ -1232,9 +1283,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             const row4 = tbody.insertRow();
             row4.createEl('td', { text: '4 (Easy)' });
-            row4.createEl('td', { text: 'Recalled very easily' });
-            row4.createEl('td', { text: 'Largest increase in stability, may decrease difficulty' });
-            container.createEl('p', {text: 'FSRS parameters (weights, retention, etc.) can be tuned, but the defaults are generally effective.'});
+            row4.createEl('td', { text: 'Recalled easily' });
+            row4.createEl('td', { text: 'Largest increase in stability' });
         }
     }
 }

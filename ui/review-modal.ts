@@ -1,4 +1,4 @@
-import { Modal, Notice, TFile, setIcon } from 'obsidian';
+import { Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, ReviewSchedule, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
 import { State as FsrsState } from 'ts-fsrs'; // For displaying FSRS state name
@@ -19,7 +19,7 @@ export class ReviewModal extends Modal {
 
     onOpen(): void {
         const { contentEl } = this;
-        contentEl.createEl("h2", { text: "Review Note" });
+        new Setting(contentEl).setName("Review Note").setHeading();
 
         const buttonsContainer = contentEl.createDiv("review-buttons-container");
         const schedule = this.plugin.reviewScheduleService.schedules[this.path];

@@ -42,11 +42,12 @@ export class ReviewSessionController implements IReviewSessionController {
 
         // If we don't have links cached, try to analyze them
         if (links.length === 0) {
-            this.analyzeNoteLinks(notePath).then(newLinks => {
+            (async () => {
+                const newLinks = await this.analyzeNoteLinks(notePath);
                 if (newLinks.length > 0) {
                     this.linkedNoteCache.set(notePath, newLinks);
                 }
-            });
+            })();
 
             // For now, return an empty array since we're still analyzing
             return [];
@@ -76,7 +77,6 @@ export class ReviewSessionController implements IReviewSessionController {
             
             return links;
         } catch (error) {
-            console.error(`Error analyzing links for ${notePath}:`, error);
             return [];
         }
     }

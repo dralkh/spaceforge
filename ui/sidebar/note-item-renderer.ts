@@ -118,7 +118,6 @@ export class NoteItemRenderer {
         onNoteAction: () => Promise<void>
     ): Promise<HTMLElement> {
         if (!parentContainerForBulkActions) {
-            console.error("Spaceforge: parentContainerForBulkActions is null in renderNoteItem. This should not happen.");
             parentContainerForBulkActions = document.body; // Fallback
         }
         const noteEl = notesContainer.createDiv("review-note-item");
@@ -126,8 +125,7 @@ export class NoteItemRenderer {
         // Data attributes and dynamic content will be set by _populateNoteItemDetails.
 
         // --- Create Static Structure ---
-        const titleEl = noteEl.createDiv("review-note-title");
-        titleEl.style.cursor = "pointer";
+        const titleEl = noteEl.createDiv({ cls: ["review-note-title", "sf-pointer-cursor"] });
 
         noteEl.createDiv("review-note-phase"); // Placeholder, content filled by _populate...
 
@@ -200,7 +198,6 @@ export class NoteItemRenderer {
                     new Notice(`Note postponed`);
                     await onNoteAction();
                 } catch (error) {
-                    console.error("Error postponing note:", error);
                     new Notice("Failed to postpone note.");
                     await onNoteAction();
                 }
@@ -221,7 +218,6 @@ export class NoteItemRenderer {
                     new Notice(`Note removed from review schedule`);
                     await onNoteAction();
                 } catch (error) {
-                    console.error("Error removing note:", error);
                     new Notice("Failed to remove note from schedule.");
                     await onNoteAction();
                 }

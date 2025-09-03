@@ -161,9 +161,7 @@ export class LinkAnalyzer {
                         }
                     }
                 }
-            } catch (error) {
-                console.error(`Error processing file ${file.path}:`, error);
-            }
+            } catch (error) { /* handle error */ }
         }
         
         // Find the node with the most outgoing links as the starting point
@@ -363,7 +361,6 @@ export class LinkAnalyzer {
 
             const node = nodes[currentNodePath];
             if (!node) {
-                console.warn(`${"  ".repeat(currentDepth)}LinkAnalyzer: Node not found for path: ${currentNodePath}`);
                 return;
             }
             
@@ -398,7 +395,6 @@ export class LinkAnalyzer {
         if (nodes[startNodePath]) {
             traverse(startNodePath, 0, mainFolder);
         } else {
-            console.warn(`LinkAnalyzer: Start node ${startNodePath} not found in nodes. Traversal order might be empty or incomplete.`);
         }
         
         // The traversal initiated by traverse(startNodePath, 0) should now correctly capture
@@ -510,9 +506,6 @@ export class LinkAnalyzer {
             
             
             return resolvedLinks;
-        } catch (error) {
-            console.error(`LinkAnalyzer: Error analyzing links in ${filePath}:`, error);
-            return [];
-        }
+        } catch (error) { /* handle error */ return []; }
     }
 }

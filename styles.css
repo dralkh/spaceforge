@@ -2973,9 +2973,6 @@ button.disabled:hover {
   -moz-appearance: none;
   text-align: center;
 }
-.pomodoro-quick-save-btn {
-  display: none;
-}
 .pomodoro-quick-calculate-btn {
   background-color: var(--background-modifier-border);
   color: var(--text-normal);

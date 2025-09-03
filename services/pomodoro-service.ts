@@ -237,9 +237,7 @@ export class PomodoroService {
 
             oscillator.start();
             oscillator.stop(audioContext.currentTime + 0.5); // Play for 0.5 seconds
-        } catch (e) {
-            console.error("Could not play sound notification:", e);
-        }
+        } catch (e) { /* handle error */ }
     }
 
     private notifyUpdate(): void {

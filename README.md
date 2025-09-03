@@ -18,21 +18,26 @@ https://github.com/user-attachments/assets/10bb251e-360c-41ae-a128-e90f3f3e2576
     *   Effortlessly create Multiple Choice Questions (MCQs) directly from your Obsidian notes, transforming them into interactive quizzes.
     *   Leverage powerful AI models from various providers: **OpenAI, OpenRouter, Ollama, Gemini, Claude, and Together** for intelligent question generation.
     *   Seamlessly configure API keys and AI models within the plugin settings for personalized quiz creation.
+    *   **Updated scoring system** that deducts full marks on initial incorrect attempts for better learning assessment.
 *   **Integrated Pomodoro Timer:**
     *   Boost productivity with a built-in Pomodoro timer.
     *   Customize work, short break, and long break durations.
     *   Track sessions and manage your focus directly within Obsidian.
 *   **Comprehensive Review Management:**
-    *   A dedicated sidebar view displays upcoming reviews, estimated completion times, and allows for easy navigation.
-    *   Calendar view for visualizing your review schedule.
+    *   A dedicated sidebar view displays upcoming reviews, estimated completion times, and allows for easy navigation with configurable hotkey support.
+    *   Calendar view for visualizing your review schedule with standardized UTC date calculations.
 *   **Flexible Note Addition:**
     *   Add individual notes or entire folders to your review schedule via the right-click context menu.
     *   Use Obsidian commands to add the current note or its folder.
-*   **Centralized Data, No Frontmatter Clutter:**
+*   **Centralized Data Management:**
     *   All review schedules and plugin data are stored centrally, keeping your note frontmatter clean.
-    *   Option to specify a custom data path for your Spaceforge data.
-*   **Customizable Settings:**
-    *   Extensive settings tab to configure scheduling algorithms, API providers, Pomodoro timer, appearance, and behavior.
+    *   Option to specify a custom data path for your Spaceforge data with automatic migration from legacy storage locations.
+    *   Enhanced data integrity verification and file cleanup processes ensure reliable performance.
+*   **Optimized Performance & Reliability:**
+    *   Streamlined application logging eliminates unnecessary console noise
+    *   Improved error handling with reduced redundant warning messages
+    *   Consistent UI styling using Setting components throughout the application
+    *   Optimized build configuration with focused TypeScript inclusion patterns
 
 ## Getting Started: Install & Configure Your Obsidian Study Plugin
 
@@ -54,7 +59,7 @@ npm install && npm run build && node install.js --d /home/user/Documents/vault/.
     *   For AI-powered MCQ Generation, choose your desired AI provider (e.g., OpenAI, Gemini) and input the necessary API key and model details.
     *   Personalize Pomodoro timer durations to fit your study habits.
 
-> **Disclaimer:** When updating Spaceforge, please ensure you preserve your `data.json` file, which contains all your review schedules and MCQ questions. striving to maintain backward compatibility, it may not always work flawlessly.
+> **Disclaimer:** When updating Spaceforge, please ensure you preserve your `data.json` file, which contains all your review schedules and MCQ questions. Spaceforge strives to maintain backward compatibility, and version 1.0.1 includes automatic migration from legacy data storage paths to current locations.
 
 ### How to Use
 
@@ -89,11 +94,11 @@ Spaceforge seamlessly integrates with various AI services to automatically gener
 ## Settings Overview
 
 The Spaceforge settings tab allows you to customize:
-*   **General Settings:** Default review views, notification preferences.
-*   **Scheduling Algorithm:** Select and configure FSRS or SM-2 parameters.
-*   **MCQ Generation:** Enable/disable MCQs, select API provider, enter API keys and models.
+*   **General Settings:** Default review views, notification preferences, navigation hotkeys.
+*   **Scheduling Algorithm:** Select and configure FSRS or SM-2 parameters with standardized UTC date calculations.
+*   **MCQ Generation:** Enable/disable MCQs, select API provider, enter API keys and models, configure scoring behavior.
 *   **Pomodoro Timer:** Enable/disable, set durations for work/break sessions, sound notifications.
-*   **Data Management:** Set a custom path for plugin data, import/export data.
+*   **Data Management:** Set a custom path for plugin data, import/export data, manage data integrity.
 
 ## Commands & Shortcuts
 
@@ -105,7 +110,7 @@ Spaceforge adds several commands to the Obsidian command palette:
 *   `Spaceforge: Add Current Note's Folder to Review Schedule`
 *   `Spaceforge: Open Review Sidebar`
 
-You can assign custom keyboard shortcuts to these commands via Obsidian's hotkey settings.
+You can assign custom keyboard shortcuts to these commands via Obsidian's hotkey settings. Spaceforge now includes enhanced navigation command execution with configurable hotkey support for improved workflow efficiency.
 
 
 ## Support & Contribution

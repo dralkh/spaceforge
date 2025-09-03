@@ -379,10 +379,7 @@ export class ListViewRenderer {
 
                     if (maxDays > 0) {
                         if (!overdueBadge) {
-                            overdueBadge = dateHeading.createSpan("review-overdue-badge");
-                            overdueBadge.style.fontSize = "0.8em";
-                            overdueBadge.style.fontWeight = "normal";
-                            overdueBadge.style.color = "var(--text-muted)";
+                            overdueBadge = dateHeading.createSpan("review-overdue-badge sf-overdue-badge");
                         }
                         overdueBadge.setText(` (${maxDays} ${maxDays === 1 ? 'day' : 'days'} overdue)`);
                         overdueBadge.style.display = '';
@@ -769,10 +766,7 @@ export class ListViewRenderer {
                     if (maxDays > 0) {
                         const badgeText = ` (${maxDays} ${maxDays === 1 ? 'day' : 'days'} overdue)`;
                         if (!overdueBadge) {
-                            overdueBadge = headerTextEl.createSpan("review-overdue-badge");
-                            overdueBadge.style.fontSize = "0.8em";
-                            overdueBadge.style.fontWeight = "normal";
-                            overdueBadge.style.color = "var(--text-muted)";
+                            overdueBadge = headerTextEl.createSpan("review-overdue-badge sf-overdue-badge");
                         }
                         overdueBadge.setText(badgeText);
                     } else if (overdueBadge) {

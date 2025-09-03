@@ -95,7 +95,6 @@ export class ContextMenuHandler {
                                await this.addFolderToReview(file.parent); // Call the existing folder logic
                            } else {
                                new Notice("Error: Parent is not a folder.");
-                               console.error("Error: file.parent is not an instance of TFolder", file.parent);
                            }
                        }
                    });
@@ -119,7 +118,6 @@ export class ContextMenuHandler {
                    });
             });
         } catch (error) {
-            console.error("Error adding folder menu items:", error);
         }
     }
 
@@ -264,7 +262,6 @@ export class ContextMenuHandler {
             await this.plugin.reviewController.updateTodayNotes();
 
         } catch (error) {
-            console.error("Error adding folder to review:", error);
             new Notice("Error adding folder to review schedule");
         }
     }

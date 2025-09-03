@@ -1,4 +1,4 @@
-import { Modal, Notice, TFile, setIcon } from 'obsidian';
+import { Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQSet } from '../models/mcq';
 import { ReviewResponse } from '../models/review-schedule';
@@ -125,7 +125,7 @@ export class ConsolidatedMCQModal extends Modal {
         const headerContainer = contentEl.createDiv('mcq-header-container');
         
         // Add title
-        headerContainer.createEl('h2', { text: 'Multiple Choice Review' });
+        new Setting(headerContainer).setName('Multiple Choice Review').setHeading();
         
         // Display progress with questions from all notes, with enhanced styling
         const progressEl = contentEl.createDiv('mcq-progress');
@@ -213,7 +213,6 @@ export class ConsolidatedMCQModal extends Modal {
         
         // Verify we have a valid question
         if (!question || !question.choices || question.choices.length < 2) {
-            console.error('Invalid question data:', question);
             new Notice('Error: Invalid question data. Moving to next question.');
             
             // Skip to next question
@@ -523,7 +522,7 @@ export class ConsolidatedMCQModal extends Modal {
         contentEl.empty();
         
         // Display results header with stylized heading
-        const headerEl = contentEl.createEl('h2', { text: 'MCQ Review Complete', cls: 'mcq-review-complete-header' });
+        const headerEl = new Setting(contentEl).setName('MCQ Review Complete').setHeading().setClass('mcq-review-complete-header');
 
         // Display overall score with enhanced styling
         const totalCorrectOverall = this.answers.filter(a => a.correct && a.attempts <= 1).length;

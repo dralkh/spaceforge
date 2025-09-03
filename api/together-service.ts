@@ -29,10 +29,8 @@ export class TogetherService implements IMCQGenerationService {
             if (settings.mcqQuestionAmountMode === MCQQuestionAmountMode.WordsPerQuestion) {
                 const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
                 numQuestionsToGenerate = Math.max(1, Math.ceil(wordCount / settings.mcqWordsPerQuestion));
-                console.log(`TogetherAI: Calculated ${numQuestionsToGenerate} questions based on ${wordCount} words and ${settings.mcqWordsPerQuestion} words/question setting.`);
             } else { // Fixed mode
                 numQuestionsToGenerate = settings.mcqQuestionsPerNote;
-                console.log(`TogetherAI: Using fixed number of questions: ${numQuestionsToGenerate}`);
             }
 
             const prompt = this.generatePrompt(noteContent, settings, numQuestionsToGenerate);
@@ -50,7 +48,6 @@ export class TogetherService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch (error) {
-            console.error('Error generating MCQs with Together AI:', error);
             new Notice('Failed to generate MCQs with Together AI. Please check console for details.');
             return null;
         }
@@ -86,8 +83,6 @@ export class TogetherService implements IMCQGenerationService {
             ? settings.mcqBasicSystemPrompt 
             : settings.mcqAdvancedSystemPrompt;
 
-        console.log(`Making API request to Together AI using model: ${model} with difficulty: ${difficulty}`);
-
         try {
             const response = await requestUrl({
                 url: 'https://api.together.xyz/v1/chat/completions',
@@ -108,18 +103,15 @@ export class TogetherService implements IMCQGenerationService {
 
             if (response.status !== 200) {
                 const errorData = response.json || { message: response.text };
-                console.error('Together AI API error:', response.status, errorData);
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
             }
 
             const data = response.json;
             if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
-                console.error('Invalid API response format from Together AI:', data);
                 throw new Error('Invalid API response format from Together AI - missing content');
             }
             return data.choices[0].message.content;
         } catch (error) {
-            console.error('Error in Together AI API request:', error);
             new Notice(`Together AI API error: ${error.message}`);
             throw error;
         }
@@ -128,7 +120,6 @@ export class TogetherService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            console.log('Raw AI response from Together AI:', response);
             let questionBlocks: string[] = response.split(/\n\d+\.\s+/).filter(block => block.trim().length > 0);
 
             if (questionBlocks.length > 0 && !/^\d+\.\s+/.test(response.trimStart())) {
@@ -167,7 +158,6 @@ export class TogetherService implements IMCQGenerationService {
                 if (tempBlocks.length > 0) questionBlocks = tempBlocks;
             }
 
-            console.log(`Found ${questionBlocks.length} question blocks from Together AI`);
             for (const block of questionBlocks) {
                 const lines = block.split('\n').filter(line => line.trim().length > 0);
                 if (lines.length < 2) continue;
@@ -208,10 +198,8 @@ export class TogetherService implements IMCQGenerationService {
                      questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
-            console.log(`Successfully parsed ${questions.length} MCQ questions from Together AI`);
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch (error) {
-            console.error('Error parsing MCQ response from Together AI:', error);
             new Notice('Error parsing MCQ response from Together AI. Please try again.');
             return [];
         }

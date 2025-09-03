@@ -151,7 +151,7 @@ export class ReviewSidebarView extends ItemView {
 
     async refresh(): Promise<void> {
         // Capture the state of activeListBaseDate *before* any potential changes in this refresh cycle.
-        const previousActiveListBaseDateEpoch = this.activeListBaseDate ? DateUtils.startOfDay(this.activeListBaseDate) : null;
+        const previousActiveListBaseDateEpoch = this.activeListBaseDate ? DateUtils.startOfUTCDay(this.activeListBaseDate) : null;
         
         // Determine the target date for this refresh. It defaults to the current activeListBaseDate
         // unless a calendar click provides a new date.
@@ -172,7 +172,7 @@ export class ReviewSidebarView extends ItemView {
         // *before* calling `this.refresh()`. So, `this.activeListBaseDate` will already reflect such changes here.
 
         // Calculate the epoch for the new target date. `null` signifies "today" (no specific override).
-        const newTargetDateEpoch = newTargetDate ? DateUtils.startOfDay(newTargetDate) : null;
+        const newTargetDateEpoch = newTargetDate ? DateUtils.startOfUTCDay(newTargetDate) : null;
         let reviewDateChanged = false;
 
         // If the effective date for the list view has changed, update the view's state.
@@ -184,7 +184,7 @@ export class ReviewSidebarView extends ItemView {
         // Synchronize the ReviewController's date override with the sidebar's `activeListBaseDate`.
         // `this.activeListBaseDate` is now the definitive date context for the sidebar's list view.
         const currentControllerOverrideEpoch = this.plugin.reviewController.getCurrentReviewDateOverride();
-        const targetControllerOverrideValue = this.activeListBaseDate ? DateUtils.startOfDay(this.activeListBaseDate) : null;
+        const targetControllerOverrideValue = this.activeListBaseDate ? DateUtils.startOfUTCDay(this.activeListBaseDate) : null;
 
         if (targetControllerOverrideValue !== currentControllerOverrideEpoch) {
             await this.plugin.reviewController.setReviewDateOverride(targetControllerOverrideValue);
@@ -243,7 +243,6 @@ export class ReviewSidebarView extends ItemView {
         if (this.listViewRenderer) { // Check if renderer is initialized
             await this.listViewRenderer.render(container);
         } else {
-            console.error("ListViewRenderer not initialized during renderListViewContent call!");
             container.setText("Error: Could not render list view. Renderer not ready.");
         }
     }
@@ -263,7 +262,6 @@ export class ReviewSidebarView extends ItemView {
         if (this.calendarView) { // Should always exist due to ensureBaseStructure
             await this.calendarView.render(); 
         } else {
-            console.error("CalendarView not initialized during renderCalendarViewContent call!");
             container.setText("Error: Could not render calendar view. CalendarView not ready.");
             return; // Avoid further errors if calendarView is somehow null
         }
@@ -311,12 +309,11 @@ export class ReviewSidebarView extends ItemView {
      */
     async moveNoteUp(dateStr: string, note: ReviewSchedule): Promise<void> {
         if (!this.listViewRenderer) {
-             console.error("Cannot move note up: ListViewRenderer not initialized.");
-             return; 
+             return;
         }
-        const notes = await this.listViewRenderer.groupNotesByDate( 
+        const notes = await this.listViewRenderer.groupNotesByDate(
             this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true),
-            false 
+            false
         ); 
         const dateNotes = notes[dateStr];
 
@@ -337,12 +334,11 @@ export class ReviewSidebarView extends ItemView {
      */
     async moveNoteDown(dateStr: string, note: ReviewSchedule): Promise<void> {
          if (!this.listViewRenderer) {
-             console.error("Cannot move note down: ListViewRenderer not initialized.");
-             return; 
+             return;
          }
-        const notes = await this.listViewRenderer.groupNotesByDate( 
+        const notes = await this.listViewRenderer.groupNotesByDate(
             this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true),
-            false 
+            false
         ); 
         const dateNotes = notes[dateStr];
 
@@ -409,11 +405,10 @@ export class ReviewSidebarView extends ItemView {
         // Now that elements exist (due to refresh), set the state for components like Pomodoro
         // Ensure pomodoroUIManager is initialized before setting state
         // if (this.pomodoroUIManager) { // Logic related to isPomodoroSectionOpen removed
-            // this.pomodoroUIManager.setIsPomodoroSectionOpen(state.isPomodoroSectionOpen ?? false); 
+            // this.pomodoroUIManager.setIsPomodoroSectionOpen(state.isPomodoroSectionOpen ?? false);
             // No need to call updatePomodoroUI here, as refresh -> showCorrectViewPane -> renderListViewContent -> render (in ListViewRenderer)
             // should call pomodoroUIManager.updatePomodoroUI() if the section is enabled.
         // } else {
-        //      console.warn("PomodoroUIManager not initialized during setViewState");
         // }
 
         // Scroll position is applied at the end of refresh() using requestAnimationFrame

@@ -1,4 +1,4 @@
-import { Modal, Notice, TFile } from 'obsidian';
+import { Modal, Notice, TFile, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, ReviewSchedule } from '../models/review-schedule';
 import { MCQSet } from '../models/mcq';
@@ -46,7 +46,7 @@ export class BatchReviewModal extends Modal {
 
     renderStartScreen(contentEl: HTMLElement): void {
         contentEl.empty();
-        contentEl.createEl("h2", { text: "Batch Review" });
+        new Setting(contentEl).setName("Batch Review").setHeading();
         const infoEl = contentEl.createDiv("batch-review-info");
         infoEl.createEl("p", { text: `${this.notes.length} notes scheduled for review` });
         this.estimateAndShowTime(infoEl);
@@ -110,15 +110,12 @@ export class BatchReviewModal extends Modal {
     async collectAllMCQs(): Promise<void> {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "Collecting MCQs" });
+        new Setting(contentEl).setName("Collecting MCQs").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Preparing MCQs for ${this.notes.length} notes...` });
-        const progressBar = contentEl.createDiv("mcq-collection-progress");
-        progressBar.style.width = "100%"; progressBar.style.height = "10px"; progressBar.style.marginTop = "20px"; progressBar.style.backgroundColor = "var(--background-modifier-border)"; progressBar.style.borderRadius = "5px"; progressBar.style.overflow = "hidden";
-        const progressFill = progressBar.createDiv();
-        progressFill.style.width = "0%"; progressFill.style.height = "100%"; progressFill.style.backgroundColor = "var(--interactive-accent)"; progressFill.style.transition = "width 0.3s ease";
+        const progressBar = contentEl.createDiv("mcq-collection-progress sf-progress-bar-container-batch");
+        const progressFill = progressBar.createDiv({ cls: "sf-progress-bar-fill-batch" });
         const statusEl = contentEl.createDiv("batch-review-status");
-        statusEl.style.marginTop = "10px"; statusEl.style.color = "var(--text-muted)";
         this.allMCQSets = [];
 
         for (let i = 0; i < this.notes.length; i++) {
@@ -137,7 +134,6 @@ export class BatchReviewModal extends Modal {
                     // generateMCQs now returns the set or null
                     mcqSet = await this.plugin.mcqController.generateMCQs(note.path);
                 } catch (error) {
-                    console.error("Error generating MCQs:", error);
                     statusEl.setText(`Error generating MCQs for ${fileName}`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
@@ -162,17 +158,15 @@ export class BatchReviewModal extends Modal {
                 const consolidatedModal = new ConsolidatedMCQModal(
                     this.plugin,
                     this.allMCQSets,
-                    (results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>) => {
+                    async (results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>) => {
                         this.results = results;
-                        this.recordAllReviews(results).then(() => {
-                            this.open();
-                            this.showSummary();
-                        });
+                        await this.recordAllReviews(results);
+                        this.open();
+                        this.showSummary();
                     }
                 );
                 consolidatedModal.open();
             } catch (error) {
-                console.error("Error showing consolidated MCQ UI:", error);
                 new Notice("Error showing MCQ review. Falling back to manual review.");
                 this.open();
                 this.processNextManual();
@@ -199,7 +193,7 @@ export class BatchReviewModal extends Modal {
         const note = this.notes[this.currentIndex];
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "MCQ Review in Progress" });
+        new Setting(contentEl).setName("MCQ Review in Progress").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Processing note ${this.currentIndex + 1}/${this.notes.length}` });
         const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -244,7 +238,6 @@ export class BatchReviewModal extends Modal {
                 */
                // Since the callback is removed, we need a way to know when the individual modal closes.
                // This flow is now broken and relies on the consolidated modal.
-               console.warn("processNextMCQ flow is currently inactive due to consolidated modal implementation.");
                // Fallback or error handling might be needed here if consolidated fails.
                this.open(); // Reopen immediately for now, but this won't wait for the MCQ modal.
                this.showSummary(); // Go to summary as the flow is broken.
@@ -275,7 +268,7 @@ export class BatchReviewModal extends Modal {
         const note = this.notes[this.currentIndex];
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "Manual Review" });
+        new Setting(contentEl).setName("Manual Review").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Note ${this.currentIndex + 1}/${this.notes.length}` });
         const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -324,7 +317,7 @@ export class BatchReviewModal extends Modal {
     showSummary(): void {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: "Batch Review Complete" });
+        new Setting(contentEl).setName("Batch Review Complete").setHeading();
         const statsEl = contentEl.createDiv("batch-review-summary-stats");
         const totalNotes = this.results.length;
         const successfulNotes = this.results.filter(r => r.success).length;
@@ -358,7 +351,7 @@ export class BatchReviewModal extends Modal {
         const closeButton = contentEl.createEl("button", { text: "Close", cls: "batch-review-close-button" });
         closeButton.addEventListener("click", () => {
             this.close();
-            if (this.plugin.sidebarView) this.plugin.sidebarView.refresh();
+            this.plugin.getSidebarView()?.refresh();
         });
     }
 

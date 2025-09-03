@@ -133,7 +133,7 @@ export class CalendarView {
         const allSchedules = Object.values(this.plugin.reviewScheduleService.schedules);
         
         for (const schedule of allSchedules) {
-            const scheduleDueDayStart = DateUtils.startOfDay(new Date(schedule.nextReviewDate));
+            const scheduleDueDayStart = DateUtils.startOfUTCDay(new Date(schedule.nextReviewDate));
             const dateKey = scheduleDueDayStart.toString(); // Use timestamp as a robust key
 
             if (!this.reviewsByDate.has(dateKey)) {
@@ -194,8 +194,8 @@ export class CalendarView {
             dayCell.onclick = null; // Remove previous click listener
 
             if (i >= firstDay && dayOfMonth <= daysInMonth) {
-                const currentDateObj = new Date(year, month, dayOfMonth);
-                const cellDayStart = DateUtils.startOfDay(currentDateObj);
+                const currentDateObj = new Date(Date.UTC(year, month, dayOfMonth));
+                const cellDayStart = DateUtils.startOfUTCDay(currentDateObj);
                 const dateKey = cellDayStart.toString(); // Use the same key format for lookup
                 dayCell.dataset.dateKey = dateKey;
 
@@ -229,8 +229,9 @@ export class CalendarView {
                         }
                         
                         await this.plugin.savePluginData();
-                        if (this.plugin.sidebarView && typeof this.plugin.sidebarView.refresh === 'function') {
-                            await this.plugin.sidebarView.refresh();
+                        const sidebarView = this.plugin.getSidebarView();
+                        if (sidebarView && typeof sidebarView.refresh === 'function') {
+                            await sidebarView.refresh();
                         } else {
                             this.plugin.app.workspace.requestSaveLayout();
                             new Notice("Switched to list view. Sidebar will update.");
