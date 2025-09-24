@@ -138,7 +138,27 @@ export class ReviewControllerCore implements IReviewController {
         // If currentReviewDateOverride is set, we are viewing a specific date from the calendar, so match exactly.
         // Otherwise (override is null), we are in the default "today" view, so get all notes due up to today.
         const matchExactDate = this.currentReviewDateOverride !== null;
-        const newDueNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, matchExactDate);
+
+        let newDueNotes: ReviewSchedule[];
+
+        if (matchExactDate) {
+            // Calendar view: Get notes for the specific date
+            newDueNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, true);
+        } else {
+            // Default view: Get notes due up to today AND notes for today's date
+            const dueNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, false);
+            const todayOnlyNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, true);
+
+            const combinedNotes = [...dueNotes, ...todayOnlyNotes];
+            const uniqueNotes = new Map<string, ReviewSchedule>();
+            for (const note of combinedNotes) {
+                if (!uniqueNotes.has(note.path)) {
+                    uniqueNotes.set(note.path, note);
+                }
+            }
+            newDueNotes = Array.from(uniqueNotes.values());
+        }
+
         this.todayNotes = newDueNotes;
 
         // The traversal order should directly reflect the order of todayNotes,

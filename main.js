@@ -1342,7 +1342,21 @@ var ReviewControllerCore = class {
     const originalPositions = new Map(this.traversalPositions);
     const effectiveDate = this.getEffectiveReviewDate();
     const matchExactDate = this.currentReviewDateOverride !== null;
-    const newDueNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, matchExactDate);
+    let newDueNotes;
+    if (matchExactDate) {
+      newDueNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, true);
+    } else {
+      const dueNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, false);
+      const todayOnlyNotes = this.plugin.dataStorage.reviewScheduleService.getDueNotesWithCustomOrder(effectiveDate, true, true);
+      const combinedNotes = [...dueNotes, ...todayOnlyNotes];
+      const uniqueNotes = /* @__PURE__ */ new Map();
+      for (const note of combinedNotes) {
+        if (!uniqueNotes.has(note.path)) {
+          uniqueNotes.set(note.path, note);
+        }
+      }
+      newDueNotes = Array.from(uniqueNotes.values());
+    }
     this.todayNotes = newDueNotes;
     this.traversalOrder = this.todayNotes.map((note) => note.path);
     this.traversalPositions = /* @__PURE__ */ new Map();
@@ -5942,11 +5956,7 @@ var CalendarView = class {
             const today = /* @__PURE__ */ new Date();
             const isClickedDateToday = DateUtils.isSameDay(currentDateObj, today);
             this.plugin.settings.sidebarViewType = "list";
-            if (isClickedDateToday) {
-              this.plugin.clickedDateFromCalendar = null;
-            } else {
-              this.plugin.clickedDateFromCalendar = currentDateObj;
-            }
+            this.plugin.clickedDateFromCalendar = currentDateObj;
             await this.plugin.savePluginData();
             const sidebarView = this.plugin.getSidebarView();
             if (sidebarView && typeof sidebarView.refresh === "function") {

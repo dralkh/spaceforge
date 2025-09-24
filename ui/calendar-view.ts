@@ -221,12 +221,7 @@ export class CalendarView {
                         const isClickedDateToday = DateUtils.isSameDay(currentDateObj, today);
 
                         this.plugin.settings.sidebarViewType = 'list';
-
-                        if (isClickedDateToday) {
-                            this.plugin.clickedDateFromCalendar = null;
-                        } else {
-                            this.plugin.clickedDateFromCalendar = currentDateObj;
-                        }
+                        this.plugin.clickedDateFromCalendar = currentDateObj;
                         
                         await this.plugin.savePluginData();
                         const sidebarView = this.plugin.getSidebarView();
