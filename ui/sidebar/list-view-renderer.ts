@@ -125,6 +125,33 @@ export class ListViewRenderer {
     // }
 
     private async _ensureAndUpdateReviewButtonsSection(container: HTMLElement, notesForDisplay: ReviewSchedule[], selectedNotes: string[]): Promise<void> {
+        // --- Pomodoro Section (Always visible when enabled, independent of notes) ---
+        let pomodoroContainer = container.querySelector(".sidebar-pomodoro-section") as HTMLElement;
+        if (!pomodoroContainer) {
+            pomodoroContainer = container.createDiv("sidebar-pomodoro-section");
+            const pomodoroSectionContainerEl = pomodoroContainer.createDiv("sidebar-pomodoro-button-container");
+        }
+        
+        // Update Pomodoro section visibility and content
+        if (this.pomodoroUIManager && pomodoroContainer) {
+            const pomodoroSectionContainerEl = pomodoroContainer.querySelector(".sidebar-pomodoro-button-container") as HTMLElement;
+            if (pomodoroSectionContainerEl) {
+                this.pomodoroUIManager.attachAndRender(pomodoroSectionContainerEl);
+                if (this.plugin.settings.pomodoroEnabled) {
+                    pomodoroContainer.style.display = '';
+                    this.pomodoroUIManager.showPomodoroSection(true);
+                    this.pomodoroUIManager.updatePomodoroUI();
+                    
+                    // Automatically calculate estimation for current notes
+                    this.pomodoroUIManager.calculateAndDisplayEstimation();
+                } else {
+                    pomodoroContainer.style.display = 'none';
+                    this.pomodoroUIManager.showPomodoroSection(false);
+                }
+            }
+        }
+
+        // --- Review Buttons Section (Only visible when there are notes) ---
         let reviewButtonsContainer = container.querySelector(".review-buttons-container") as HTMLElement;
 
         // Visibility of review buttons should depend on whether there are notes in the current context (notesForDisplay)
@@ -138,8 +165,6 @@ export class ListViewRenderer {
                 const nextNoteBtn = navButtonsContainer.createEl("button", { text: "Next", title: "Navigate to Next Note", cls: "review-all-button" });
                 nextNoteBtn.addEventListener("click", () => { this.plugin.reviewController.navigateToNextNote(); });
 
-                reviewButtonsContainer.createDiv("sidebar-pomodoro-button-container"); // Placeholder for Pomodoro
-
                 const reviewCurrentBtn = reviewButtonsContainer.createEl("button", { text: "Review Current Note", title: "Review the currently open note if it's due", cls: "review-all-button" });
                 reviewCurrentBtn.addEventListener("click", () => { this.plugin.reviewController.reviewCurrentNote(); });
                 const reviewAllBtn = reviewButtonsContainer.createEl("button", { text: "Review All", title: "Start Reviewing All Due Notes", cls: "review-all-button" });
@@ -151,18 +176,6 @@ export class ListViewRenderer {
                 }
             }
             reviewButtonsContainer.style.display = '';
-
-            // Pomodoro section
-            const pomodoroSectionContainerEl = reviewButtonsContainer.querySelector(".sidebar-pomodoro-button-container") as HTMLElement;
-            if (this.pomodoroUIManager && pomodoroSectionContainerEl) {
-                this.pomodoroUIManager.attachAndRender(pomodoroSectionContainerEl); // This method will be refactored to be non-destructive
-                if (this.plugin.settings.pomodoroEnabled) {
-                    this.pomodoroUIManager.showPomodoroSection(true); // Controls overall visibility
-                    this.pomodoroUIManager.updatePomodoroUI(); // Updates internal state and button text
-                } else {
-                    this.pomodoroUIManager.showPomodoroSection(false);
-                }
-            }
             
             // Bulk action buttons
             let bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;

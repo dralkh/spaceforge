@@ -464,6 +464,13 @@ export default class SpaceforgePlugin extends Plugin {
                 pomodoroSessionsCompletedInCycle: this.pluginState.pomodoroSessionsCompletedInCycle || DEFAULT_PLUGIN_STATE_DATA.pomodoroSessionsCompletedInCycle,
                 pomodoroIsRunning: typeof this.pluginState.pomodoroIsRunning === 'boolean' ? this.pluginState.pomodoroIsRunning : DEFAULT_PLUGIN_STATE_DATA.pomodoroIsRunning,
                 pomodoroEndTimeMs: this.pluginState.pomodoroEndTimeMs ?? null, // Add the missing field
+                pomodoroEstimatedTotalCycles: this.pluginState.pomodoroEstimatedTotalCycles ?? DEFAULT_PLUGIN_STATE_DATA.pomodoroEstimatedTotalCycles,
+                pomodoroEstimatedWorkSessions: this.pluginState.pomodoroEstimatedWorkSessions ?? DEFAULT_PLUGIN_STATE_DATA.pomodoroEstimatedWorkSessions,
+                pomodoroIsEstimationActive: typeof this.pluginState.pomodoroIsEstimationActive === 'boolean' ? this.pluginState.pomodoroIsEstimationActive : DEFAULT_PLUGIN_STATE_DATA.pomodoroIsEstimationActive,
+                pomodoroUserHasModifiedSettings: typeof this.pluginState.pomodoroUserHasModifiedSettings === 'boolean' ? this.pluginState.pomodoroUserHasModifiedSettings : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserHasModifiedSettings,
+                pomodoroUserOverrideHours: typeof this.pluginState.pomodoroUserOverrideHours === 'number' ? this.pluginState.pomodoroUserOverrideHours : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideHours,
+                pomodoroUserOverrideMinutes: typeof this.pluginState.pomodoroUserOverrideMinutes === 'number' ? this.pluginState.pomodoroUserOverrideMinutes : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideMinutes,
+                pomodoroUserAddToEstimation: typeof this.pluginState.pomodoroUserAddToEstimation === 'boolean' ? this.pluginState.pomodoroUserAddToEstimation : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserAddToEstimation,
                 version: this.manifest.version,
             };
             this.pluginState = currentPluginState; // Update the live pluginState

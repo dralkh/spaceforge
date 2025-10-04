@@ -21,6 +21,14 @@ export class PomodoroUIManager {
     private pomodoroQuickLongInput: HTMLInputElement | null = null;
     private pomodoroQuickSessionsInput: HTMLInputElement | null = null;
     private pomodoroCalculationResultEl: HTMLElement | null = null;
+    
+    // New estimation and cycle tracking elements (moved to calculation panel)
+    private pomodoroCycleProgressEl: HTMLElement | null = null;
+    
+    // User override input elements
+    private pomodoroUserOverrideHoursInput: HTMLInputElement | null = null;
+    private pomodoroUserOverrideMinutesInput: HTMLInputElement | null = null;
+    private pomodoroUserAddToEstimationCheckbox: HTMLInputElement | null = null;
 
     // private isPomodoroSectionOpen: boolean = false; // No longer needed, section is always "open"
     private areButtonsVisible: boolean = true; // For Play/Pause/Skip buttons
@@ -237,6 +245,12 @@ export class PomodoroUIManager {
             this.pomodoroSkipBtn.addEventListener("click", () => this.plugin.pomodoroService.skipSession());
         }
 
+        // Cycle Progress Display (shows current cycle and remaining sessions)
+        if (!this.pomodoroCycleProgressEl || this.pomodoroCycleProgressEl.parentElement !== container) {
+            this.pomodoroCycleProgressEl?.remove();
+            this.pomodoroCycleProgressEl = container.createDiv("pomodoro-cycle-progress");
+        }
+        
         // Quick Settings Toggle Button - REMOVED
         // if (!this.pomodoroQuickSettingsToggleBtn || this.pomodoroQuickSettingsToggleBtn.parentElement !== mainControlsRow) {
         //     this.pomodoroQuickSettingsToggleBtn?.remove();
@@ -302,6 +316,35 @@ export class PomodoroUIManager {
             //     }
             // });
 
+            // User override time inputs
+            const overrideContainer = this.pomodoroQuickSettingsPanelEl.createDiv("pomodoro-override-container");
+            const overrideLabel = overrideContainer.createEl("label", { text: "Override time (optional):", cls: "pomodoro-override-label" });
+            
+            const overrideInputsContainer = overrideContainer.createDiv("pomodoro-override-inputs");
+            this.pomodoroUserOverrideHoursInput = overrideInputsContainer.createEl("input", { type: "number", cls: "pomodoro-override-hours" });
+            this.pomodoroUserOverrideHoursInput.setAttr("min", "0");
+            this.pomodoroUserOverrideHoursInput.setAttr("placeholder", "H");
+            this.pomodoroUserOverrideHoursInput.value = String(this.plugin.pluginState.pomodoroUserOverrideHours);
+            
+            const hoursLabel = overrideInputsContainer.createSpan("pomodoro-override-label-small");
+            hoursLabel.setText("h");
+            
+            this.pomodoroUserOverrideMinutesInput = overrideInputsContainer.createEl("input", { type: "number", cls: "pomodoro-override-minutes" });
+            this.pomodoroUserOverrideMinutesInput.setAttr("min", "0");
+            this.pomodoroUserOverrideMinutesInput.setAttr("placeholder", "M");
+            this.pomodoroUserOverrideMinutesInput.value = String(this.plugin.pluginState.pomodoroUserOverrideMinutes);
+            
+            const minutesLabel = overrideInputsContainer.createSpan("pomodoro-override-label-small");
+            minutesLabel.setText("m");
+            
+            // Add to estimation toggle
+            const toggleContainer = overrideContainer.createDiv("pomodoro-override-toggle-container");
+            this.pomodoroUserAddToEstimationCheckbox = toggleContainer.createEl("input", { type: "checkbox", cls: "pomodoro-add-to-estimation" });
+            this.pomodoroUserAddToEstimationCheckbox.checked = this.plugin.pluginState.pomodoroUserAddToEstimation;
+            
+            const toggleLabel = toggleContainer.createEl("label", { text: "Add to estimated time", cls: "pomodoro-toggle-label" });
+            toggleLabel.setAttribute("for", "pomodoro-add-to-estimation");
+
             const calculateBtn = buttonsContainer.createEl("button", { text: "Calculate Reading Time", cls: "pomodoro-quick-calculate-btn" });
             calculateBtn.addEventListener("click", async () => {
                 const settingsSaved = this._savePomodoroSettings();
@@ -323,10 +366,18 @@ export class PomodoroUIManager {
     private async calculateAndDisplayPomodoroEstimate(): Promise<void> {
         if (!this.plugin || !this.pomodoroCalculationResultEl) return;
 
+        // Save user override settings
+        this.saveUserOverrideSettings();
+
         // Use notes from the review controller, which are context-aware (selected date or actual today)
         const notesForEstimate = this.plugin.reviewController.getTodayNotes(); 
         
-        if (notesForEstimate.length === 0) {
+        // Check if we have either notes or user override
+        const userOverrideHours = this.plugin.pluginState.pomodoroUserOverrideHours || 0;
+        const userOverrideMinutes = this.plugin.pluginState.pomodoroUserOverrideMinutes || 0;
+        const userOverrideTimeInMinutes = (userOverrideHours * 60) + userOverrideMinutes;
+        
+        if (notesForEstimate.length === 0 && userOverrideTimeInMinutes === 0) {
             const activeDate = this.plugin.reviewController.getCurrentReviewDateOverride();
             const message = activeDate 
                 ? `No notes scheduled for ${new Date(activeDate).toLocaleDateString()} to calculate.`
@@ -336,54 +387,68 @@ export class PomodoroUIManager {
             return;
         }
 
-        let totalReadingTimeInSeconds = 0;
-        for (const note of notesForEstimate) {
-            totalReadingTimeInSeconds += await this.plugin.reviewScheduleService.estimateReviewTime(note.path);
-        }
-        const totalReadingTimeInMinutes = totalReadingTimeInSeconds / 60;
-
-        const settings = this.plugin.settings;
-        const workDuration = settings.pomodoroWorkDuration;
-        const shortBreakDuration = settings.pomodoroShortBreakDuration;
-        const longBreakDuration = settings.pomodoroLongBreakDuration;
-        const sessionsUntilLongBreak = settings.pomodoroSessionsUntilLongBreak;
-
-        let pomodorosNeeded = 0;
-        let sessionsCompletedInCycle = 0;
-        let remainingReadingTimeMinutes = totalReadingTimeInMinutes;
-        let totalBreakTimeInMinutes = 0;
-
-        if (totalReadingTimeInMinutes === 0) {
-             this.pomodoroCalculationResultEl.setText("Estimated reading time is 0 minutes.");
-             this.pomodoroCalculationResultEl.style.display = 'block';
-             return;
+        // Use the PomodoroService to calculate estimation (this also resets and updates cycle tracking)
+        const result = await this.plugin.pomodoroService.calculateEstimationFromNotes(notesForEstimate);
+        
+        if (!result) {
+            this.pomodoroCalculationResultEl.setText("Unable to calculate estimation.");
+            this.pomodoroCalculationResultEl.style.display = 'block';
+            return;
         }
 
-        while (remainingReadingTimeMinutes > 0) {
-            pomodorosNeeded++;
-            remainingReadingTimeMinutes -= workDuration;
-            sessionsCompletedInCycle++;
+        const { totalReadingTimeInSeconds, totalReadingTimeInMinutes, pomodorosNeeded, totalTimeWithBreaksMinutes } = result;
 
-            if (remainingReadingTimeMinutes <= 0) break;
-
-            if (sessionsCompletedInCycle >= sessionsUntilLongBreak) {
-                totalBreakTimeInMinutes += longBreakDuration;
-                sessionsCompletedInCycle = 0;
-            } else {
-                totalBreakTimeInMinutes += shortBreakDuration;
-            }
-        }
-
-        const totalTimeWithBreaksMinutes = (pomodorosNeeded * workDuration) + totalBreakTimeInMinutes;
+        // Get user override values for display (already declared above)
+        const addToEstimation = this.plugin.pluginState.pomodoroUserAddToEstimation || false;
 
         const formattedTotalReadingTime = EstimationUtils.formatTime(totalReadingTimeInSeconds);
         const formattedTotalTimeWithBreaks = EstimationUtils.formatTime(Math.ceil(totalTimeWithBreaksMinutes * 60));
 
         this.pomodoroCalculationResultEl.empty();
-        this.pomodoroCalculationResultEl.createEl("p", { text: `Estimated reading time for ${notesForEstimate.length} note(s) in current view: ${formattedTotalReadingTime}.` });
+        
+        // Show base reading time if we have notes and it wasn't completely overridden
+        if (notesForEstimate.length > 0 && totalReadingTimeInSeconds > 0 && (!userOverrideTimeInMinutes || addToEstimation)) {
+            // Calculate base reading time without overrides for display
+            let baseReadingTimeInSeconds = 0;
+            for (const note of notesForEstimate) {
+                baseReadingTimeInSeconds += await this.plugin.reviewScheduleService.estimateReviewTime(note.path);
+            }
+            const formattedBaseReadingTime = EstimationUtils.formatTime(baseReadingTimeInSeconds);
+            this.pomodoroCalculationResultEl.createEl("p", { text: `Base reading time for ${notesForEstimate.length} note(s): ${formattedBaseReadingTime}.` });
+        } else if (notesForEstimate.length === 0 && userOverrideTimeInMinutes > 0) {
+            // Show message when using only override time
+            this.pomodoroCalculationResultEl.createEl("p", { text: `Using override time only (no notes).` });
+        }
+        
+        // Show user override information if applicable
+        if (userOverrideTimeInMinutes > 0) {
+            const overrideText = addToEstimation 
+                ? `Added ${userOverrideHours}h ${userOverrideMinutes}m override time.`
+                : `Using ${userOverrideHours}h ${userOverrideMinutes}m override time (replacing estimate).`;
+            this.pomodoroCalculationResultEl.createEl("p", { text: overrideText, cls: "pomodoro-override-info" });
+        }
+        
         this.pomodoroCalculationResultEl.createEl("p", { text: `Requires ~${pomodorosNeeded} Pomodoro work session(s).` });
         this.pomodoroCalculationResultEl.createEl("p", { text: `Total time with breaks: ~${formattedTotalTimeWithBreaks}.` });
         this.pomodoroCalculationResultEl.style.display = 'block';
+        
+        // Update the cycle progress display to show the new estimation
+        this.updateCycleProgressDisplay();
+    }
+
+    /**
+     * Saves user override settings to plugin state
+     */
+    private saveUserOverrideSettings(): void {
+        const hours = parseInt(this.pomodoroUserOverrideHoursInput?.value || "0");
+        const minutes = parseInt(this.pomodoroUserOverrideMinutesInput?.value || "0");
+        const addToEstimation = this.pomodoroUserAddToEstimationCheckbox?.checked || false;
+
+        this.plugin.pluginState.pomodoroUserOverrideHours = hours;
+        this.plugin.pluginState.pomodoroUserOverrideMinutes = minutes;
+        this.plugin.pluginState.pomodoroUserAddToEstimation = addToEstimation;
+        
+        this.plugin.savePluginData();
     }
 
     /**
@@ -487,5 +552,59 @@ export class PomodoroUIManager {
         if (this.pomodoroCalculationResultEl && this.pomodoroQuickSettingsPanelEl?.style.display === 'none') {
             this.pomodoroCalculationResultEl.style.display = 'none';
         }
+
+        // Update cycle progress display
+        this.updateCycleProgressDisplay();
+    }
+
+
+
+    /**
+     * Updates the cycle progress display based on current state
+     */
+    private updateCycleProgressDisplay(): void {
+        if (!this.pomodoroCycleProgressEl) return;
+
+        const cycleProgress = this.plugin.pomodoroService.getCycleProgress();
+        
+        if (cycleProgress) {
+            const { current, total, workSessionsRemaining, totalWorkSessions, totalTimeMinutes } = cycleProgress;
+            
+            // Calculate completed sessions
+            const completedSessions = totalWorkSessions - workSessionsRemaining;
+            
+            // Format total time
+            const totalHours = Math.floor(totalTimeMinutes / 60);
+            const totalMinutes = Math.round(totalTimeMinutes % 60);
+            const timeString = totalHours > 0 ? `${totalHours}H/${totalMinutes}M` : `${totalMinutes}M`;
+            
+            this.pomodoroCycleProgressEl.setText(`Cycles ${current}/${total} - Sessions ${completedSessions}/${totalWorkSessions} - ${timeString}`);
+            this.pomodoroCycleProgressEl.style.display = '';
+            this.pomodoroCycleProgressEl.addClass('cycle-active');
+        } else {
+            this.pomodoroCycleProgressEl.style.display = 'none';
+        }
+    }
+
+    /**
+     * Format time in seconds to a readable string
+     */
+    private formatTime(totalSeconds: number): string {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
+    }
+
+    /**
+     * Calculate and display estimation for current notes
+     */
+    public async calculateAndDisplayEstimation(): Promise<void> {
+        const notesForEstimate = this.plugin.reviewController.getTodayNotes();
+        await this.plugin.pomodoroService.calculateEstimationFromNotes(notesForEstimate);
     }
 }

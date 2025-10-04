@@ -3,6 +3,17 @@
   display: none !important; /* Hide the old toggle button */
 }
 
+.sidebar-pomodoro-section {
+  width: 100%; /* Make it fit the width of its parent in the sidebar */
+  margin-top: 8px; /* Space above Pomodoro section */
+  margin-bottom: 8px; /* Space below Pomodoro section */
+  padding: 8px; /* Padding inside the Pomodoro container */
+  background-color: var(--background-secondary); /* Match sidebar section bg */
+  border-radius: var(--radius-m); /* Consistent border radius */
+  border: 1px solid var(--background-modifier-border); /* Consistent border */
+  box-sizing: border-box; /* Ensure padding and border are within width */
+}
+
 .sidebar-pomodoro-section-container {
   width: 100%; /* Make it fit the width of its parent in the sidebar */
   margin-top: 8px; /* Space above Pomodoro section */
@@ -207,11 +218,110 @@
 .pomodoro-calculation-result {
     font-size: 0.9em;
     margin-top: 8px; /* Increased margin */
-    padding: 8px; /* Increased padding */
+    padding: 10px; /* Increased padding */
     background-color: var(--background-secondary-alt);
     border-radius: var(--radius-s);
     border: 1px solid var(--background-modifier-border); /* Add border for definition */
+    line-height: 1.4;
 }
 .pomodoro-calculation-result p {
     margin: 4px 0; /* Spacing for paragraphs within result */
+}
+
+/* Cycle Tracking Styles */
+.pomodoro-cycle-progress {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 4px;
+    padding: 2px 6px;
+    border-radius: var(--radius-s);
+    transition: var(--sf-transition);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pomodoro-cycle-progress.cycle-active {
+    color: var(--sf-info);
+    background-color: var(--background-modifier-hover);
+    font-weight: 500;
+}
+
+/* User Override Styles */
+.pomodoro-override-container {
+    margin: 12px 0;
+    padding: 10px;
+    background-color: var(--background-secondary-alt);
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.pomodoro-override-label {
+    font-size: 0.9em;
+    color: var(--text-normal);
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.pomodoro-override-inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.pomodoro-override-hours,
+.pomodoro-override-minutes {
+    width: 50px;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.pomodoro-override-hours:focus,
+.pomodoro-override-minutes:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+.pomodoro-override-label-small {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.pomodoro-override-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pomodoro-add-to-estimation {
+    margin: 0;
+}
+
+.pomodoro-toggle-label {
+    font-size: 0.85em;
+    color: var(--text-normal);
+    cursor: pointer;
+    user-select: none;
+}
+
+.pomodoro-override-info {
+    color: var(--sf-info);
+    font-style: italic;
+    font-size: 0.9em;
+    margin-top: 4px;
+    padding: 4px 6px;
+    background-color: var(--background-primary);
+    border-radius: var(--radius-s);
+    border-left: 3px solid var(--sf-info);
 }

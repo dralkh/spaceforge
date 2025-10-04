@@ -99,6 +99,13 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     pomodoroSessionsCompletedInCycle: this.plugin.pluginState.pomodoroSessionsCompletedInCycle,
                     pomodoroIsRunning: this.plugin.pluginState.pomodoroIsRunning,
                     pomodoroEndTimeMs: this.plugin.pluginState.pomodoroEndTimeMs ?? null, // Add the missing field
+                    pomodoroEstimatedTotalCycles: this.plugin.pluginState.pomodoroEstimatedTotalCycles ?? null,
+                    pomodoroEstimatedWorkSessions: this.plugin.pluginState.pomodoroEstimatedWorkSessions ?? null,
+                    pomodoroIsEstimationActive: this.plugin.pluginState.pomodoroIsEstimationActive ?? false,
+                    pomodoroUserHasModifiedSettings: this.plugin.pluginState.pomodoroUserHasModifiedSettings ?? false,
+                    pomodoroUserOverrideHours: this.plugin.pluginState.pomodoroUserOverrideHours ?? 0,
+                    pomodoroUserOverrideMinutes: this.plugin.pluginState.pomodoroUserOverrideMinutes ?? 0,
+                    pomodoroUserAddToEstimation: this.plugin.pluginState.pomodoroUserAddToEstimation ?? false,
                 };
 
                 const dataToExport: SpaceforgePluginData = {

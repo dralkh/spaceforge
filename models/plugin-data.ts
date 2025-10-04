@@ -23,6 +23,17 @@ export interface PluginStateData {
     pomodoroSessionsCompletedInCycle: number;
     pomodoroIsRunning: boolean;
     pomodoroEndTimeMs: number | null; // Timestamp when the current session ends
+    
+    // Pomodoro Estimation and Cycle Tracking
+    pomodoroEstimatedTotalCycles: number | null; // Total cycles calculated from reading time
+    pomodoroEstimatedWorkSessions: number | null; // Total work sessions calculated
+    pomodoroIsEstimationActive: boolean; // Whether estimation is currently active (not overridden by user)
+    pomodoroUserHasModifiedSettings: boolean; // Whether user has manually changed H/M settings
+    
+    // User Override Time Settings
+    pomodoroUserOverrideHours: number; // User-specified hours for override
+    pomodoroUserOverrideMinutes: number; // User-specified minutes for override
+    pomodoroUserAddToEstimation: boolean; // Whether to add user time to estimation or replace it
 }
 
 /**
@@ -44,6 +55,17 @@ export const DEFAULT_PLUGIN_STATE_DATA: PluginStateData = {
     pomodoroSessionsCompletedInCycle: 0,
     pomodoroIsRunning: false,
     pomodoroEndTimeMs: null,
+    
+    // Pomodoro Estimation and Cycle Tracking Defaults
+    pomodoroEstimatedTotalCycles: null,
+    pomodoroEstimatedWorkSessions: null,
+    pomodoroIsEstimationActive: false,
+    pomodoroUserHasModifiedSettings: false,
+    
+    // User Override Time Settings Defaults
+    pomodoroUserOverrideHours: 0,
+    pomodoroUserOverrideMinutes: 0,
+    pomodoroUserAddToEstimation: false,
 };
 
 /**

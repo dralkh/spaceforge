@@ -94,10 +94,26 @@ export class PomodoroService {
     }
 
     public updateDurations(work: number, short: number, long: number, sessions: number): void {
+        // Check if user is modifying from the current settings (indicating manual override)
+        const currentWork = this.settings.pomodoroWorkDuration;
+        const currentShort = this.settings.pomodoroShortBreakDuration;
+        const currentLong = this.settings.pomodoroLongBreakDuration;
+        const currentSessions = this.settings.pomodoroSessionsUntilLongBreak;
+        
+        const userChangedSettings = work !== currentWork || short !== currentShort || long !== currentLong || sessions !== currentSessions;
+        
         this.settings.pomodoroWorkDuration = work;
         this.settings.pomodoroShortBreakDuration = short;
         this.settings.pomodoroLongBreakDuration = long;
         this.settings.pomodoroSessionsUntilLongBreak = sessions;
+        
+        // If user manually changed settings, mark as modified and deactivate estimation
+        if (userChangedSettings) {
+            this.state.pomodoroUserHasModifiedSettings = true;
+            this.state.pomodoroIsEstimationActive = false;
+            this.state.pomodoroEstimatedTotalCycles = null;
+            this.state.pomodoroEstimatedWorkSessions = null;
+        }
         
         // If current session is not running and its mode (which is an active timed mode) had its duration changed, update its timeLeft
         const activeModesForDurationUpdate: PomodoroMode[] = ['work', 'shortBreak', 'longBreak'];
@@ -105,6 +121,165 @@ export class PomodoroService {
              this.resetTimeForMode(this.state.pomodoroCurrentMode);
         }
         this.plugin.savePluginData(); // Save settings and potentially updated state
+        this.notifyUpdate();
+    }
+
+    /**
+     * Calculate and set estimation based on reading time
+     */
+    public async calculateEstimationFromNotes(notes: any[]): Promise<{
+        totalReadingTimeInSeconds: number;
+        totalReadingTimeInMinutes: number;
+        pomodorosNeeded: number;
+        totalTimeWithBreaksMinutes: number;
+    } | null> {
+        // Apply user override if specified
+        const userOverrideHours = this.state.pomodoroUserOverrideHours || 0;
+        const userOverrideMinutes = this.state.pomodoroUserOverrideMinutes || 0;
+        const userOverrideTimeInMinutes = (userOverrideHours * 60) + userOverrideMinutes;
+        const addToEstimation = this.state.pomodoroUserAddToEstimation || false;
+
+        let totalReadingTimeInSeconds = 0;
+        let totalReadingTimeInMinutes = 0;
+
+        // Calculate base reading time from notes
+        if (notes.length > 0) {
+            for (const note of notes) {
+                totalReadingTimeInSeconds += await this.plugin.reviewScheduleService.estimateReviewTime(note.path);
+            }
+            totalReadingTimeInMinutes = totalReadingTimeInSeconds / 60;
+        }
+
+        // Apply user override
+        if (userOverrideTimeInMinutes > 0) {
+            if (addToEstimation) {
+                totalReadingTimeInMinutes += userOverrideTimeInMinutes;
+            } else {
+                totalReadingTimeInMinutes = userOverrideTimeInMinutes;
+                totalReadingTimeInSeconds = userOverrideTimeInMinutes * 60; // Update seconds too for consistency
+            }
+        }
+
+        // If no notes and no override, return null
+        if (notes.length === 0 && userOverrideTimeInMinutes === 0) {
+            this.state.pomodoroIsEstimationActive = false;
+            this.state.pomodoroEstimatedTotalCycles = null;
+            this.state.pomodoroEstimatedWorkSessions = null;
+            this.notifyUpdate();
+            return null;
+        }
+
+        const settings = this.settings;
+        const workDuration = settings.pomodoroWorkDuration;
+        const shortBreakDuration = settings.pomodoroShortBreakDuration;
+        const longBreakDuration = settings.pomodoroLongBreakDuration;
+        const sessionsUntilLongBreak = settings.pomodoroSessionsUntilLongBreak;
+
+        if (totalReadingTimeInMinutes === 0 || workDuration === 0) {
+            this.state.pomodoroIsEstimationActive = false;
+            this.state.pomodoroEstimatedTotalCycles = null;
+            this.state.pomodoroEstimatedWorkSessions = null;
+            this.notifyUpdate();
+            return null;
+        }
+
+        let pomodorosNeeded = 0;
+        let sessionsCompletedInCycle = 0;
+        let remainingReadingTimeMinutes = totalReadingTimeInMinutes;
+        let totalBreakTimeInMinutes = 0;
+
+        while (remainingReadingTimeMinutes > 0) {
+            pomodorosNeeded++;
+            remainingReadingTimeMinutes -= workDuration;
+            sessionsCompletedInCycle++;
+
+            if (remainingReadingTimeMinutes <= 0) break;
+
+            if (sessionsCompletedInCycle >= sessionsUntilLongBreak) {
+                totalBreakTimeInMinutes += longBreakDuration;
+                sessionsCompletedInCycle = 0;
+            } else {
+                totalBreakTimeInMinutes += shortBreakDuration;
+            }
+        }
+
+        // Always update estimation when calculate is called (this resets the estimation)
+        this.state.pomodoroEstimatedTotalCycles = Math.ceil(pomodorosNeeded / sessionsUntilLongBreak);
+        this.state.pomodoroEstimatedWorkSessions = pomodorosNeeded;
+        this.state.pomodoroIsEstimationActive = true;
+        
+        this.plugin.savePluginData();
+        this.notifyUpdate();
+        
+        // Return calculation results for UI display
+        return {
+            totalReadingTimeInSeconds,
+            totalReadingTimeInMinutes,
+            pomodorosNeeded,
+            totalTimeWithBreaksMinutes: (pomodorosNeeded * workDuration) + totalBreakTimeInMinutes
+        };
+    }
+
+    /**
+     * Get current cycle progress information
+     */
+    public getCycleProgress(): { 
+        current: number; 
+        total: number; 
+        workSessionsRemaining: number;
+        totalWorkSessions: number;
+        totalTimeMinutes: number;
+    } | null {
+        if (!this.state.pomodoroIsEstimationActive || !this.state.pomodoroEstimatedWorkSessions) {
+            return null;
+        }
+
+        const currentCycle = Math.floor(this.state.pomodoroSessionsCompletedInCycle / this.settings.pomodoroSessionsUntilLongBreak) + 1;
+        const totalCycles = this.state.pomodoroEstimatedTotalCycles || 1;
+        const workSessionsRemaining = Math.max(0, this.state.pomodoroEstimatedWorkSessions - this.state.pomodoroSessionsCompletedInCycle);
+        const totalWorkSessions = this.state.pomodoroEstimatedWorkSessions;
+
+        // Calculate total time including breaks
+        const workDuration = this.settings.pomodoroWorkDuration;
+        const shortBreakDuration = this.settings.pomodoroShortBreakDuration;
+        const longBreakDuration = this.settings.pomodoroLongBreakDuration;
+        const sessionsUntilLongBreak = this.settings.pomodoroSessionsUntilLongBreak;
+
+        let totalBreakTime = 0;
+        let sessionsInCycle = 0;
+        
+        for (let i = 0; i < totalWorkSessions; i++) {
+            sessionsInCycle++;
+            if (i < totalWorkSessions - 1) { // Don't add break after last session
+                if (sessionsInCycle >= sessionsUntilLongBreak) {
+                    totalBreakTime += longBreakDuration;
+                    sessionsInCycle = 0;
+                } else {
+                    totalBreakTime += shortBreakDuration;
+                }
+            }
+        }
+
+        const totalTimeMinutes = (totalWorkSessions * workDuration) + totalBreakTime;
+
+        return {
+            current: currentCycle,
+            total: totalCycles,
+            workSessionsRemaining: workSessionsRemaining,
+            totalWorkSessions: totalWorkSessions,
+            totalTimeMinutes: totalTimeMinutes
+        };
+    }
+
+    /**
+     * Reset estimation state (call when user wants to clear estimation)
+     */
+    public resetEstimation(): void {
+        this.state.pomodoroIsEstimationActive = false;
+        this.state.pomodoroEstimatedTotalCycles = null;
+        this.state.pomodoroEstimatedWorkSessions = null;
+        this.state.pomodoroUserHasModifiedSettings = false;
+        this.plugin.savePluginData();
         this.notifyUpdate();
     }
 
