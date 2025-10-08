@@ -17,6 +17,10 @@
   --sf-info: #2196f3;
   --sf-info-light: rgba(33, 150, 243, 0.15); /* Adjusted opacity */
   
+  /* Overdue colors - softer than error red */
+  --sf-overdue-accent: #ff8c42; /* Warm orange/amber */
+  --sf-overdue-bg: rgba(255, 140, 66, 0.08); /* Very light orange tint */
+  
   /* Text colors */
   --sf-text: var(--text-normal, #333);
   --sf-text-muted: var(--text-muted, #888);
@@ -56,6 +60,7 @@
   --sf-warning-light: rgba(255, 152, 0, 0.2); /* Adjusted opacity */
   --sf-danger-light: rgba(244, 67, 54, 0.2); /* Adjusted opacity */
   --sf-info-light: rgba(33, 150, 243, 0.2); /* Adjusted opacity */
+  --sf-overdue-bg: rgba(255, 140, 66, 0.12); /* Slightly more visible in dark mode */
   --sf-bg-primary: var(--background-primary-alt);
   --sf-bg-secondary: var(--background-secondary-alt);
 }

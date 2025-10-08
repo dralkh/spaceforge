@@ -264,7 +264,7 @@
 }
 
 .review-date-section-overdue {
-  border-left: 3px solid var(--text-error); /* Use Obsidian error color */
+  border-left: 3px solid var(--sf-overdue-accent); /* Softer orange/amber */
   background-color: var(--background-secondary);
 }
 
@@ -299,7 +299,7 @@
 }
 
 .review-date-section-overdue .review-date-header h3 {
-  color: var(--text-error);
+  color: var(--sf-overdue-accent);
 }
 
 .review-date-postpone-all {
@@ -363,8 +363,8 @@
 
 
 .review-note-item.overdue-note {
-  background-color: var(--background-modifier-error-hover);
-  border-left: 3px solid var(--text-error);
+  background-color: var(--sf-overdue-bg);
+  border-left: 3px solid var(--sf-overdue-accent);
 }
 
 .review-note-title {
