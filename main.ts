@@ -24,6 +24,7 @@ import { ReviewHistoryService } from './services/review-history-service';
 import { ReviewSessionService } from './services/review-session-service';
 import { MCQService } from './services/mcq-service';
 import { PomodoroService } from './services/pomodoro-service';
+import { CalendarEventService } from './services/calendar-event-service';
 
 /**
  * Spaceforge: Spaced Repetition Plugin for Obsidian
@@ -37,6 +38,7 @@ export default class SpaceforgePlugin extends Plugin {
     reviewSessionService: ReviewSessionService;
     mcqService: MCQService;
     pomodoroService: PomodoroService;
+    calendarEventService: CalendarEventService;
 
     private readonly stylesheetPath: string = "styles.css";
     private readonly stylesheetId: string = "spaceforge-styles";
@@ -85,6 +87,11 @@ export default class SpaceforgePlugin extends Plugin {
         
         // Initialize PomodoroService after settings are loaded
         this.pomodoroService = new PomodoroService(this);
+        
+        // Initialize CalendarEventService after settings are loaded
+        this.calendarEventService = new CalendarEventService();
+        const eventsArray = Object.values(this.pluginState.calendarEvents);
+        this.calendarEventService.initialize(eventsArray);
 
 
         this.registerView(
@@ -373,6 +380,11 @@ export default class SpaceforgePlugin extends Plugin {
                 this.pluginState = { ...this.pluginState, ...(rawLoadedData as Partial<PluginStateData>) };
             }
             
+            // Ensure calendarEvents exists for legacy data
+            if (!this.pluginState.calendarEvents) {
+                this.pluginState.calendarEvents = {};
+            }
+            
             // Ensure pomodoro state is initialized if not present in loaded data
             this.pluginState.pomodoroCurrentMode = this.pluginState.pomodoroCurrentMode || DEFAULT_PLUGIN_STATE_DATA.pomodoroCurrentMode;
             this.pluginState.pomodoroTimeLeftInSeconds = this.pluginState.pomodoroTimeLeftInSeconds || DEFAULT_PLUGIN_STATE_DATA.pomodoroTimeLeftInSeconds;
@@ -471,6 +483,7 @@ export default class SpaceforgePlugin extends Plugin {
                 pomodoroUserOverrideHours: typeof this.pluginState.pomodoroUserOverrideHours === 'number' ? this.pluginState.pomodoroUserOverrideHours : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideHours,
                 pomodoroUserOverrideMinutes: typeof this.pluginState.pomodoroUserOverrideMinutes === 'number' ? this.pluginState.pomodoroUserOverrideMinutes : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideMinutes,
                 pomodoroUserAddToEstimation: typeof this.pluginState.pomodoroUserAddToEstimation === 'boolean' ? this.pluginState.pomodoroUserAddToEstimation : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserAddToEstimation,
+                calendarEvents: this.calendarEventService ? Object.fromEntries(this.calendarEventService.getAllEvents().map(event => [event.id, event])) : {},
                 version: this.manifest.version,
             };
             this.pluginState = currentPluginState; // Update the live pluginState

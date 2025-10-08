@@ -106,6 +106,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     pomodoroUserOverrideHours: this.plugin.pluginState.pomodoroUserOverrideHours ?? 0,
                     pomodoroUserOverrideMinutes: this.plugin.pluginState.pomodoroUserOverrideMinutes ?? 0,
                     pomodoroUserAddToEstimation: this.plugin.pluginState.pomodoroUserAddToEstimation ?? false,
+                    calendarEvents: this.plugin.pluginState.calendarEvents ?? {},
                 };
 
                 const dataToExport: SpaceforgePluginData = {

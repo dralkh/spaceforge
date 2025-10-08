@@ -26,6 +26,15 @@ https://github.com/user-attachments/assets/10bb251e-360c-41ae-a128-e90f3f3e2576
 *   **Comprehensive Review Management:**
     *   A dedicated sidebar view displays upcoming reviews, estimated completion times, and allows for easy navigation with configurable hotkey support.
     *   Calendar view for visualizing your review schedule with standardized UTC date calculations.
+*   **📅 Calendar Events Organization:**
+    *   **Full Event Management**: Create, edit, and delete calendar events with comprehensive CRUD operations
+    *   **Event Categories**: Color-coded categories (Work, Personal, Study, Meeting, Health, Social, Other) for visual organization
+    *   **Recurring Events**: Support for daily, weekly, monthly, and yearly recurrence patterns with end dates
+    *   **Visual Event Display**: Events shown as colored tabs in calendar cells with hover interactions
+    *   **Upcoming Events List**: Organized list of upcoming events below calendar grid with day-based grouping
+    *   **Quick Event Creation**: Hover plus button on calendar days for fast event creation with pre-filled dates
+    *   **Event Details Modal**: Comprehensive event creation/editing interface with all event properties
+    *   **Real-time Updates**: Calendar refreshes instantly after event operations with proper state management
 *   **Flexible Note Addition:**
     *   Add individual notes or entire folders to your review schedule via the right-click context menu.
     *   Use Obsidian commands to add the current note or its folder.
@@ -82,6 +91,15 @@ npm install && npm run build && node install.js --d /home/user/Documents/vault/.
 2.  Start, pause, reset, or skip Pomodoro sessions (Work, Short Break, Long Break).
 3.  The timer and current session type are displayed in the sidebar.
 
+#### Managing Calendar Events
+1.  **Create Events**: Click the plus button in the calendar header or hover over calendar days to reveal the quick-add button
+2.  **View Events**: Events appear as colored tabs in calendar cells and in the upcoming events list below the calendar
+3.  **Edit Events**: Double-click event tabs in calendar cells to open the edit modal
+4.  **Delete Events**: Use the delete button in the edit modal (no confirmation required for quick workflow)
+5.  **Event Categories**: Choose from predefined categories with automatic color coding or set custom colors
+6.  **Recurring Events**: Set recurrence patterns (daily, weekly, monthly, yearly) with optional end dates
+7.  **Event Details**: Add title, description, date, time, location, and category for comprehensive event management
+
 ## Core Concepts
 
 ### Scheduling Algorithms: Optimize Your Learning
@@ -98,6 +116,7 @@ The Spaceforge settings tab allows you to customize:
 *   **Scheduling Algorithm:** Select and configure FSRS or SM-2 parameters with standardized UTC date calculations.
 *   **MCQ Generation:** Enable/disable MCQs, select API provider, enter API keys and models, configure scoring behavior.
 *   **Pomodoro Timer:** Enable/disable, set durations for work/break sessions, sound notifications.
+*   **Calendar Events:** Enable/disable calendar events, set default event category, configure event display options.
 *   **Data Management:** Set a custom path for plugin data, import/export data, manage data integrity.
 
 ## Commands & Shortcuts
@@ -109,6 +128,7 @@ Spaceforge adds several commands to the Obsidian command palette:
 *   `Spaceforge: Add Current Note to Review Schedule`
 *   `Spaceforge: Add Current Note's Folder to Review Schedule`
 *   `Spaceforge: Open Review Sidebar`
+*   `Spaceforge: Create Calendar Event`
 
 You can assign custom keyboard shortcuts to these commands via Obsidian's hotkey settings. Spaceforge now includes enhanced navigation command execution with configurable hotkey support for improved workflow efficiency.
 
@@ -141,6 +161,10 @@ This plugin is licensed under the MIT License.
 *   **Customizable Sidebar Sections:** Allow users to show/hide or reorder sections within the Spaceforge sidebar for a personalized study environment.
 *   **More Informative Note Items:** Display more details on note items (e.g., icons for MCQ availability, leech status, FSRS/SM-2 type; hover for more stats) for quick insights.
 *   **Calendar View Enhancements:** More interactive calendar with direct review options, visual density indicators, and hover details for better schedule management.
+*   **Event Reminders:** Notifications and alerts for upcoming calendar events with customizable timing.
+*   **Calendar Synchronization:** Integration with external calendar services (Google Calendar, Outlook, etc.).
+*   **Advanced Event Filtering:** Filter events by category, date range, or search terms for better organization.
+*   **Event Templates**: Pre-defined event templates for common activities (meetings, study sessions, etc.).
 *   **Pomodoro UI Refinements:** Visual timer, session history, and more sound customization options for an improved focus timer experience.
 
 **IV. Integrations & Data Management:**

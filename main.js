@@ -32,7 +32,7 @@ __export(main_exports, {
   default: () => SpaceforgePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian26 = require("obsidian");
+var import_obsidian28 = require("obsidian");
 
 // utils/event-emitter.ts
 var EventEmitter = class {
@@ -4332,7 +4332,7 @@ var ContextMenuHandler = class {
 };
 
 // ui/sidebar-view.ts
-var import_obsidian16 = require("obsidian");
+var import_obsidian18 = require("obsidian");
 
 // ui/sidebar/pomodoro-ui-manager.ts
 var import_obsidian12 = require("obsidian");
@@ -5882,7 +5882,603 @@ var ListViewRenderer = class {
 };
 
 // ui/calendar-view.ts
+var import_obsidian17 = require("obsidian");
+
+// ui/upcoming-events.ts
 var import_obsidian15 = require("obsidian");
+var UpcomingEvents = class {
+  /**
+   * Initialize upcoming events component
+   * 
+   * @param containerEl Container element
+   * @param plugin Reference to the main plugin
+   */
+  constructor(containerEl, plugin) {
+    /**
+     * Upcoming events data
+     */
+    this.upcomingEvents = [];
+    this.containerEl = containerEl;
+    this.plugin = plugin;
+  }
+  /**
+   * Render upcoming events list
+   */
+  async render() {
+    if (!this.plugin.settings.enableCalendarEvents || !this.plugin.settings.showUpcomingEvents) {
+      this.containerEl.empty();
+      return;
+    }
+    if (!this.plugin.calendarEventService) {
+      this.containerEl.empty();
+      return;
+    }
+    await this.loadUpcomingEvents();
+    this.containerEl.empty();
+    if (this.upcomingEvents.length === 0) {
+      this.renderEmptyState();
+      return;
+    }
+    this.renderEventsList();
+  }
+  /**
+   * Load upcoming events data
+   */
+  async loadUpcomingEvents() {
+    this.upcomingEvents = this.plugin.calendarEventService.getUpcomingEvents(
+      this.plugin.settings.upcomingEventsDays || 7
+    );
+  }
+  /**
+   * Render empty state when no upcoming events
+   */
+  renderEmptyState() {
+    const emptyState = this.containerEl.createDiv("upcoming-events-empty");
+    const emptyIcon = emptyState.createDiv("upcoming-events-empty-icon");
+    (0, import_obsidian15.setIcon)(emptyIcon, "calendar");
+    const emptyText = emptyState.createDiv("upcoming-events-empty-text");
+    emptyText.setText("No upcoming events");
+    const emptySubtext = emptyState.createDiv("upcoming-events-empty-subtext");
+    emptySubtext.setText("Events will appear here once you create them");
+  }
+  /**
+   * Render the events list
+   */
+  renderEventsList() {
+    const header = this.containerEl.createDiv("upcoming-events-header");
+    const headerTitle = header.createDiv("upcoming-events-title");
+    headerTitle.setText("Upcoming Events");
+    const headerSubtitle = header.createDiv("upcoming-events-subtitle");
+    const daysText = this.plugin.settings.upcomingEventsDays || 7;
+    headerSubtitle.setText(`Next ${daysText} days`);
+    const eventsContainer = this.containerEl.createDiv("upcoming-events-container");
+    const eventsByDay = this.groupEventsByDay();
+    eventsByDay.forEach((dayEvents, dayKey) => {
+      this.renderDaySection(eventsContainer, dayKey, dayEvents);
+    });
+  }
+  /**
+   * Group upcoming events by day
+   */
+  groupEventsByDay() {
+    const eventsByDay = /* @__PURE__ */ new Map();
+    this.upcomingEvents.forEach((upcomingEvent) => {
+      let dayKey;
+      if (upcomingEvent.isToday) {
+        dayKey = "Today";
+      } else if (upcomingEvent.isTomorrow) {
+        dayKey = "Tomorrow";
+      } else {
+        const eventDate = new Date(upcomingEvent.event.date);
+        dayKey = eventDate.toLocaleDateString(void 0, {
+          weekday: "short",
+          month: "short",
+          day: "numeric"
+        });
+      }
+      if (!eventsByDay.has(dayKey)) {
+        eventsByDay.set(dayKey, []);
+      }
+      eventsByDay.get(dayKey).push(upcomingEvent);
+    });
+    return eventsByDay;
+  }
+  /**
+   * Render a day section with its events
+   */
+  renderDaySection(container, dayKey, dayEvents) {
+    const daySection = container.createDiv("upcoming-events-day-section");
+    const dayHeader = daySection.createDiv("upcoming-events-day-header");
+    const dayTitle = dayHeader.createDiv("upcoming-events-day-title");
+    dayTitle.setText(dayKey);
+    if (dayKey === "Today") {
+      daySection.addClass("today");
+    } else if (dayKey === "Tomorrow") {
+      daySection.addClass("tomorrow");
+    }
+    const dayEventsContainer = daySection.createDiv("upcoming-events-day-events");
+    dayEvents.forEach((upcomingEvent) => {
+      this.renderEventItem(dayEventsContainer, upcomingEvent);
+    });
+  }
+  /**
+   * Render a single event item
+   */
+  renderEventItem(container, upcomingEvent) {
+    var _a;
+    const event = upcomingEvent.event;
+    const eventItem = container.createDiv("upcoming-events-event-item");
+    const colorIndicator = eventItem.createDiv("upcoming-events-event-color");
+    const eventColor = ((_a = this.plugin.calendarEventService) == null ? void 0 : _a.getEventColor(event)) || "#95A5A6";
+    colorIndicator.style.backgroundColor = eventColor;
+    const eventContent = eventItem.createDiv("upcoming-events-event-content");
+    const eventHeader = eventContent.createDiv("upcoming-events-event-header");
+    const eventTitle = eventHeader.createDiv("upcoming-events-event-title");
+    eventTitle.setText(event.title);
+    if (event.time) {
+      const eventTime = eventHeader.createDiv("upcoming-events-event-time");
+      eventTime.setText(event.time);
+    } else if (event.isAllDay) {
+      const eventTime = eventHeader.createDiv("upcoming-events-event-time");
+      eventTime.setText("All day");
+    }
+    if (event.description || event.location) {
+      const eventDetails = eventContent.createDiv("upcoming-events-event-details");
+      if (event.location) {
+        const eventLocation = eventDetails.createDiv("upcoming-events-event-location");
+        (0, import_obsidian15.setIcon)(eventLocation, "map-pin");
+        eventLocation.appendText(" " + event.location);
+      }
+      if (event.description) {
+        const eventDescription = eventDetails.createDiv("upcoming-events-event-description");
+        eventDescription.setText(event.description.substring(0, 100) + (event.description.length > 100 ? "..." : ""));
+      }
+    }
+    const eventCategory = eventContent.createDiv("upcoming-events-event-category");
+    eventCategory.setText(event.category);
+    eventItem.addEventListener("click", () => {
+      this.showEventDetails(event);
+    });
+    eventItem.addEventListener("mouseenter", () => {
+      eventItem.addClass("hover");
+    });
+    eventItem.addEventListener("mouseleave", () => {
+      eventItem.removeClass("hover");
+    });
+  }
+  /**
+   * Show event details modal
+   * 
+   * @param event Event to show details for
+   */
+  showEventDetails(event) {
+    const eventDate = new Date(event.date);
+    const dateStr = eventDate.toLocaleDateString(void 0, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+    let details = `\u{1F4C5} ${event.title}
+\u{1F4C6} ${dateStr}`;
+    if (event.time) {
+      details += `
+\u{1F550} ${event.time}`;
+    }
+    if (event.description) {
+      details += `
+\u{1F4DD} ${event.description}`;
+    }
+    if (event.location) {
+      details += `
+\u{1F4CD} ${event.location}`;
+    }
+    details += `
+\u{1F3F7}\uFE0F ${event.category}`;
+    new import_obsidian15.Notice(details, 8e3);
+  }
+  /**
+   * Refresh the upcoming events display
+   */
+  async refresh() {
+    await this.render();
+  }
+  /**
+   * Clean up the component
+   */
+  destroy() {
+    this.containerEl.empty();
+  }
+};
+
+// ui/event-modal.ts
+var import_obsidian16 = require("obsidian");
+
+// models/calendar-event.ts
+var EventCategory = /* @__PURE__ */ ((EventCategory2) => {
+  EventCategory2["Work"] = "work";
+  EventCategory2["Personal"] = "personal";
+  EventCategory2["Study"] = "study";
+  EventCategory2["Meeting"] = "meeting";
+  EventCategory2["Health"] = "health";
+  EventCategory2["Social"] = "social";
+  EventCategory2["Other"] = "other";
+  return EventCategory2;
+})(EventCategory || {});
+var EventRecurrence = /* @__PURE__ */ ((EventRecurrence2) => {
+  EventRecurrence2["None"] = "none";
+  EventRecurrence2["Daily"] = "daily";
+  EventRecurrence2["Weekly"] = "weekly";
+  EventRecurrence2["Monthly"] = "monthly";
+  EventRecurrence2["Yearly"] = "yearly";
+  return EventRecurrence2;
+})(EventRecurrence || {});
+var EVENT_CATEGORY_COLORS = {
+  ["work" /* Work */]: "#4A90E2",
+  ["personal" /* Personal */]: "#7B68EE",
+  ["study" /* Study */]: "#50C878",
+  ["meeting" /* Meeting */]: "#FF6B6B",
+  ["health" /* Health */]: "#FF9F40",
+  ["social" /* Social */]: "#FF69B4",
+  ["other" /* Other */]: "#95A5A6"
+};
+
+// ui/event-modal.ts
+var EventModal = class extends import_obsidian16.Modal {
+  constructor(app, plugin, event = null, onSave) {
+    super(app);
+    this.plugin = plugin;
+    this.event = event;
+    this.onSave = onSave;
+  }
+  onOpen() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("event-modal");
+    const header = contentEl.createDiv("event-modal-header");
+    const headerIcon = header.createDiv("event-modal-header-icon");
+    (0, import_obsidian16.setIcon)(headerIcon, this.event ? "edit" : "calendar-plus");
+    const headerText = header.createDiv("event-modal-header-text");
+    headerText.createEl("h2", {
+      text: this.event ? "Edit Event" : "New Event",
+      cls: "event-modal-title"
+    });
+    const formContainer = contentEl.createDiv("event-modal-form");
+    const titleRow = formContainer.createDiv("event-modal-row");
+    const titleGroup = titleRow.createDiv("event-modal-field-group");
+    titleGroup.createEl("label", { text: "Title", cls: "event-modal-label required" });
+    this.titleInput = titleGroup.createEl("input", {
+      type: "text",
+      cls: "event-modal-input",
+      placeholder: "Event title..."
+    });
+    if ((_a = this.event) == null ? void 0 : _a.title) {
+      this.titleInput.value = this.event.title;
+    }
+    this.titleInput.addEventListener("input", () => this.validateForm());
+    const dateTimeRow = formContainer.createDiv("event-modal-row");
+    const dateGroup = dateTimeRow.createDiv("event-modal-field-group");
+    dateGroup.createEl("label", { text: "Date", cls: "event-modal-label" });
+    this.dateInput = dateGroup.createEl("input", {
+      type: "date",
+      cls: "event-modal-input"
+    });
+    if ((_b = this.event) == null ? void 0 : _b.date) {
+      const date = new Date(this.event.date);
+      this.dateInput.value = date.toISOString().split("T")[0];
+    } else {
+      this.dateInput.value = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    }
+    this.dateInput.addEventListener("change", () => this.validateForm());
+    const timeGroup = dateTimeRow.createDiv("event-modal-field-group");
+    timeGroup.createEl("label", { text: "Time", cls: "event-modal-label" });
+    this.timeInput = timeGroup.createEl("input", {
+      type: "time",
+      cls: "event-modal-input"
+    });
+    if ((_c = this.event) == null ? void 0 : _c.time) {
+      this.timeInput.value = this.event.time;
+    }
+    this.timeInput.addEventListener("change", () => this.updateAllDayToggle());
+    const allDayRow = formContainer.createDiv("event-modal-row");
+    const allDayGroup = allDayRow.createDiv("event-modal-field-group");
+    this.isAllDayToggle = allDayGroup.createEl("input", {
+      type: "checkbox",
+      cls: "event-modal-checkbox"
+    });
+    this.isAllDayToggle.checked = (_e = (_d = this.event) == null ? void 0 : _d.isAllDay) != null ? _e : false;
+    this.isAllDayToggle.addEventListener("change", () => this.toggleTimeInput());
+    const allDayLabel = allDayGroup.createEl("label", {
+      text: "All-day event",
+      cls: "event-modal-checkbox-label"
+    });
+    const locationRow = formContainer.createDiv("event-modal-row");
+    const locationGroup = locationRow.createDiv("event-modal-field-group");
+    locationGroup.createEl("label", { text: "Location", cls: "event-modal-label" });
+    this.locationInput = locationGroup.createEl("input", {
+      type: "text",
+      cls: "event-modal-input",
+      placeholder: "Location (optional)..."
+    });
+    if ((_f = this.event) == null ? void 0 : _f.location) {
+      this.locationInput.value = this.event.location;
+    }
+    const categoryColorRow = formContainer.createDiv("event-modal-row");
+    const categoryGroup = categoryColorRow.createDiv("event-modal-field-group");
+    categoryGroup.createEl("label", { text: "Category", cls: "event-modal-label" });
+    this.categorySelect = categoryGroup.createEl("select", {
+      cls: "event-modal-select"
+    });
+    Object.values(EventCategory).forEach((category) => {
+      const option = this.categorySelect.createEl("option", {
+        value: category,
+        text: category.charAt(0).toUpperCase() + category.slice(1)
+      });
+      this.categorySelect.appendChild(option);
+    });
+    if ((_g = this.event) == null ? void 0 : _g.category) {
+      this.categorySelect.value = this.event.category;
+    } else {
+      this.categorySelect.value = this.plugin.settings.defaultEventCategory || "personal";
+    }
+    this.categorySelect.addEventListener("change", () => this.updateColorFromCategory());
+    const colorGroup = categoryColorRow.createDiv("event-modal-field-group");
+    colorGroup.createEl("label", { text: "Color", cls: "event-modal-label" });
+    const colorPickerContainer = colorGroup.createDiv("event-modal-color-picker-compact");
+    this.colorInput = colorPickerContainer.createEl("input", {
+      type: "color",
+      cls: "event-modal-color-input"
+    });
+    if ((_h = this.event) == null ? void 0 : _h.color) {
+      this.colorInput.value = this.event.color;
+    } else {
+      this.updateColorFromCategory();
+    }
+    const descriptionRow = formContainer.createDiv("event-modal-row event-modal-full-width");
+    const descriptionGroup = descriptionRow.createDiv("event-modal-field-group");
+    descriptionGroup.createEl("label", { text: "Description", cls: "event-modal-label" });
+    this.descriptionInput = descriptionGroup.createEl("textarea", {
+      cls: "event-modal-textarea",
+      placeholder: "Event details (optional)..."
+    });
+    this.descriptionInput.rows = 2;
+    if ((_i = this.event) == null ? void 0 : _i.description) {
+      this.descriptionInput.value = this.event.description;
+    }
+    const recurrenceRow = formContainer.createDiv("event-modal-row");
+    const recurrenceGroup = recurrenceRow.createDiv("event-modal-field-group");
+    recurrenceGroup.createEl("label", { text: "Recurrence", cls: "event-modal-label" });
+    this.recurrenceSelect = recurrenceGroup.createEl("select", {
+      cls: "event-modal-select"
+    });
+    Object.values(EventRecurrence).forEach((recurrence) => {
+      const option = this.recurrenceSelect.createEl("option", {
+        value: recurrence,
+        text: this.getRecurrenceDisplayText(recurrence)
+      });
+      this.recurrenceSelect.appendChild(option);
+    });
+    if ((_j = this.event) == null ? void 0 : _j.recurrence) {
+      this.recurrenceSelect.value = this.event.recurrence;
+    } else {
+      this.recurrenceSelect.value = "none" /* None */;
+    }
+    this.recurrenceSelect.addEventListener("change", () => this.toggleRecurrenceEndDate());
+    const recurrenceEndRow = formContainer.createDiv("event-modal-row event-modal-recurrence-end-row");
+    const recurrenceEndGroup = recurrenceEndRow.createDiv("event-modal-field-group");
+    recurrenceEndGroup.createEl("label", { text: "End Date", cls: "event-modal-label" });
+    this.recurrenceEndDateInput = recurrenceEndGroup.createEl("input", {
+      type: "date",
+      cls: "event-modal-input"
+    });
+    if ((_k = this.event) == null ? void 0 : _k.recurrenceEndDate) {
+      const date = new Date(this.event.recurrenceEndDate);
+      this.recurrenceEndDateInput.value = date.toISOString().split("T")[0];
+    }
+    const buttonContainer = contentEl.createDiv("event-modal-actions");
+    const cancelButton = buttonContainer.createEl("button", {
+      text: "Cancel",
+      cls: "event-modal-btn event-modal-btn-secondary"
+    });
+    cancelButton.addEventListener("click", () => this.close());
+    if (this.event) {
+      const deleteButton = buttonContainer.createEl("button", {
+        text: "Delete",
+        cls: "event-modal-btn event-modal-btn-danger"
+      });
+      deleteButton.addEventListener("click", () => this.deleteEvent());
+    }
+    const saveButton = buttonContainer.createEl("button", {
+      text: this.event ? "Update Event" : "Create Event",
+      cls: "event-modal-btn event-modal-btn-primary"
+    });
+    saveButton.addEventListener("click", () => this.saveEvent());
+    this.validateForm();
+    this.updateAllDayToggle();
+    this.toggleTimeInput();
+    this.toggleRecurrenceEndDate();
+    this.updateColorPreview();
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+  /**
+   * Validate form and enable/disable save button
+   */
+  validateForm() {
+    const saveButton = this.contentEl.querySelector(".event-modal-btn-primary");
+    const isValid = this.titleInput.value.trim() !== "" && this.dateInput.value !== "";
+    if (saveButton) {
+      saveButton.disabled = !isValid;
+    }
+  }
+  /**
+   * Update color based on selected category
+   */
+  updateColorFromCategory() {
+    const category = this.categorySelect.value;
+    const categoryColor = EVENT_CATEGORY_COLORS[category];
+    this.colorInput.value = categoryColor;
+    this.updateColorPreview();
+  }
+  /**
+   * Update color preview
+   */
+  updateColorPreview() {
+    const colorPreview = this.contentEl.querySelector(".event-modal-color-preview");
+    if (colorPreview) {
+      colorPreview.style.backgroundColor = this.colorInput.value;
+    }
+  }
+  /**
+   * Toggle time input based on all-day setting
+   */
+  toggleTimeInput() {
+    const isAllDay = this.isAllDayToggle.checked;
+    const timeContainer = this.timeInput.closest(".event-modal-input-group");
+    if (timeContainer) {
+      timeContainer.style.display = isAllDay ? "none" : "block";
+    }
+    if (isAllDay) {
+      this.timeInput.value = "";
+    }
+  }
+  /**
+   * Update all-day toggle based on time input
+   */
+  updateAllDayToggle() {
+    const hasTime = this.timeInput.value !== "";
+    if (hasTime && this.isAllDayToggle.checked) {
+      this.isAllDayToggle.checked = false;
+      this.toggleTimeInput();
+    }
+  }
+  /**
+   * Toggle recurrence end date based on recurrence setting
+   */
+  toggleRecurrenceEndDate() {
+    const recurrence = this.recurrenceSelect.value;
+    const endDateContainer = this.recurrenceEndDateInput.closest(".event-modal-recurrence-end-container");
+    if (endDateContainer) {
+      endDateContainer.style.display = recurrence === "none" /* None */ ? "none" : "block";
+    }
+    if (recurrence === "none" /* None */) {
+      this.recurrenceEndDateInput.value = "";
+    }
+  }
+  /**
+   * Get display text for recurrence option
+   */
+  getRecurrenceDisplayText(recurrence) {
+    switch (recurrence) {
+      case "none" /* None */:
+        return "None";
+      case "daily" /* Daily */:
+        return "Daily";
+      case "weekly" /* Weekly */:
+        return "Weekly";
+      case "monthly" /* Monthly */:
+        return "Monthly";
+      case "yearly" /* Yearly */:
+        return "Yearly";
+      default:
+        return recurrence;
+    }
+  }
+  /**
+   * Delete the event
+   */
+  async deleteEvent() {
+    var _a;
+    if (!this.event)
+      return;
+    try {
+      const deleted = (_a = this.plugin.calendarEventService) == null ? void 0 : _a.deleteEvent(this.event.id);
+      if (deleted) {
+        new import_obsidian16.Notice("Event deleted successfully");
+        await this.plugin.savePluginData();
+        this.onSave(this.event);
+        this.close();
+      } else {
+        new import_obsidian16.Notice("Failed to delete event");
+      }
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      new import_obsidian16.Notice("Error deleting event");
+    }
+  }
+  /**
+   * Save the event
+   */
+  async saveEvent() {
+    var _a, _b;
+    try {
+      const title = this.titleInput.value.trim();
+      const description = this.descriptionInput.value.trim();
+      const date = new Date(this.dateInput.value);
+      const time = this.timeInput.value;
+      const location = this.locationInput.value.trim();
+      const category = this.categorySelect.value;
+      const color = this.colorInput.value;
+      const isAllDay = this.isAllDayToggle.checked;
+      const recurrence = this.recurrenceSelect.value;
+      const recurrenceEndDateText = this.recurrenceEndDateInput.value;
+      const recurrenceEndDate = recurrenceEndDateText ? new Date(recurrenceEndDateText).getTime() : void 0;
+      if (!title || !this.dateInput.value) {
+        new import_obsidian16.Notice("Please fill in all required fields");
+        return;
+      }
+      let eventData;
+      if (this.event) {
+        eventData = {
+          ...this.event,
+          title,
+          description: description || void 0,
+          date: date.getTime(),
+          time: time || void 0,
+          location: location || void 0,
+          category,
+          color: color !== EVENT_CATEGORY_COLORS[category] ? color : void 0,
+          isAllDay,
+          recurrence,
+          recurrenceEndDate
+        };
+        const updatedEvent = (_a = this.plugin.calendarEventService) == null ? void 0 : _a.updateEvent(this.event.id, eventData);
+        if (updatedEvent) {
+          this.onSave(updatedEvent);
+          new import_obsidian16.Notice("Event updated successfully");
+        }
+      } else {
+        eventData = {
+          title,
+          description: description || void 0,
+          date: date.getTime(),
+          time: time || void 0,
+          location: location || void 0,
+          category,
+          color: color !== EVENT_CATEGORY_COLORS[category] ? color : void 0,
+          isAllDay,
+          recurrence,
+          recurrenceEndDate
+        };
+        const newEvent = (_b = this.plugin.calendarEventService) == null ? void 0 : _b.createEvent(eventData);
+        if (newEvent) {
+          this.onSave(newEvent);
+          new import_obsidian16.Notice("Event created successfully");
+        }
+      }
+      await this.plugin.savePluginData();
+      this.close();
+    } catch (error) {
+      console.error("Error saving event:", error);
+      new import_obsidian16.Notice("Error saving event");
+    }
+  }
+};
+
+// ui/calendar-view.ts
 var CalendarView = class {
   /**
    * Initialize calendar view
@@ -5895,10 +6491,19 @@ var CalendarView = class {
      * Reviews grouped by date
      */
     this.reviewsByDate = /* @__PURE__ */ new Map();
+    /**
+     * Events grouped by date
+     */
+    this.eventsByDate = /* @__PURE__ */ new Map();
     // Persistent UI elements
     this.calendarHeaderEl = null;
     this.monthTitleEl = null;
     this.calendarGridEl = null;
+    this.upcomingEventsEl = null;
+    this.upcomingEventsComponent = null;
+    // Tooltip elements
+    this.tooltipEl = null;
+    this.tooltipTimeout = null;
     this.containerEl = containerEl;
     this.plugin = plugin;
     this.currentDate = /* @__PURE__ */ new Date();
@@ -5910,12 +6515,16 @@ var CalendarView = class {
     this.ensureCalendarBaseStructure();
     this.updateCalendarHeader();
     await this.loadReviewsData();
+    await this.loadEventsData();
     if (this.calendarGridEl) {
       this.renderCalendarGridContent(this.calendarGridEl);
     }
+    if (this.upcomingEventsComponent) {
+      await this.upcomingEventsComponent.render();
+    }
   }
   ensureCalendarBaseStructure() {
-    var _a, _b;
+    var _a, _b, _c;
     if (!this.containerEl)
       return;
     let calendarContainer = this.containerEl.querySelector(".calendar-container");
@@ -5926,14 +6535,14 @@ var CalendarView = class {
       (_a = this.calendarHeaderEl) == null ? void 0 : _a.remove();
       this.calendarHeaderEl = calendarContainer.createDiv("calendar-header");
       const prevMonthBtn = this.calendarHeaderEl.createDiv("calendar-nav-btn");
-      (0, import_obsidian15.setIcon)(prevMonthBtn, "chevron-left");
+      (0, import_obsidian17.setIcon)(prevMonthBtn, "chevron-left");
       prevMonthBtn.addEventListener("click", () => {
         this.currentDate.setMonth(this.currentDate.getMonth() - 1);
         this.render();
       });
       this.monthTitleEl = this.calendarHeaderEl.createDiv("calendar-month-title");
       const nextMonthBtn = this.calendarHeaderEl.createDiv("calendar-nav-btn");
-      (0, import_obsidian15.setIcon)(nextMonthBtn, "chevron-right");
+      (0, import_obsidian17.setIcon)(nextMonthBtn, "chevron-right");
       nextMonthBtn.addEventListener("click", () => {
         this.currentDate.setMonth(this.currentDate.getMonth() + 1);
         this.render();
@@ -5944,10 +6553,20 @@ var CalendarView = class {
         this.currentDate = /* @__PURE__ */ new Date();
         this.render();
       });
+      const addEventBtn = this.calendarHeaderEl.createDiv("calendar-add-event-btn");
+      (0, import_obsidian17.setIcon)(addEventBtn, "plus");
+      addEventBtn.addEventListener("click", () => {
+        this.openCreateEventModal();
+      });
     }
     if (!this.calendarGridEl || !calendarContainer.contains(this.calendarGridEl)) {
       (_b = this.calendarGridEl) == null ? void 0 : _b.remove();
       this.calendarGridEl = calendarContainer.createDiv("calendar-grid");
+    }
+    if (!this.upcomingEventsEl || !calendarContainer.contains(this.upcomingEventsEl)) {
+      (_c = this.upcomingEventsEl) == null ? void 0 : _c.remove();
+      this.upcomingEventsEl = calendarContainer.createDiv("upcoming-events-wrapper");
+      this.upcomingEventsComponent = new UpcomingEvents(this.upcomingEventsEl, this.plugin);
     }
   }
   /**
@@ -5984,6 +6603,36 @@ var CalendarView = class {
       if (dateReviews) {
         dateReviews.notes.push(schedule);
         dateReviews.totalTime += await this.plugin.reviewScheduleService.estimateReviewTime(schedule.path);
+      }
+    }
+  }
+  /**
+   * Load and organize event data by date
+   */
+  async loadEventsData() {
+    this.eventsByDate = /* @__PURE__ */ new Map();
+    if (!this.plugin.settings.enableCalendarEvents || !this.plugin.calendarEventService) {
+      return;
+    }
+    const { year, month } = this.getCalendarData();
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0);
+    const eventsInRange = this.plugin.calendarEventService.getEventsInRange(
+      startDate.getTime(),
+      endDate.getTime()
+    );
+    for (const event of eventsInRange) {
+      const eventDayStart = DateUtils.startOfUTCDay(new Date(event.date));
+      const dateKey = eventDayStart.toString();
+      if (!this.eventsByDate.has(dateKey)) {
+        this.eventsByDate.set(dateKey, {
+          timestamp: eventDayStart,
+          events: []
+        });
+      }
+      const dateEvents = this.eventsByDate.get(dateKey);
+      if (dateEvents) {
+        dateEvents.events.push(event);
       }
     }
   }
@@ -6031,6 +6680,7 @@ var CalendarView = class {
           dayCell.addClass("today");
         }
         const dateReviews = this.reviewsByDate.get(dateKey);
+        const dateEvents = this.eventsByDate.get(dateKey);
         if (dateReviews && dateReviews.notes.length > 0) {
           dayCell.addClass("has-reviews");
           const reviewCount = dayCell.createDiv("calendar-review-count");
@@ -6048,7 +6698,7 @@ var CalendarView = class {
               await sidebarView.refresh();
             } else {
               this.plugin.app.workspace.requestSaveLayout();
-              new import_obsidian15.Notice("Switched to list view. Sidebar will update.");
+              new import_obsidian17.Notice("Switched to list view. Sidebar will update.");
             }
           });
           if (dateReviews.notes.length > 10)
@@ -6058,6 +6708,42 @@ var CalendarView = class {
           else
             dayCell.addClass("light-load");
         }
+        if (dateEvents && dateEvents.events.length > 0) {
+          dayCell.addClass("has-events");
+          const eventsContainer = dayCell.createDiv("calendar-events-container");
+          const eventsToShow = dateEvents.events.slice(0, 3);
+          eventsToShow.forEach((event) => {
+            var _a;
+            const eventTab = eventsContainer.createDiv("calendar-event-tab");
+            eventTab.setText(event.title.substring(0, 8) + (event.title.length > 8 ? "..." : ""));
+            const eventColor = ((_a = this.plugin.calendarEventService) == null ? void 0 : _a.getEventColor(event)) || "#95A5A6";
+            eventTab.style.backgroundColor = eventColor;
+            eventTab.addEventListener("mouseenter", (e) => {
+              this.showEventTooltip(eventTab, event);
+            });
+            eventTab.addEventListener("mouseleave", (e) => {
+              this.hideEventTooltip();
+            });
+            eventTab.addEventListener("click", (e) => {
+              e.stopPropagation();
+              this.showEventDetails(event);
+            });
+            eventTab.addEventListener("dblclick", (e) => {
+              e.stopPropagation();
+              this.openEditEventModal(event);
+            });
+          });
+          if (dateEvents.events.length > 3) {
+            const moreIndicator = eventsContainer.createDiv("calendar-events-more");
+            moreIndicator.setText(`+${dateEvents.events.length - 3}`);
+          }
+        }
+        const addEventBtn = dayCell.createDiv("calendar-day-add-event");
+        (0, import_obsidian17.setIcon)(addEventBtn, "plus");
+        addEventBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.openCreateEventModalForDate(currentDateObj);
+        });
         dayOfMonth++;
       } else {
         dayCell.addClass("empty");
@@ -6088,10 +6774,191 @@ var CalendarView = class {
     const today = /* @__PURE__ */ new Date();
     return today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
   }
+  /**
+   * Show event details modal
+   * 
+   * @param event Event to show details for
+   */
+  showEventDetails(event) {
+    const eventDate = new Date(event.date);
+    const dateStr = eventDate.toLocaleDateString(void 0, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+    let details = `\u{1F4C5} ${event.title}
+\u{1F4C6} ${dateStr}`;
+    if (event.time) {
+      details += `
+\u{1F550} ${event.time}`;
+    }
+    if (event.description) {
+      details += `
+\u{1F4DD} ${event.description}`;
+    }
+    if (event.location) {
+      details += `
+\u{1F4CD} ${event.location}`;
+    }
+    details += `
+\u{1F3F7}\uFE0F ${event.category}`;
+    new import_obsidian17.Notice(details, 8e3);
+  }
+  /**
+   * Open create event modal
+   */
+  openCreateEventModal() {
+    const modal = new EventModal(
+      this.plugin.app,
+      this.plugin,
+      null,
+      async (savedEvent) => {
+        await this.render();
+      }
+    );
+    modal.open();
+  }
+  /**
+   * Open create event modal for a specific date
+   * 
+   * @param date Date to pre-fill in the modal
+   */
+  openCreateEventModalForDate(date) {
+    const defaultEvent = {
+      title: "",
+      date: date.getTime(),
+      isAllDay: true,
+      category: this.plugin.settings.defaultEventCategory || "personal",
+      recurrence: "none"
+    };
+    const modal = new EventModal(
+      this.plugin.app,
+      this.plugin,
+      null,
+      async (savedEvent) => {
+        await this.render();
+      }
+    );
+    modal.open();
+    setTimeout(() => {
+      const dateInput = modal.contentEl.querySelector('input[type="date"]');
+      if (dateInput) {
+        dateInput.value = date.toISOString().split("T")[0];
+      }
+    }, 100);
+  }
+  /**
+   * Open edit event modal
+   * 
+   * @param event Event to edit
+   */
+  openEditEventModal(event) {
+    const modal = new EventModal(
+      this.plugin.app,
+      this.plugin,
+      event,
+      async (savedEvent) => {
+        await this.render();
+      }
+    );
+    modal.open();
+  }
+  /**
+   * Clean up resources when the calendar view is destroyed
+   */
+  destroy() {
+    this.hideEventTooltip();
+    this.calendarHeaderEl = null;
+    this.monthTitleEl = null;
+    this.calendarGridEl = null;
+    this.upcomingEventsEl = null;
+    this.upcomingEventsComponent = null;
+  }
+  /**
+   * Show event tooltip
+   * 
+   * @param targetEl Element to show tooltip for
+   * @param event Event to show details for
+   */
+  showEventTooltip(targetEl, event) {
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+    }
+    this.tooltipTimeout = setTimeout(() => {
+      this.createEventTooltip(targetEl, event);
+    }, 300);
+  }
+  /**
+   * Hide event tooltip
+   */
+  hideEventTooltip() {
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+      this.tooltipTimeout = null;
+    }
+    if (this.tooltipEl) {
+      this.tooltipEl.remove();
+      this.tooltipEl = null;
+    }
+  }
+  /**
+   * Create and show the tooltip element
+   * 
+   * @param targetEl Element to position tooltip relative to
+   * @param event Event to show details for
+   */
+  createEventTooltip(targetEl, event) {
+    this.hideEventTooltip();
+    this.tooltipEl = document.createElement("div");
+    this.tooltipEl.className = "calendar-event-tooltip";
+    const eventDate = new Date(event.date);
+    const dateStr = eventDate.toLocaleDateString(void 0, {
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    });
+    let tooltipContent = `<div class="tooltip-title">${event.title}</div>`;
+    tooltipContent += `<div class="tooltip-date">\u{1F4C5} ${dateStr}</div>`;
+    if (event.time) {
+      tooltipContent += `<div class="tooltip-time">\u{1F550} ${event.time}</div>`;
+    }
+    if (event.description) {
+      tooltipContent += `<div class="tooltip-description">\u{1F4DD} ${event.description}</div>`;
+    }
+    if (event.location) {
+      tooltipContent += `<div class="tooltip-location">\u{1F4CD} ${event.location}</div>`;
+    }
+    tooltipContent += `<div class="tooltip-category">\u{1F3F7}\uFE0F ${event.category}</div>`;
+    this.tooltipEl.innerHTML = tooltipContent;
+    const rect = targetEl.getBoundingClientRect();
+    const tooltipRect = this.tooltipEl.getBoundingClientRect();
+    document.body.appendChild(this.tooltipEl);
+    let left = rect.left + rect.width / 2 - this.tooltipEl.offsetWidth / 2;
+    let top = rect.bottom + 8;
+    if (left < 8)
+      left = 8;
+    if (left + this.tooltipEl.offsetWidth > window.innerWidth - 8) {
+      left = window.innerWidth - this.tooltipEl.offsetWidth - 8;
+    }
+    if (top + this.tooltipEl.offsetHeight > window.innerHeight - 8) {
+      top = rect.top - this.tooltipEl.offsetHeight - 8;
+    }
+    this.tooltipEl.style.left = `${left}px`;
+    this.tooltipEl.style.top = `${top}px`;
+    this.tooltipEl.style.opacity = "0";
+    this.tooltipEl.style.transform = "translateY(-4px)";
+    requestAnimationFrame(() => {
+      if (this.tooltipEl) {
+        this.tooltipEl.style.opacity = "1";
+        this.tooltipEl.style.transform = "translateY(0)";
+      }
+    });
+  }
 };
 
 // ui/sidebar-view.ts
-var ReviewSidebarView = class extends import_obsidian16.ItemView {
+var ReviewSidebarView = class extends import_obsidian18.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.activeListBaseDate = null;
@@ -6339,7 +7206,7 @@ var ReviewSidebarView = class extends import_obsidian16.ItemView {
     const path2 = dateNotes[index - 1].path;
     await this.plugin.reviewController.swapNotes(path1, path2);
     await this.refresh();
-    new import_obsidian16.Notice(`Moved note up`);
+    new import_obsidian18.Notice(`Moved note up`);
   }
   /**
    * Move a note down in the list
@@ -6363,7 +7230,7 @@ var ReviewSidebarView = class extends import_obsidian16.ItemView {
     const path2 = dateNotes[index + 1].path;
     await this.plugin.reviewController.swapNotes(path1, path2);
     await this.refresh();
-    new import_obsidian16.Notice(`Moved note down`);
+    new import_obsidian18.Notice(`Moved note down`);
   }
   /**
    * Group notes by their folder
@@ -6412,7 +7279,7 @@ var ReviewSidebarView = class extends import_obsidian16.ItemView {
 };
 
 // ui/settings-tab.ts
-var import_obsidian17 = require("obsidian");
+var import_obsidian19 = require("obsidian");
 
 // models/settings.ts
 var DEFAULT_SETTINGS = {
@@ -6512,7 +7379,12 @@ var DEFAULT_SETTINGS = {
     modifiers: [],
     key: null
   },
-  navigationCommandDelay: 500
+  navigationCommandDelay: 500,
+  // Calendar Events Defaults
+  enableCalendarEvents: true,
+  showUpcomingEvents: true,
+  upcomingEventsDays: 7,
+  defaultEventCategory: "personal"
 };
 
 // models/plugin-data.ts
@@ -6541,7 +7413,9 @@ var DEFAULT_PLUGIN_STATE_DATA = {
   // User Override Time Settings Defaults
   pomodoroUserOverrideHours: 0,
   pomodoroUserOverrideMinutes: 0,
-  pomodoroUserAddToEstimation: false
+  pomodoroUserAddToEstimation: false,
+  // Calendar Events Defaults
+  calendarEvents: {}
 };
 var DEFAULT_APP_DATA = {
   settings: DEFAULT_SETTINGS,
@@ -6549,7 +7423,7 @@ var DEFAULT_APP_DATA = {
 };
 
 // ui/settings-tab.ts
-var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
+var SpaceforgeSettingTab = class extends import_obsidian19.PluginSettingTab {
   /**
    * Initialize settings tab
    * 
@@ -6571,7 +7445,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       const header = sectionContainer.createEl("div", { cls: "sf-settings-section-header" });
       if (iconName) {
         const iconEl = header.createEl("span", { cls: "sf-settings-icon" });
-        (0, import_obsidian17.setIcon)(iconEl, iconName);
+        (0, import_obsidian19.setIcon)(iconEl, iconName);
       }
       header.createEl("h3", { text: title });
       const collapseIndicator = header.createEl("span", {
@@ -6595,7 +7469,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       const actionsContainer = containerEl.createEl("div", { cls: "sf-settings-actions" });
       const exportBtn = actionsContainer.createEl("button", { text: "Export all data" });
       exportBtn.addEventListener("click", () => {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i;
         const pluginStateToExport = {
           schedules: this.plugin.reviewScheduleService.schedules,
           history: this.plugin.reviewHistoryService.history,
@@ -6617,7 +7491,8 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           pomodoroUserHasModifiedSettings: (_e = this.plugin.pluginState.pomodoroUserHasModifiedSettings) != null ? _e : false,
           pomodoroUserOverrideHours: (_f = this.plugin.pluginState.pomodoroUserOverrideHours) != null ? _f : 0,
           pomodoroUserOverrideMinutes: (_g = this.plugin.pluginState.pomodoroUserOverrideMinutes) != null ? _g : 0,
-          pomodoroUserAddToEstimation: (_h = this.plugin.pluginState.pomodoroUserAddToEstimation) != null ? _h : false
+          pomodoroUserAddToEstimation: (_h = this.plugin.pluginState.pomodoroUserAddToEstimation) != null ? _h : false,
+          calendarEvents: (_i = this.plugin.pluginState.calendarEvents) != null ? _i : {}
         };
         const dataToExport = {
           settings: this.plugin.settings,
@@ -6631,7 +7506,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        new import_obsidian17.Notice("All plugin data exported successfully");
+        new import_obsidian19.Notice("All plugin data exported successfully");
       });
       const importBtn = actionsContainer.createEl("button", { text: "Import all data" });
       importBtn.addEventListener("click", () => {
@@ -6662,9 +7537,9 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
               this.plugin.initializeMCQComponents();
               await this.plugin.savePluginData();
               this.display();
-              new import_obsidian17.Notice("All plugin data imported successfully. Plugin may require a reload for all changes to take effect.");
+              new import_obsidian19.Notice("All plugin data imported successfully. Plugin may require a reload for all changes to take effect.");
             } catch (error) {
-              new import_obsidian17.Notice(`Failed to import data: ${error.message}`);
+              new import_obsidian19.Notice(`Failed to import data: ${error.message}`);
             }
           }
         };
@@ -6689,7 +7564,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           this.plugin.initializeMCQComponents();
           await this.plugin.savePluginData();
           this.display();
-          new import_obsidian17.Notice("All plugin data reset to defaults.");
+          new import_obsidian19.Notice("All plugin data reset to defaults.");
         }
       });
       const clearScheduleBtn = actionsContainer.createEl("button", {
@@ -6717,19 +7592,19 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
               this.plugin.events.emit("sidebar-update");
             }
             await this.plugin.savePluginData();
-            new import_obsidian17.Notice("All schedule data cleared successfully.");
+            new import_obsidian19.Notice("All schedule data cleared successfully.");
             this.display();
             (_a = this.plugin.getSidebarView()) == null ? void 0 : _a.refresh();
           } catch (error) {
-            new import_obsidian17.Notice("Failed to clear schedule data. Check console for details.");
+            new import_obsidian19.Notice("Failed to clear schedule data. Check console for details.");
           }
         }
       });
       return actionsContainer;
     };
     const spacedRepSection = createCollapsible("Spaced repetition", "calendar-clock", true);
-    new import_obsidian17.Setting(spacedRepSection).setName("Algorithm configuration").setHeading();
-    const algoSelectionSetting = new import_obsidian17.Setting(spacedRepSection).setName("Default scheduling algorithm").setDesc("Choose the default algorithm for newly created notes.").addDropdown((dropdown) => dropdown.addOption("sm2", "SM-2").addOption("fsrs", "FSRS").setValue(this.plugin.settings.defaultSchedulingAlgorithm).onChange(async (value) => {
+    new import_obsidian19.Setting(spacedRepSection).setName("Algorithm configuration").setHeading();
+    const algoSelectionSetting = new import_obsidian19.Setting(spacedRepSection).setName("Default scheduling algorithm").setDesc("Choose the default algorithm for newly created notes.").addDropdown((dropdown) => dropdown.addOption("sm2", "SM-2").addOption("fsrs", "FSRS").setValue(this.plugin.settings.defaultSchedulingAlgorithm).onChange(async (value) => {
       this.plugin.settings.defaultSchedulingAlgorithm = value;
       await this.plugin.savePluginData();
       this.display();
@@ -6740,35 +7615,35 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
     const sm2Summary = sm2ParamsContainer.createEl("summary");
     sm2Summary.setText("SM-2 parameters");
     sm2ParamsContainer.open = false;
-    new import_obsidian17.Setting(sm2ParamsContainer).setName("SM-2: Base ease factor").setDesc("Initial ease factor for new SM-2 notes (2.5 is SM-2 default). Higher ease increases interval growth. Value shown is internal format (250 = 2.5).").addSlider((slider) => slider.setLimits(130, 500, 10).setValue(this.plugin.settings.baseEase).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian19.Setting(sm2ParamsContainer).setName("SM-2: Base ease factor").setDesc("Initial ease factor for new SM-2 notes (2.5 is SM-2 default). Higher ease increases interval growth. Value shown is internal format (250 = 2.5).").addSlider((slider) => slider.setLimits(130, 500, 10).setValue(this.plugin.settings.baseEase).setDynamicTooltip().onChange(async (value) => {
       this.plugin.settings.baseEase = value;
       await this.plugin.savePluginData();
     }));
-    new import_obsidian17.Setting(sm2ParamsContainer).setName("SM-2: Use initial learning schedule").setDesc("For new SM-2 notes, use a fixed set of initial intervals before applying the full algorithm.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useInitialSchedule).onChange(async (value) => {
+    new import_obsidian19.Setting(sm2ParamsContainer).setName("SM-2: Use initial learning schedule").setDesc("For new SM-2 notes, use a fixed set of initial intervals before applying the full algorithm.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useInitialSchedule).onChange(async (value) => {
       this.plugin.settings.useInitialSchedule = value;
       await this.plugin.savePluginData();
       this.display();
     }));
     if (this.plugin.settings.useInitialSchedule) {
-      new import_obsidian17.Setting(sm2ParamsContainer).setName("SM-2: Custom initial intervals (days)").setDesc("Comma-separated list for initial SM-2 reviews (e.g., 0,1,3,7). Must start with 0.").addText((text) => text.setValue(this.plugin.settings.initialScheduleCustomIntervals.join(", ")).onChange(async (value) => {
+      new import_obsidian19.Setting(sm2ParamsContainer).setName("SM-2: Custom initial intervals (days)").setDesc("Comma-separated list for initial SM-2 reviews (e.g., 0,1,3,7). Must start with 0.").addText((text) => text.setValue(this.plugin.settings.initialScheduleCustomIntervals.join(", ")).onChange(async (value) => {
         const intervals = value.split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n) && n >= 0);
         if (intervals.length > 0 && intervals[0] === 0) {
           this.plugin.settings.initialScheduleCustomIntervals = intervals;
           await this.plugin.savePluginData();
         } else {
-          new import_obsidian17.Notice("Custom initial SM-2 intervals must start with 0 and be valid numbers.", 5e3);
+          new import_obsidian19.Notice("Custom initial SM-2 intervals must start with 0 and be valid numbers.", 5e3);
           text.setValue(this.plugin.settings.initialScheduleCustomIntervals.join(", "));
         }
       }));
     }
-    new import_obsidian17.Setting(sm2ParamsContainer).setName("SM-2: Maximum interval (days)").setDesc("Longest possible interval between SM-2 reviews.").addText((text) => text.setValue(this.plugin.settings.maximumInterval.toString()).onChange(async (value) => {
+    new import_obsidian19.Setting(sm2ParamsContainer).setName("SM-2: Maximum interval (days)").setDesc("Longest possible interval between SM-2 reviews.").addText((text) => text.setValue(this.plugin.settings.maximumInterval.toString()).onChange(async (value) => {
       const numValue = parseInt(value);
       if (!isNaN(numValue) && numValue > 0) {
         this.plugin.settings.maximumInterval = numValue;
         await this.plugin.savePluginData();
       }
     }));
-    new import_obsidian17.Setting(sm2ParamsContainer).setName("SM-2: Load balancing").setDesc("Add slight randomness to SM-2 intervals to prevent reviews clumping on the same day.").addToggle((toggle) => toggle.setValue(this.plugin.settings.loadBalance).onChange(async (value) => {
+    new import_obsidian19.Setting(sm2ParamsContainer).setName("SM-2: Load balancing").setDesc("Add slight randomness to SM-2 intervals to prevent reviews clumping on the same day.").addToggle((toggle) => toggle.setValue(this.plugin.settings.loadBalance).onChange(async (value) => {
       this.plugin.settings.loadBalance = value;
       await this.plugin.savePluginData();
     }));
@@ -6776,7 +7651,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
     const fsrsSummary = fsrsParamsContainer.createEl("summary");
     fsrsSummary.setText("FSRS parameters");
     fsrsParamsContainer.open = false;
-    new import_obsidian17.Setting(fsrsParamsContainer).setName("Request retention").setDesc("Desired recall probability (0.7-0.99, default: 0.9). Higher values mean more frequent reviews.").addText((text) => {
+    new import_obsidian19.Setting(fsrsParamsContainer).setName("Request retention").setDesc("Desired recall probability (0.7-0.99, default: 0.9). Higher values mean more frequent reviews.").addText((text) => {
       var _a, _b, _c;
       return text.setValue((_c = (_b = (_a = this.plugin.settings.fsrsParameters) == null ? void 0 : _a.request_retention) == null ? void 0 : _b.toString()) != null ? _c : DEFAULT_SETTINGS.fsrsParameters.request_retention.toString()).onChange(async (value) => {
         const numValue = parseFloat(value);
@@ -6785,11 +7660,11 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           await this.plugin.savePluginData();
           this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
         } else {
-          new import_obsidian17.Notice("FSRS Request Retention must be between 0.7 and 0.99.");
+          new import_obsidian19.Notice("FSRS Request Retention must be between 0.7 and 0.99.");
         }
       });
     });
-    new import_obsidian17.Setting(fsrsParamsContainer).setName("Maximum interval (days)").setDesc("Longest possible interval FSRS will schedule.").addText((text) => {
+    new import_obsidian19.Setting(fsrsParamsContainer).setName("Maximum interval (days)").setDesc("Longest possible interval FSRS will schedule.").addText((text) => {
       var _a, _b, _c;
       return text.setValue((_c = (_b = (_a = this.plugin.settings.fsrsParameters) == null ? void 0 : _a.maximum_interval) == null ? void 0 : _b.toString()) != null ? _c : DEFAULT_SETTINGS.fsrsParameters.maximum_interval.toString()).onChange(async (value) => {
         const numValue = parseInt(value);
@@ -6798,11 +7673,11 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           await this.plugin.savePluginData();
           this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
         } else {
-          new import_obsidian17.Notice("FSRS Maximum Interval must be a positive number.");
+          new import_obsidian19.Notice("FSRS Maximum Interval must be a positive number.");
         }
       });
     });
-    new import_obsidian17.Setting(fsrsParamsContainer).setName("Learning steps (minutes)").setDesc("Comma-separated initial learning intervals in minutes (e.g., 1,10 for 1m, 10m).").addText((text) => {
+    new import_obsidian19.Setting(fsrsParamsContainer).setName("Learning steps (minutes)").setDesc("Comma-separated initial learning intervals in minutes (e.g., 1,10 for 1m, 10m).").addText((text) => {
       var _a, _b, _c;
       return text.setValue((_c = (_b = (_a = this.plugin.settings.fsrsParameters) == null ? void 0 : _a.learning_steps) == null ? void 0 : _b.join(",")) != null ? _c : DEFAULT_SETTINGS.fsrsParameters.learning_steps.join(",")).onChange(async (value) => {
         const steps = value.split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n) && n > 0);
@@ -6815,11 +7690,11 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           await this.plugin.savePluginData();
           this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
         } else {
-          new import_obsidian17.Notice("FSRS Learning Steps must be valid comma-separated numbers > 0, or empty.");
+          new import_obsidian19.Notice("FSRS Learning Steps must be valid comma-separated numbers > 0, or empty.");
         }
       });
     });
-    new import_obsidian17.Setting(fsrsParamsContainer).setName("Enable fuzz").setDesc("Add slight randomness to FSRS intervals (recommended).").addToggle((toggle) => {
+    new import_obsidian19.Setting(fsrsParamsContainer).setName("Enable fuzz").setDesc("Add slight randomness to FSRS intervals (recommended).").addToggle((toggle) => {
       var _a, _b;
       return toggle.setValue((_b = (_a = this.plugin.settings.fsrsParameters) == null ? void 0 : _a.enable_fuzz) != null ? _b : DEFAULT_SETTINGS.fsrsParameters.enable_fuzz).onChange(async (value) => {
         this.plugin.settings.fsrsParameters = { ...this.plugin.settings.fsrsParameters, enable_fuzz: value };
@@ -6827,7 +7702,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
       });
     });
-    new import_obsidian17.Setting(fsrsParamsContainer).setName("Enable short term scheduling").setDesc("Use FSRS short-term memory model (affects initial learning steps).").addToggle((toggle) => {
+    new import_obsidian19.Setting(fsrsParamsContainer).setName("Enable short term scheduling").setDesc("Use FSRS short-term memory model (affects initial learning steps).").addToggle((toggle) => {
       var _a, _b;
       return toggle.setValue((_b = (_a = this.plugin.settings.fsrsParameters) == null ? void 0 : _a.enable_short_term) != null ? _b : DEFAULT_SETTINGS.fsrsParameters.enable_short_term).onChange(async (value) => {
         this.plugin.settings.fsrsParameters = { ...this.plugin.settings.fsrsParameters, enable_short_term: value };
@@ -6835,7 +7710,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
       });
     });
-    new import_obsidian17.Setting(fsrsParamsContainer).setName("Weights (w)").setDesc("FSRS algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.").addTextArea((text) => {
+    new import_obsidian19.Setting(fsrsParamsContainer).setName("Weights (w)").setDesc("FSRS algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.").addTextArea((text) => {
       var _a, _b, _c;
       text.inputEl.rows = 3;
       text.inputEl.addClass("sf-full-width-textarea");
@@ -6846,7 +7721,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           await this.plugin.savePluginData();
           this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
         } else {
-          new import_obsidian17.Notice("FSRS Weights must be a comma-separated list of 17 valid numbers.");
+          new import_obsidian19.Notice("FSRS Weights must be a comma-separated list of 17 valid numbers.");
         }
       });
     });
@@ -6854,51 +7729,51 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
     const conversionSummary = conversionContainer.createEl("summary");
     conversionSummary.setText("Card conversion utilities");
     conversionContainer.open = false;
-    new import_obsidian17.Setting(conversionContainer).setName("Convert all SM-2 cards to FSRS").setDesc("Migrate all existing SM-2 cards to use the FSRS algorithm. This will reset their learning state for FSRS.").addButton((button) => button.setButtonText("Convert SM-2 to FSRS").setCta().onClick(async () => {
+    new import_obsidian19.Setting(conversionContainer).setName("Convert all SM-2 cards to FSRS").setDesc("Migrate all existing SM-2 cards to use the FSRS algorithm. This will reset their learning state for FSRS.").addButton((button) => button.setButtonText("Convert SM-2 to FSRS").setCta().onClick(async () => {
       const confirmed = confirm("Are you sure you want to convert ALL SM-2 cards to FSRS? Their FSRS learning state will be reset. This action cannot be easily undone.");
       if (confirmed) {
-        new import_obsidian17.Notice("Converting SM-2 cards to FSRS... This may take a moment.");
+        new import_obsidian19.Notice("Converting SM-2 cards to FSRS... This may take a moment.");
         await this.plugin.reviewScheduleService.convertAllSm2ToFsrs();
         await this.plugin.savePluginData();
-        new import_obsidian17.Notice("All SM-2 cards have been converted to FSRS.");
+        new import_obsidian19.Notice("All SM-2 cards have been converted to FSRS.");
         this.display();
       }
     }));
-    new import_obsidian17.Setting(conversionContainer).setName("Convert all FSRS cards to SM-2").setDesc("Migrate all existing FSRS cards to use the SM-2 algorithm. Their SM-2 learning state will be initialized with defaults.").addButton((button) => button.setButtonText("Convert FSRS to SM-2").setCta().onClick(async () => {
+    new import_obsidian19.Setting(conversionContainer).setName("Convert all FSRS cards to SM-2").setDesc("Migrate all existing FSRS cards to use the SM-2 algorithm. Their SM-2 learning state will be initialized with defaults.").addButton((button) => button.setButtonText("Convert FSRS to SM-2").setCta().onClick(async () => {
       const confirmed = confirm("Are you sure you want to convert ALL FSRS cards to SM-2? Their SM-2 learning state will be reset to defaults. This action cannot be easily undone.");
       if (confirmed) {
-        new import_obsidian17.Notice("Converting FSRS cards to SM-2... This may take a moment.");
+        new import_obsidian19.Notice("Converting FSRS cards to SM-2... This may take a moment.");
         await this.plugin.reviewScheduleService.convertAllFsrsToSm2();
         await this.plugin.savePluginData();
-        new import_obsidian17.Notice("All FSRS cards have been converted to SM-2.");
+        new import_obsidian19.Notice("All FSRS cards have been converted to SM-2.");
         this.display();
       }
     }));
     const interfaceSection = createCollapsible("Interface & behavior", "settings", false);
-    new import_obsidian17.Setting(interfaceSection).setName("Display").setHeading().setClass("sf-settings-subsection-header");
-    new import_obsidian17.Setting(interfaceSection).setName("Default view type").setDesc("Choose between list or calendar for the review sidebar").addDropdown((dropdown) => dropdown.addOption("list", "List view").addOption("calendar", "Calendar view").setValue(this.plugin.settings.sidebarViewType).onChange(async (value) => {
+    new import_obsidian19.Setting(interfaceSection).setName("Display").setHeading().setClass("sf-settings-subsection-header");
+    new import_obsidian19.Setting(interfaceSection).setName("Default view type").setDesc("Choose between list or calendar for the review sidebar").addDropdown((dropdown) => dropdown.addOption("list", "List view").addOption("calendar", "Calendar view").setValue(this.plugin.settings.sidebarViewType).onChange(async (value) => {
       var _a;
       this.plugin.settings.sidebarViewType = value;
       await this.plugin.savePluginData();
       (_a = this.plugin.getSidebarView()) == null ? void 0 : _a.refresh();
     }));
-    new import_obsidian17.Setting(interfaceSection).setName("Show navigation notifications").setDesc("Display notifications when moving between notes").addToggle((toggle) => toggle.setValue(this.plugin.settings.showNavigationNotifications).onChange(async (value) => {
+    new import_obsidian19.Setting(interfaceSection).setName("Show navigation notifications").setDesc("Display notifications when moving between notes").addToggle((toggle) => toggle.setValue(this.plugin.settings.showNavigationNotifications).onChange(async (value) => {
       this.plugin.settings.showNavigationNotifications = value;
       await this.plugin.savePluginData();
     }));
-    new import_obsidian17.Setting(interfaceSection).setName("Review behavior").setHeading().setClass("sf-settings-subsection-header");
-    new import_obsidian17.Setting(interfaceSection).setName("Include subfolders").setDesc("When adding a folder to review, include all notes in subfolders").addToggle((toggle) => toggle.setValue(this.plugin.settings.includeSubfolders).onChange(async (value) => {
+    new import_obsidian19.Setting(interfaceSection).setName("Review behavior").setHeading().setClass("sf-settings-subsection-header");
+    new import_obsidian19.Setting(interfaceSection).setName("Include subfolders").setDesc("When adding a folder to review, include all notes in subfolders").addToggle((toggle) => toggle.setValue(this.plugin.settings.includeSubfolders).onChange(async (value) => {
       this.plugin.settings.includeSubfolders = value;
       await this.plugin.savePluginData();
     }));
-    new import_obsidian17.Setting(interfaceSection).setName("Notification time").setDesc("Minutes before due time to notify about upcoming reviews (0 to disable)").addText((text) => text.setValue(this.plugin.settings.notifyBeforeDue.toString()).onChange(async (value) => {
+    new import_obsidian19.Setting(interfaceSection).setName("Notification time").setDesc("Minutes before due time to notify about upcoming reviews (0 to disable)").addText((text) => text.setValue(this.plugin.settings.notifyBeforeDue.toString()).onChange(async (value) => {
       const numValue = parseInt(value);
       if (!isNaN(numValue) && numValue >= 0) {
         this.plugin.settings.notifyBeforeDue = numValue;
         await this.plugin.savePluginData();
       }
     }));
-    new import_obsidian17.Setting(interfaceSection).setName("Reading speed (WPM)").setDesc("Words per minute for estimating review time").addSlider((slider) => slider.setLimits(100, 500, 10).setValue(this.plugin.settings.readingSpeed).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian19.Setting(interfaceSection).setName("Reading speed (WPM)").setDesc("Words per minute for estimating review time").addSlider((slider) => slider.setLimits(100, 500, 10).setValue(this.plugin.settings.readingSpeed).setDynamicTooltip().onChange(async (value) => {
       this.plugin.settings.readingSpeed = value;
       await this.plugin.savePluginData();
     }));
@@ -6906,14 +7781,14 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       cls: "sf-setting-explain",
       text: "Average adults read 200-250 WPM for regular content, 100-150 WPM for technical content"
     });
-    new import_obsidian17.Setting(interfaceSection).setName("Navigation command").setHeading().setClass("sf-settings-subsection-header");
-    new import_obsidian17.Setting(interfaceSection).setName("Enable navigation command").setDesc("Execute a command with a slight delay after navigating to the next or previous note.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableNavigationCommands).onChange(async (value) => {
+    new import_obsidian19.Setting(interfaceSection).setName("Navigation command").setHeading().setClass("sf-settings-subsection-header");
+    new import_obsidian19.Setting(interfaceSection).setName("Enable navigation command").setDesc("Execute a command with a slight delay after navigating to the next or previous note.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableNavigationCommands).onChange(async (value) => {
       this.plugin.settings.enableNavigationCommands = value;
       await this.plugin.savePluginData();
       this.display();
     }));
     if (this.plugin.settings.enableNavigationCommands) {
-      new import_obsidian17.Setting(interfaceSection).setName("Command to execute").setDesc("Click the button and press the desired hotkey.").addButton((button) => {
+      new import_obsidian19.Setting(interfaceSection).setName("Command to execute").setDesc("Click the button and press the desired hotkey.").addButton((button) => {
         const command = this.plugin.settings.navigationCommand;
         const hotkeyText = command.key ? [...command.modifiers, command.key].join(" + ") : "Click to set";
         button.setButtonText(hotkeyText).onClick(() => {
@@ -6946,13 +7821,13 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           document.addEventListener("keydown", keydownHandler, { capture: true });
         });
       });
-      new import_obsidian17.Setting(interfaceSection).setName("Command execution delay (ms)").setDesc("How long to wait before executing the command after navigation.").addSlider((slider) => slider.setLimits(0, 2e3, 100).setValue(this.plugin.settings.navigationCommandDelay).setDynamicTooltip().onChange(async (value) => {
+      new import_obsidian19.Setting(interfaceSection).setName("Command execution delay (ms)").setDesc("How long to wait before executing the command after navigation.").addSlider((slider) => slider.setLimits(0, 2e3, 100).setValue(this.plugin.settings.navigationCommandDelay).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.navigationCommandDelay = value;
         await this.plugin.savePluginData();
       }));
     }
     const mcqSection = createCollapsible("Multiple choice questions", "newspaper", false);
-    new import_obsidian17.Setting(mcqSection).setName("Enable MCQ feature").setDesc("Use AI-generated multiple-choice questions to test your knowledge").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableMCQ).onChange(async (value) => {
+    new import_obsidian19.Setting(mcqSection).setName("Enable MCQ feature").setDesc("Use AI-generated multiple-choice questions to test your knowledge").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableMCQ).onChange(async (value) => {
       this.plugin.settings.enableMCQ = value;
       await this.plugin.savePluginData();
       this.plugin.initializeMCQComponents();
@@ -6968,8 +7843,8 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       this.display();
     }));
     if (this.plugin.settings.enableMCQ) {
-      new import_obsidian17.Setting(mcqSection).setName("API configuration").setHeading().setClass("sf-settings-subsection-header");
-      new import_obsidian17.Setting(mcqSection).setName("API provider").setDesc("Select the API provider for generating MCQs.").addDropdown((dropdown) => {
+      new import_obsidian19.Setting(mcqSection).setName("API configuration").setHeading().setClass("sf-settings-subsection-header");
+      new import_obsidian19.Setting(mcqSection).setName("API provider").setDesc("Select the API provider for generating MCQs.").addDropdown((dropdown) => {
         dropdown.addOption("openrouter" /* OpenRouter */, "OpenRouter").addOption("openai" /* OpenAI */, "OpenAI").addOption("ollama" /* Ollama */, "Ollama").addOption("gemini" /* Gemini */, "Gemini").addOption("claude" /* Claude */, "Claude").addOption("together" /* Together */, "Together AI").setValue(this.plugin.settings.mcqApiProvider).onChange(async (value) => {
           this.plugin.settings.mcqApiProvider = value;
           await this.plugin.savePluginData();
@@ -6979,116 +7854,116 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       });
       const provider = this.plugin.settings.mcqApiProvider;
       if (provider === "openrouter" /* OpenRouter */) {
-        new import_obsidian17.Setting(mcqSection).setName("OpenRouter configuration").setHeading().setClass("sf-settings-subsection-provider-header");
+        new import_obsidian19.Setting(mcqSection).setName("OpenRouter configuration").setHeading().setClass("sf-settings-subsection-provider-header");
         const apiKeyContainer = mcqSection.createEl("div", { cls: "sf-setting-highlight" });
-        new import_obsidian17.Setting(apiKeyContainer).setName("OpenRouter API key").setDesc("Required for generating MCQs via OpenRouter.").addText((text) => text.setPlaceholder("Enter your OpenRouter API key").setValue(this.plugin.settings.openRouterApiKey).onChange(async (value) => {
+        new import_obsidian19.Setting(apiKeyContainer).setName("OpenRouter API key").setDesc("Required for generating MCQs via OpenRouter.").addText((text) => text.setPlaceholder("Enter your OpenRouter API key").setValue(this.plugin.settings.openRouterApiKey).onChange(async (value) => {
           this.plugin.settings.openRouterApiKey = value;
           await this.plugin.savePluginData();
         }));
         apiKeyContainer.createEl("div").setText("Get your API key at https://openrouter.ai/keys");
-        new import_obsidian17.Setting(mcqSection).setName("OpenRouter model").setDesc("Model identifier from OpenRouter (e.g., openai/gpt-4.1-mini)").addText((text) => text.setPlaceholder("Enter OpenRouter model identifier").setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("OpenRouter model").setDesc("Model identifier from OpenRouter (e.g., openai/gpt-4.1-mini)").addText((text) => text.setPlaceholder("Enter OpenRouter model identifier").setValue(this.plugin.settings.openRouterModel).onChange(async (value) => {
           this.plugin.settings.openRouterModel = value;
           await this.plugin.savePluginData();
         }));
       } else if (provider === "openai" /* OpenAI */) {
-        new import_obsidian17.Setting(mcqSection).setName("OpenAI configuration").setHeading().setClass("sf-settings-subsection-provider-header");
-        new import_obsidian17.Setting(mcqSection).setName("OpenAI API key").setDesc("Your OpenAI API key.").addText((text) => text.setPlaceholder("Enter your OpenAI API key (sk-...)").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("OpenAI configuration").setHeading().setClass("sf-settings-subsection-provider-header");
+        new import_obsidian19.Setting(mcqSection).setName("OpenAI API key").setDesc("Your OpenAI API key.").addText((text) => text.setPlaceholder("Enter your OpenAI API key (sk-...)").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
           this.plugin.settings.openaiApiKey = value;
           await this.plugin.savePluginData();
         }));
-        new import_obsidian17.Setting(mcqSection).setName("OpenAI model").setDesc("Model name (e.g., gpt-3.5-turbo, gpt-4)").addText((text) => text.setPlaceholder("Enter OpenAI model name").setValue(this.plugin.settings.openaiModel).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("OpenAI model").setDesc("Model name (e.g., gpt-3.5-turbo, gpt-4)").addText((text) => text.setPlaceholder("Enter OpenAI model name").setValue(this.plugin.settings.openaiModel).onChange(async (value) => {
           this.plugin.settings.openaiModel = value;
           await this.plugin.savePluginData();
         }));
       } else if (provider === "ollama" /* Ollama */) {
-        new import_obsidian17.Setting(mcqSection).setName("Ollama configuration").setHeading().setClass("sf-settings-subsection-provider-header");
-        new import_obsidian17.Setting(mcqSection).setName("Ollama API URL").setDesc("URL of your running Ollama instance (e.g., http://localhost:11434)").addText((text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaApiUrl).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Ollama configuration").setHeading().setClass("sf-settings-subsection-provider-header");
+        new import_obsidian19.Setting(mcqSection).setName("Ollama API URL").setDesc("URL of your running Ollama instance (e.g., http://localhost:11434)").addText((text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaApiUrl).onChange(async (value) => {
           this.plugin.settings.ollamaApiUrl = value;
           await this.plugin.savePluginData();
         }));
-        new import_obsidian17.Setting(mcqSection).setName("Ollama model").setDesc("Name of the Ollama model to use (e.g., llama3, mistral)").addText((text) => text.setPlaceholder("Enter Ollama model name").setValue(this.plugin.settings.ollamaModel).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Ollama model").setDesc("Name of the Ollama model to use (e.g., llama3, mistral)").addText((text) => text.setPlaceholder("Enter Ollama model name").setValue(this.plugin.settings.ollamaModel).onChange(async (value) => {
           this.plugin.settings.ollamaModel = value;
           await this.plugin.savePluginData();
         }));
       } else if (provider === "gemini" /* Gemini */) {
-        new import_obsidian17.Setting(mcqSection).setName("Gemini configuration").setHeading().setClass("sf-settings-subsection-provider-header");
-        new import_obsidian17.Setting(mcqSection).setName("Gemini API key").setDesc("Your Google AI Gemini API key.").addText((text) => text.setPlaceholder("Enter your Gemini API key").setValue(this.plugin.settings.geminiApiKey).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Gemini configuration").setHeading().setClass("sf-settings-subsection-provider-header");
+        new import_obsidian19.Setting(mcqSection).setName("Gemini API key").setDesc("Your Google AI Gemini API key.").addText((text) => text.setPlaceholder("Enter your Gemini API key").setValue(this.plugin.settings.geminiApiKey).onChange(async (value) => {
           this.plugin.settings.geminiApiKey = value;
           await this.plugin.savePluginData();
         }));
-        new import_obsidian17.Setting(mcqSection).setName("Gemini model").setDesc("Model name (e.g., gemini-pro)").addText((text) => text.setPlaceholder("Enter Gemini model name").setValue(this.plugin.settings.geminiModel).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Gemini model").setDesc("Model name (e.g., gemini-pro)").addText((text) => text.setPlaceholder("Enter Gemini model name").setValue(this.plugin.settings.geminiModel).onChange(async (value) => {
           this.plugin.settings.geminiModel = value;
           await this.plugin.savePluginData();
         }));
       } else if (provider === "claude" /* Claude */) {
-        new import_obsidian17.Setting(mcqSection).setName("Claude configuration").setHeading().setClass("sf-settings-subsection-provider-header");
-        new import_obsidian17.Setting(mcqSection).setName("Claude API key").setDesc("Your Anthropic Claude API key.").addText((text) => text.setPlaceholder("Enter your Claude API key").setValue(this.plugin.settings.claudeApiKey).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Claude configuration").setHeading().setClass("sf-settings-subsection-provider-header");
+        new import_obsidian19.Setting(mcqSection).setName("Claude API key").setDesc("Your Anthropic Claude API key.").addText((text) => text.setPlaceholder("Enter your Claude API key").setValue(this.plugin.settings.claudeApiKey).onChange(async (value) => {
           this.plugin.settings.claudeApiKey = value;
           await this.plugin.savePluginData();
         }));
-        new import_obsidian17.Setting(mcqSection).setName("Claude model").setDesc("Model name (e.g., claude-3-opus-20240229, claude-3-sonnet-20240229)").addText((text) => text.setPlaceholder("Enter Claude model name").setValue(this.plugin.settings.claudeModel).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Claude model").setDesc("Model name (e.g., claude-3-opus-20240229, claude-3-sonnet-20240229)").addText((text) => text.setPlaceholder("Enter Claude model name").setValue(this.plugin.settings.claudeModel).onChange(async (value) => {
           this.plugin.settings.claudeModel = value;
           await this.plugin.savePluginData();
         }));
       } else if (provider === "together" /* Together */) {
-        new import_obsidian17.Setting(mcqSection).setName("Together AI configuration").setHeading().setClass("sf-settings-subsection-provider-header");
-        new import_obsidian17.Setting(mcqSection).setName("Together AI API key").setDesc("Your Together AI API key.").addText((text) => text.setPlaceholder("Enter your Together AI API key").setValue(this.plugin.settings.togetherApiKey).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Together AI configuration").setHeading().setClass("sf-settings-subsection-provider-header");
+        new import_obsidian19.Setting(mcqSection).setName("Together AI API key").setDesc("Your Together AI API key.").addText((text) => text.setPlaceholder("Enter your Together AI API key").setValue(this.plugin.settings.togetherApiKey).onChange(async (value) => {
           this.plugin.settings.togetherApiKey = value;
           await this.plugin.savePluginData();
         }));
-        new import_obsidian17.Setting(mcqSection).setName("Together AI model").setDesc("Model identifier from Together AI (e.g., meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)").addText((text) => text.setPlaceholder("Enter Together AI model identifier").setValue(this.plugin.settings.togetherModel).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Together AI model").setDesc("Model identifier from Together AI (e.g., meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)").addText((text) => text.setPlaceholder("Enter Together AI model identifier").setValue(this.plugin.settings.togetherModel).onChange(async (value) => {
           this.plugin.settings.togetherModel = value;
           await this.plugin.savePluginData();
         }));
       }
-      new import_obsidian17.Setting(mcqSection).setName("Question generation (common)").setHeading().setClass("sf-settings-subsection-header");
-      new import_obsidian17.Setting(mcqSection).setName("Question amount mode").setDesc("How to determine the number of questions per note.").addDropdown((dropdown) => dropdown.addOption("fixed" /* Fixed */, "Fixed Number").addOption("wordsPerQuestion" /* WordsPerQuestion */, "Per X Words").setValue(this.plugin.settings.mcqQuestionAmountMode).onChange(async (value) => {
+      new import_obsidian19.Setting(mcqSection).setName("Question generation (common)").setHeading().setClass("sf-settings-subsection-header");
+      new import_obsidian19.Setting(mcqSection).setName("Question amount mode").setDesc("How to determine the number of questions per note.").addDropdown((dropdown) => dropdown.addOption("fixed" /* Fixed */, "Fixed Number").addOption("wordsPerQuestion" /* WordsPerQuestion */, "Per X Words").setValue(this.plugin.settings.mcqQuestionAmountMode).onChange(async (value) => {
         this.plugin.settings.mcqQuestionAmountMode = value;
         await this.plugin.savePluginData();
         this.display();
       }));
       if (this.plugin.settings.mcqQuestionAmountMode === "fixed" /* Fixed */) {
-        new import_obsidian17.Setting(mcqSection).setName("Questions per note (Fixed)").setDesc("Number of questions to generate for each note.").addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.mcqQuestionsPerNote).setDynamicTooltip().onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Questions per note (Fixed)").setDesc("Number of questions to generate for each note.").addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.mcqQuestionsPerNote).setDynamicTooltip().onChange(async (value) => {
           this.plugin.settings.mcqQuestionsPerNote = value;
           await this.plugin.savePluginData();
         }));
       } else if (this.plugin.settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
-        new import_obsidian17.Setting(mcqSection).setName("Words per question target").setDesc("Generate approximately 1 question for every X words in the note.").addText((text) => text.setPlaceholder("100").setValue(this.plugin.settings.mcqWordsPerQuestion.toString()).onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Words per question target").setDesc("Generate approximately 1 question for every X words in the note.").addText((text) => text.setPlaceholder("100").setValue(this.plugin.settings.mcqWordsPerQuestion.toString()).onChange(async (value) => {
           const numValue = parseInt(value);
           if (!isNaN(numValue) && numValue > 0) {
             this.plugin.settings.mcqWordsPerQuestion = numValue;
             await this.plugin.savePluginData();
           } else {
-            new import_obsidian17.Notice("Words per question must be a positive number.");
+            new import_obsidian19.Notice("Words per question must be a positive number.");
             text.setValue(this.plugin.settings.mcqWordsPerQuestion.toString());
           }
         }));
       }
-      new import_obsidian17.Setting(mcqSection).setName("Choices per question").setDesc("Number of answer choices for each question").addSlider((slider) => slider.setLimits(2, 6, 1).setValue(this.plugin.settings.mcqChoicesPerQuestion).setDynamicTooltip().onChange(async (value) => {
+      new import_obsidian19.Setting(mcqSection).setName("Choices per question").setDesc("Number of answer choices for each question").addSlider((slider) => slider.setLimits(2, 6, 1).setValue(this.plugin.settings.mcqChoicesPerQuestion).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.mcqChoicesPerQuestion = value;
         await this.plugin.savePluginData();
       }));
       const mcqFormattingGrid = mcqSection.createEl("div", { cls: "sf-setting-grid" });
       const promptTypeContainer = mcqFormattingGrid.createEl("div");
-      new import_obsidian17.Setting(promptTypeContainer).setName("Prompt type").setDesc("Format for MCQ generation").addDropdown((dropdown) => dropdown.addOption("basic", "Basic").addOption("detailed", "Detailed").setValue(this.plugin.settings.mcqPromptType).onChange(async (value) => {
+      new import_obsidian19.Setting(promptTypeContainer).setName("Prompt type").setDesc("Format for MCQ generation").addDropdown((dropdown) => dropdown.addOption("basic", "Basic").addOption("detailed", "Detailed").setValue(this.plugin.settings.mcqPromptType).onChange(async (value) => {
         this.plugin.settings.mcqPromptType = value;
         await this.plugin.savePluginData();
       }));
       const difficultyContainer = mcqFormattingGrid.createEl("div");
-      new import_obsidian17.Setting(difficultyContainer).setName("MCQ difficulty").setDesc("Complexity level").addDropdown((dropdown) => dropdown.addOption("basic" /* Basic */, "Basic recall").addOption("advanced" /* Advanced */, "Advanced understanding").setValue(this.plugin.settings.mcqDifficulty).onChange(async (value) => {
+      new import_obsidian19.Setting(difficultyContainer).setName("MCQ difficulty").setDesc("Complexity level").addDropdown((dropdown) => dropdown.addOption("basic" /* Basic */, "Basic recall").addOption("advanced" /* Advanced */, "Advanced understanding").setValue(this.plugin.settings.mcqDifficulty).onChange(async (value) => {
         this.plugin.settings.mcqDifficulty = value;
         await this.plugin.savePluginData();
       }));
-      new import_obsidian17.Setting(mcqSection).setName("Scoring").setHeading().setClass("sf-settings-subsection-header");
-      new import_obsidian17.Setting(mcqSection).setName("Time deduction amount").setDesc("Score penalty for slow answers (0-1)").addSlider((slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.mcqTimeDeductionAmount).setDynamicTooltip().onChange(async (value) => {
+      new import_obsidian19.Setting(mcqSection).setName("Scoring").setHeading().setClass("sf-settings-subsection-header");
+      new import_obsidian19.Setting(mcqSection).setName("Time deduction amount").setDesc("Score penalty for slow answers (0-1)").addSlider((slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.mcqTimeDeductionAmount).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.mcqTimeDeductionAmount = value;
         await this.plugin.savePluginData();
       }));
-      new import_obsidian17.Setting(mcqSection).setName("Time deduction threshold").setDesc("Apply penalty after this many seconds").addSlider((slider) => slider.setLimits(10, 120, 5).setValue(this.plugin.settings.mcqTimeDeductionSeconds).setDynamicTooltip().onChange(async (value) => {
+      new import_obsidian19.Setting(mcqSection).setName("Time deduction threshold").setDesc("Apply penalty after this many seconds").addSlider((slider) => slider.setLimits(10, 120, 5).setValue(this.plugin.settings.mcqTimeDeductionSeconds).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.mcqTimeDeductionSeconds = value;
         await this.plugin.savePluginData();
       }));
-      new import_obsidian17.Setting(mcqSection).setName("Deduct full mark on first failure").setDesc("If enabled, the score for a question will be 0 if the first attempt is incorrect.").addToggle((toggle) => toggle.setValue(this.plugin.settings.mcqDeductFullMarkOnFirstFailure).onChange(async (value) => {
+      new import_obsidian19.Setting(mcqSection).setName("Deduct full mark on first failure").setDesc("If enabled, the score for a question will be 0 if the first attempt is incorrect.").addToggle((toggle) => toggle.setValue(this.plugin.settings.mcqDeductFullMarkOnFirstFailure).onChange(async (value) => {
         this.plugin.settings.mcqDeductFullMarkOnFirstFailure = value;
         await this.plugin.savePluginData();
       }));
@@ -7120,18 +7995,18 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
         this.plugin.settings.mcqAdvancedSystemPrompt = advancedTextarea.value;
         await this.plugin.savePluginData();
       });
-      new import_obsidian17.Setting(mcqSection).setName("Advanced question behavior").setHeading().setClass("sf-settings-subsection-header");
-      const regenerationSetting = new import_obsidian17.Setting(mcqSection).setName("Enable question regeneration on rating").setDesc("Automatically regenerate questions for a note if its review rating meets or exceeds a specified value.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableQuestionRegenerationOnRating).onChange(async (value) => {
+      new import_obsidian19.Setting(mcqSection).setName("Advanced question behavior").setHeading().setClass("sf-settings-subsection-header");
+      const regenerationSetting = new import_obsidian19.Setting(mcqSection).setName("Enable question regeneration on rating").setDesc("Automatically regenerate questions for a note if its review rating meets or exceeds a specified value.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableQuestionRegenerationOnRating).onChange(async (value) => {
         this.plugin.settings.enableQuestionRegenerationOnRating = value;
         await this.plugin.savePluginData();
         this.display();
       }));
       if (this.plugin.settings.enableQuestionRegenerationOnRating) {
-        new import_obsidian17.Setting(mcqSection).setName("Min SM-2 rating for MCQ regeneration").setDesc("For SM-2: Regenerate MCQs if review rating (0-5) is this value or higher. (0:Blackout, 5:Perfect)").addSlider((slider) => slider.setLimits(0, 5, 1).setValue(this.plugin.settings.minSm2RatingForQuestionRegeneration).setDynamicTooltip().onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Min SM-2 rating for MCQ regeneration").setDesc("For SM-2: Regenerate MCQs if review rating (0-5) is this value or higher. (0:Blackout, 5:Perfect)").addSlider((slider) => slider.setLimits(0, 5, 1).setValue(this.plugin.settings.minSm2RatingForQuestionRegeneration).setDynamicTooltip().onChange(async (value) => {
           this.plugin.settings.minSm2RatingForQuestionRegeneration = value;
           await this.plugin.savePluginData();
         }));
-        new import_obsidian17.Setting(mcqSection).setName("Min FSRS rating for MCQ regeneration").setDesc("For FSRS: Regenerate MCQs if review rating (1-4) is this value or higher. (1:Again, 4:Easy)").addSlider((slider) => slider.setLimits(1, 4, 1).setValue(this.plugin.settings.minFsrsRatingForQuestionRegeneration).setDynamicTooltip().onChange(async (value) => {
+        new import_obsidian19.Setting(mcqSection).setName("Min FSRS rating for MCQ regeneration").setDesc("For FSRS: Regenerate MCQs if review rating (1-4) is this value or higher. (1:Again, 4:Easy)").addSlider((slider) => slider.setLimits(1, 4, 1).setValue(this.plugin.settings.minFsrsRatingForQuestionRegeneration).setDynamicTooltip().onChange(async (value) => {
           this.plugin.settings.minFsrsRatingForQuestionRegeneration = value;
           await this.plugin.savePluginData();
         }));
@@ -7143,7 +8018,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       });
     }
     const pomodoroSection = createCollapsible("Pomodoro timer", "timer", false);
-    new import_obsidian17.Setting(pomodoroSection).setName("Enable pomodoro timer").setDesc("Show the Pomodoro timer in the sidebar.").addToggle((toggle) => toggle.setValue(this.plugin.settings.pomodoroEnabled).onChange(async (value) => {
+    new import_obsidian19.Setting(pomodoroSection).setName("Enable pomodoro timer").setDesc("Show the Pomodoro timer in the sidebar.").addToggle((toggle) => toggle.setValue(this.plugin.settings.pomodoroEnabled).onChange(async (value) => {
       var _a, _b;
       this.plugin.settings.pomodoroEnabled = value;
       await this.plugin.savePluginData();
@@ -7152,8 +8027,8 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
       this.display();
     }));
     if (this.plugin.settings.pomodoroEnabled) {
-      new import_obsidian17.Setting(pomodoroSection).setName("Timer durations (minutes)").setHeading().setClass("sf-settings-subsection-header");
-      new import_obsidian17.Setting(pomodoroSection).setName("Work duration").setDesc("Length of a work session.").addText((text) => text.setPlaceholder("25").setValue(this.plugin.settings.pomodoroWorkDuration.toString()).onChange(async (value) => {
+      new import_obsidian19.Setting(pomodoroSection).setName("Timer durations (minutes)").setHeading().setClass("sf-settings-subsection-header");
+      new import_obsidian19.Setting(pomodoroSection).setName("Work duration").setDesc("Length of a work session.").addText((text) => text.setPlaceholder("25").setValue(this.plugin.settings.pomodoroWorkDuration.toString()).onChange(async (value) => {
         var _a;
         const numValue = parseInt(value);
         if (!isNaN(numValue) && numValue > 0) {
@@ -7162,7 +8037,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           (_a = this.plugin.pomodoroService) == null ? void 0 : _a.onSettingsChanged();
         }
       }));
-      new import_obsidian17.Setting(pomodoroSection).setName("Short break duration").setDesc("Length of a short break.").addText((text) => text.setPlaceholder("5").setValue(this.plugin.settings.pomodoroShortBreakDuration.toString()).onChange(async (value) => {
+      new import_obsidian19.Setting(pomodoroSection).setName("Short break duration").setDesc("Length of a short break.").addText((text) => text.setPlaceholder("5").setValue(this.plugin.settings.pomodoroShortBreakDuration.toString()).onChange(async (value) => {
         var _a;
         const numValue = parseInt(value);
         if (!isNaN(numValue) && numValue > 0) {
@@ -7171,7 +8046,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           (_a = this.plugin.pomodoroService) == null ? void 0 : _a.onSettingsChanged();
         }
       }));
-      new import_obsidian17.Setting(pomodoroSection).setName("Long break duration").setDesc("Length of a long break.").addText((text) => text.setPlaceholder("15").setValue(this.plugin.settings.pomodoroLongBreakDuration.toString()).onChange(async (value) => {
+      new import_obsidian19.Setting(pomodoroSection).setName("Long break duration").setDesc("Length of a long break.").addText((text) => text.setPlaceholder("15").setValue(this.plugin.settings.pomodoroLongBreakDuration.toString()).onChange(async (value) => {
         var _a;
         const numValue = parseInt(value);
         if (!isNaN(numValue) && numValue > 0) {
@@ -7180,7 +8055,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           (_a = this.plugin.pomodoroService) == null ? void 0 : _a.onSettingsChanged();
         }
       }));
-      new import_obsidian17.Setting(pomodoroSection).setName("Sessions until long break").setDesc("Number of work sessions before a long break starts.").addText((text) => text.setPlaceholder("4").setValue(this.plugin.settings.pomodoroSessionsUntilLongBreak.toString()).onChange(async (value) => {
+      new import_obsidian19.Setting(pomodoroSection).setName("Sessions until long break").setDesc("Number of work sessions before a long break starts.").addText((text) => text.setPlaceholder("4").setValue(this.plugin.settings.pomodoroSessionsUntilLongBreak.toString()).onChange(async (value) => {
         var _a;
         const numValue = parseInt(value);
         if (!isNaN(numValue) && numValue > 0) {
@@ -7189,8 +8064,8 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
           (_a = this.plugin.pomodoroService) == null ? void 0 : _a.onSettingsChanged();
         }
       }));
-      new import_obsidian17.Setting(pomodoroSection).setName("Notifications").setHeading().setClass("sf-settings-subsection-header");
-      new import_obsidian17.Setting(pomodoroSection).setName("Enable sound notifications").setDesc("Play a sound at the end of each work/break session.").addToggle((toggle) => toggle.setValue(this.plugin.settings.pomodoroSoundEnabled).onChange(async (value) => {
+      new import_obsidian19.Setting(pomodoroSection).setName("Notifications").setHeading().setClass("sf-settings-subsection-header");
+      new import_obsidian19.Setting(pomodoroSection).setName("Enable sound notifications").setDesc("Play a sound at the end of each work/break session.").addToggle((toggle) => toggle.setValue(this.plugin.settings.pomodoroSoundEnabled).onChange(async (value) => {
         this.plugin.settings.pomodoroSoundEnabled = value;
         await this.plugin.savePluginData();
       }));
@@ -7280,7 +8155,7 @@ var SpaceforgeSettingTab = class extends import_obsidian17.PluginSettingTab {
 };
 
 // api/openrouter-service.ts
-var import_obsidian18 = require("obsidian");
+var import_obsidian20 = require("obsidian");
 var OpenRouterService = class {
   /**
    * Initialize OpenRouter service
@@ -7300,11 +8175,11 @@ var OpenRouterService = class {
    */
   async generateMCQs(notePath, noteContent, settings) {
     if (!settings.openRouterApiKey) {
-      new import_obsidian18.Notice("OpenRouter API key is not set. Please add it in the settings.");
+      new import_obsidian20.Notice("OpenRouter API key is not set. Please add it in the settings.");
       return null;
     }
     try {
-      new import_obsidian18.Notice("Generating MCQs using OpenRouter...");
+      new import_obsidian20.Notice("Generating MCQs using OpenRouter...");
       let numQuestionsToGenerate;
       if (settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
         const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
@@ -7316,7 +8191,7 @@ var OpenRouterService = class {
       const response = await this.makeApiRequest(prompt, settings);
       const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
       if (questions.length === 0) {
-        new import_obsidian18.Notice("Failed to generate valid MCQs from OpenRouter. Please try again.");
+        new import_obsidian20.Notice("Failed to generate valid MCQs from OpenRouter. Please try again.");
         return null;
       }
       const mcqSet = {
@@ -7326,7 +8201,7 @@ var OpenRouterService = class {
       };
       return mcqSet;
     } catch (error) {
-      new import_obsidian18.Notice("Failed to generate MCQs with OpenRouter. Please check console for details.");
+      new import_obsidian20.Notice("Failed to generate MCQs with OpenRouter. Please check console for details.");
       return null;
     }
   }
@@ -7384,7 +8259,7 @@ ${noteContent}`;
     const difficulty = settings.mcqDifficulty;
     try {
       const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
-      const response = await (0, import_obsidian18.requestUrl)({
+      const response = await (0, import_obsidian20.requestUrl)({
         url: "https://openrouter.ai/api/v1/chat/completions",
         method: "POST",
         headers: {
@@ -7418,7 +8293,7 @@ ${noteContent}`;
       }
       return data.choices[0].message.content;
     } catch (error) {
-      new import_obsidian18.Notice(`OpenRouter API error: ${error.message}`);
+      new import_obsidian20.Notice(`OpenRouter API error: ${error.message}`);
       throw error;
     }
   }
@@ -7492,29 +8367,29 @@ ${noteContent}`;
       }
       return questions.slice(0, numQuestionsToGenerate);
     } catch (error) {
-      new import_obsidian18.Notice("Error parsing MCQ response from OpenRouter. Please try again.");
+      new import_obsidian20.Notice("Error parsing MCQ response from OpenRouter. Please try again.");
       return [];
     }
   }
 };
 
 // api/openai-service.ts
-var import_obsidian19 = require("obsidian");
+var import_obsidian21 = require("obsidian");
 var OpenAIService = class {
   constructor(plugin) {
     this.plugin = plugin;
   }
   async generateMCQs(notePath, noteContent, settings) {
     if (!settings.openaiApiKey) {
-      new import_obsidian19.Notice("OpenAI API key is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian21.Notice("OpenAI API key is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     if (!settings.openaiModel) {
-      new import_obsidian19.Notice("OpenAI Model is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian21.Notice("OpenAI Model is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     try {
-      new import_obsidian19.Notice("Generating MCQs using OpenAI...");
+      new import_obsidian21.Notice("Generating MCQs using OpenAI...");
       let numQuestionsToGenerate;
       if (settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
         const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
@@ -7526,7 +8401,7 @@ var OpenAIService = class {
       const response = await this.makeApiRequest(prompt, settings);
       const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
       if (questions.length === 0) {
-        new import_obsidian19.Notice("Failed to generate valid MCQs from OpenAI. Please try again.");
+        new import_obsidian21.Notice("Failed to generate valid MCQs from OpenAI. Please try again.");
         return null;
       }
       return {
@@ -7535,7 +8410,7 @@ var OpenAIService = class {
         generatedAt: Date.now()
       };
     } catch (error) {
-      new import_obsidian19.Notice("Failed to generate MCQs with OpenAI. Please check console for details.");
+      new import_obsidian21.Notice("Failed to generate MCQs with OpenAI. Please check console for details.");
       return null;
     }
   }
@@ -7579,7 +8454,7 @@ ${noteContent}`;
     const difficulty = settings.mcqDifficulty;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     try {
-      const response = await (0, import_obsidian19.requestUrl)({
+      const response = await (0, import_obsidian21.requestUrl)({
         url: "https://api.openai.com/v1/chat/completions",
         method: "POST",
         headers: {
@@ -7604,7 +8479,7 @@ ${noteContent}`;
       }
       return data.choices[0].message.content;
     } catch (error) {
-      new import_obsidian19.Notice(`OpenAI API error: ${error.message}`);
+      new import_obsidian21.Notice(`OpenAI API error: ${error.message}`);
       throw error;
     }
   }
@@ -7659,29 +8534,29 @@ ${noteContent}`;
       }
       return questions.slice(0, numQuestionsToGenerate);
     } catch (error) {
-      new import_obsidian19.Notice("Error parsing MCQ response from OpenAI. Please try again.");
+      new import_obsidian21.Notice("Error parsing MCQ response from OpenAI. Please try again.");
       return [];
     }
   }
 };
 
 // api/ollama-service.ts
-var import_obsidian20 = require("obsidian");
+var import_obsidian22 = require("obsidian");
 var OllamaService = class {
   constructor(plugin) {
     this.plugin = plugin;
   }
   async generateMCQs(notePath, noteContent, settings) {
     if (!settings.ollamaApiUrl) {
-      new import_obsidian20.Notice("Ollama API URL is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian22.Notice("Ollama API URL is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     if (!settings.ollamaModel) {
-      new import_obsidian20.Notice("Ollama Model is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian22.Notice("Ollama Model is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     try {
-      new import_obsidian20.Notice("Generating MCQs using Ollama...");
+      new import_obsidian22.Notice("Generating MCQs using Ollama...");
       let numQuestionsToGenerate;
       if (settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
         const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
@@ -7693,7 +8568,7 @@ var OllamaService = class {
       const response = await this.makeApiRequest(prompt, settings);
       const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
       if (questions.length === 0) {
-        new import_obsidian20.Notice("Failed to generate valid MCQs from Ollama. Please try again.");
+        new import_obsidian22.Notice("Failed to generate valid MCQs from Ollama. Please try again.");
         return null;
       }
       return {
@@ -7702,7 +8577,7 @@ var OllamaService = class {
         generatedAt: Date.now()
       };
     } catch (error) {
-      new import_obsidian20.Notice("Failed to generate MCQs with Ollama. Please check console for details.");
+      new import_obsidian22.Notice("Failed to generate MCQs with Ollama. Please check console for details.");
       return null;
     }
   }
@@ -7745,7 +8620,7 @@ ${noteContent}`;
     const difficulty = settings.mcqDifficulty;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     try {
-      const response = await (0, import_obsidian20.requestUrl)({
+      const response = await (0, import_obsidian22.requestUrl)({
         url: `${apiUrl}/api/chat`,
         method: "POST",
         headers: {
@@ -7771,7 +8646,7 @@ ${noteContent}`;
       }
       return data.message.content;
     } catch (error) {
-      new import_obsidian20.Notice(`Ollama API error: ${error.message}`);
+      new import_obsidian22.Notice(`Ollama API error: ${error.message}`);
       throw error;
     }
   }
@@ -7826,29 +8701,29 @@ ${noteContent}`;
       }
       return questions.slice(0, numQuestionsToGenerate);
     } catch (error) {
-      new import_obsidian20.Notice("Error parsing MCQ response from Ollama. Please try again.");
+      new import_obsidian22.Notice("Error parsing MCQ response from Ollama. Please try again.");
       return [];
     }
   }
 };
 
 // api/gemini-service.ts
-var import_obsidian21 = require("obsidian");
+var import_obsidian23 = require("obsidian");
 var GeminiService = class {
   constructor(plugin) {
     this.plugin = plugin;
   }
   async generateMCQs(notePath, noteContent, settings) {
     if (!settings.geminiApiKey) {
-      new import_obsidian21.Notice("Gemini API key is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian23.Notice("Gemini API key is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     if (!settings.geminiModel) {
-      new import_obsidian21.Notice("Gemini Model is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian23.Notice("Gemini Model is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     try {
-      new import_obsidian21.Notice("Generating MCQs using Gemini...");
+      new import_obsidian23.Notice("Generating MCQs using Gemini...");
       let numQuestionsToGenerate;
       if (settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
         const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
@@ -7860,7 +8735,7 @@ var GeminiService = class {
       const response = await this.makeApiRequest(prompt, settings);
       const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
       if (questions.length === 0) {
-        new import_obsidian21.Notice("Failed to generate valid MCQs from Gemini. Please try again.");
+        new import_obsidian23.Notice("Failed to generate valid MCQs from Gemini. Please try again.");
         return null;
       }
       return {
@@ -7869,7 +8744,7 @@ var GeminiService = class {
         generatedAt: Date.now()
       };
     } catch (error) {
-      new import_obsidian21.Notice("Failed to generate MCQs with Gemini. Please check console for details.");
+      new import_obsidian23.Notice("Failed to generate MCQs with Gemini. Please check console for details.");
       return null;
     }
   }
@@ -7908,7 +8783,7 @@ ${noteContent}`;
     const model = settings.geminiModel;
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     try {
-      const response = await (0, import_obsidian21.requestUrl)({
+      const response = await (0, import_obsidian23.requestUrl)({
         url: apiUrl,
         method: "POST",
         headers: {
@@ -7935,7 +8810,7 @@ ${noteContent}`;
       }
       return data.candidates[0].content.parts[0].text;
     } catch (error) {
-      new import_obsidian21.Notice(`Gemini API error: ${error.message}`);
+      new import_obsidian23.Notice(`Gemini API error: ${error.message}`);
       throw error;
     }
   }
@@ -7990,29 +8865,29 @@ ${noteContent}`;
       }
       return questions.slice(0, numQuestionsToGenerate);
     } catch (error) {
-      new import_obsidian21.Notice("Error parsing MCQ response from Gemini. Please try again.");
+      new import_obsidian23.Notice("Error parsing MCQ response from Gemini. Please try again.");
       return [];
     }
   }
 };
 
 // api/claude-service.ts
-var import_obsidian22 = require("obsidian");
+var import_obsidian24 = require("obsidian");
 var ClaudeService = class {
   constructor(plugin) {
     this.plugin = plugin;
   }
   async generateMCQs(notePath, noteContent, settings) {
     if (!settings.claudeApiKey) {
-      new import_obsidian22.Notice("Claude API key is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian24.Notice("Claude API key is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     if (!settings.claudeModel) {
-      new import_obsidian22.Notice("Claude Model is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian24.Notice("Claude Model is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     try {
-      new import_obsidian22.Notice("Generating MCQs using Claude...");
+      new import_obsidian24.Notice("Generating MCQs using Claude...");
       let numQuestionsToGenerate;
       if (settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
         const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
@@ -8024,7 +8899,7 @@ var ClaudeService = class {
       const response = await this.makeApiRequest(prompt, settings);
       const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
       if (questions.length === 0) {
-        new import_obsidian22.Notice("Failed to generate valid MCQs from Claude. Please try again.");
+        new import_obsidian24.Notice("Failed to generate valid MCQs from Claude. Please try again.");
         return null;
       }
       return {
@@ -8033,7 +8908,7 @@ var ClaudeService = class {
         generatedAt: Date.now()
       };
     } catch (error) {
-      new import_obsidian22.Notice("Failed to generate MCQs with Claude. Please check console for details.");
+      new import_obsidian24.Notice("Failed to generate MCQs with Claude. Please check console for details.");
       return null;
     }
   }
@@ -8077,7 +8952,7 @@ ${noteContent}`;
     const difficulty = settings.mcqDifficulty;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     try {
-      const response = await (0, import_obsidian22.requestUrl)({
+      const response = await (0, import_obsidian24.requestUrl)({
         url: "https://api.anthropic.com/v1/messages",
         method: "POST",
         headers: {
@@ -8105,7 +8980,7 @@ ${noteContent}`;
       }
       return data.content[0].text;
     } catch (error) {
-      new import_obsidian22.Notice(`Claude API error: ${error.message}`);
+      new import_obsidian24.Notice(`Claude API error: ${error.message}`);
       throw error;
     }
   }
@@ -8186,29 +9061,29 @@ ${noteContent}`;
       }
       return questions.slice(0, numQuestionsToGenerate);
     } catch (error) {
-      new import_obsidian22.Notice("Error parsing MCQ response from Claude. Please try again.");
+      new import_obsidian24.Notice("Error parsing MCQ response from Claude. Please try again.");
       return [];
     }
   }
 };
 
 // api/together-service.ts
-var import_obsidian23 = require("obsidian");
+var import_obsidian25 = require("obsidian");
 var TogetherService = class {
   constructor(plugin) {
     this.plugin = plugin;
   }
   async generateMCQs(notePath, noteContent, settings) {
     if (!settings.togetherApiKey) {
-      new import_obsidian23.Notice("Together AI API key is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian25.Notice("Together AI API key is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     if (!settings.togetherModel) {
-      new import_obsidian23.Notice("Together AI Model is not set. Please add it in the Spaceforge settings.");
+      new import_obsidian25.Notice("Together AI Model is not set. Please add it in the Spaceforge settings.");
       return null;
     }
     try {
-      new import_obsidian23.Notice("Generating MCQs using Together AI...");
+      new import_obsidian25.Notice("Generating MCQs using Together AI...");
       let numQuestionsToGenerate;
       if (settings.mcqQuestionAmountMode === "wordsPerQuestion" /* WordsPerQuestion */) {
         const wordCount = noteContent.split(/\s+/).filter(Boolean).length;
@@ -8220,7 +9095,7 @@ var TogetherService = class {
       const response = await this.makeApiRequest(prompt, settings);
       const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
       if (questions.length === 0) {
-        new import_obsidian23.Notice("Failed to generate valid MCQs from Together AI. Please try again.");
+        new import_obsidian25.Notice("Failed to generate valid MCQs from Together AI. Please try again.");
         return null;
       }
       return {
@@ -8229,7 +9104,7 @@ var TogetherService = class {
         generatedAt: Date.now()
       };
     } catch (error) {
-      new import_obsidian23.Notice("Failed to generate MCQs with Together AI. Please check console for details.");
+      new import_obsidian25.Notice("Failed to generate MCQs with Together AI. Please check console for details.");
       return null;
     }
   }
@@ -8273,7 +9148,7 @@ ${noteContent}`;
     const difficulty = settings.mcqDifficulty;
     const systemPrompt = difficulty === "basic" ? settings.mcqBasicSystemPrompt : settings.mcqAdvancedSystemPrompt;
     try {
-      const response = await (0, import_obsidian23.requestUrl)({
+      const response = await (0, import_obsidian25.requestUrl)({
         url: "https://api.together.xyz/v1/chat/completions",
         method: "POST",
         headers: {
@@ -8300,7 +9175,7 @@ ${noteContent}`;
       }
       return data.choices[0].message.content;
     } catch (error) {
-      new import_obsidian23.Notice(`Together AI API error: ${error.message}`);
+      new import_obsidian25.Notice(`Together AI API error: ${error.message}`);
       throw error;
     }
   }
@@ -8380,14 +9255,14 @@ ${noteContent}`;
       }
       return questions.slice(0, numQuestionsToGenerate);
     } catch (error) {
-      new import_obsidian23.Notice("Error parsing MCQ response from Together AI. Please try again.");
+      new import_obsidian25.Notice("Error parsing MCQ response from Together AI. Please try again.");
       return [];
     }
   }
 };
 
 // services/review-schedule-service.ts
-var import_obsidian24 = require("obsidian");
+var import_obsidian26 = require("obsidian");
 
 // services/fsrs-schedule-service.ts
 var FsrsScheduleService = class {
@@ -8521,8 +9396,8 @@ var ReviewScheduleService = class {
    */
   async scheduleNoteForReview(path, daysFromNow = 0) {
     const file = this.plugin.app.vault.getAbstractFileByPath(path);
-    if (!file || !(file instanceof import_obsidian24.TFile) || file.extension !== "md") {
-      new import_obsidian24.Notice("Only markdown files can be added to the review schedule");
+    if (!file || !(file instanceof import_obsidian26.TFile) || file.extension !== "md") {
+      new import_obsidian26.Notice("Only markdown files can be added to the review schedule");
       return;
     }
     const now = Date.now();
@@ -8581,7 +9456,7 @@ var ReviewScheduleService = class {
     if (this.plugin.events) {
       this.plugin.events.emit("sidebar-update");
     }
-    new import_obsidian24.Notice(`Note added to review schedule`);
+    new import_obsidian26.Notice(`Note added to review schedule`);
   }
   /**
    * Check if a note is due for review on or before the specified date
@@ -9005,7 +9880,7 @@ var ReviewScheduleService = class {
         this.plugin.events.emit("sidebar-update");
       }, 50);
     }
-    new import_obsidian24.Notice(`Review postponed for ${days} day${days !== 1 ? "s" : ""}`);
+    new import_obsidian26.Notice(`Review postponed for ${days} day${days !== 1 ? "s" : ""}`);
   }
   /**
    * Advance a note's review by one day, if eligible.
@@ -9045,7 +9920,7 @@ var ReviewScheduleService = class {
     if (this.schedules[path]) {
       delete this.schedules[path];
       this.customNoteOrder = this.customNoteOrder.filter((p2) => p2 !== path);
-      new import_obsidian24.Notice("Note removed from review schedule");
+      new import_obsidian26.Notice("Note removed from review schedule");
       if (this.plugin.events) {
         this.plugin.events.emit("sidebar-update");
       }
@@ -9057,7 +9932,7 @@ var ReviewScheduleService = class {
   async clearAllSchedules() {
     this.schedules = {};
     this.customNoteOrder = [];
-    new import_obsidian24.Notice("All review schedules have been cleared");
+    new import_obsidian26.Notice("All review schedules have been cleared");
     if (this.plugin.events) {
       this.plugin.events.emit("sidebar-update");
     }
@@ -9073,7 +9948,7 @@ var ReviewScheduleService = class {
    */
   async estimateReviewTime(path) {
     const file = this.plugin.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof import_obsidian24.TFile))
+    if (!(file instanceof import_obsidian26.TFile))
       return 60;
     try {
       const content = await this.plugin.app.vault.read(file);
@@ -9093,7 +9968,7 @@ var ReviewScheduleService = class {
     let count = 0;
     for (const path of paths) {
       const file = this.plugin.app.vault.getAbstractFileByPath(path);
-      if (!file || !(file instanceof import_obsidian24.TFile) || file.extension !== "md" || this.schedules[path]) {
+      if (!file || !(file instanceof import_obsidian26.TFile) || file.extension !== "md" || this.schedules[path]) {
         continue;
       }
       const now = Date.now();
@@ -9320,7 +10195,7 @@ var ReviewHistoryService = class {
 };
 
 // services/review-session-service.ts
-var import_obsidian25 = require("obsidian");
+var import_obsidian27 = require("obsidian");
 
 // models/review-session.ts
 function generateSessionId(prefix = "session") {
@@ -9367,8 +10242,8 @@ var ReviewSessionService = class {
    */
   async createReviewSession(folderPath, name) {
     const folder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
-    if (!folder || !(folder instanceof import_obsidian25.TFolder)) {
-      new import_obsidian25.Notice("Invalid folder for review session");
+    if (!folder || !(folder instanceof import_obsidian27.TFolder)) {
+      new import_obsidian27.Notice("Invalid folder for review session");
       return null;
     }
     try {
@@ -9395,7 +10270,7 @@ var ReviewSessionService = class {
       }
       return session;
     } catch (error) {
-      new import_obsidian25.Notice("Failed to create review session");
+      new import_obsidian27.Notice("Failed to create review session");
       return null;
     }
   }
@@ -9464,7 +10339,7 @@ var ReviewSessionService = class {
     if (isSessionComplete(updatedSession)) {
       updatedSession.isActive = false;
       this.reviewSessions.activeSessionId = null;
-      new import_obsidian25.Notice(`Completed review session: ${updatedSession.name}`);
+      new import_obsidian27.Notice(`Completed review session: ${updatedSession.name}`);
     }
     if (this.plugin.events) {
       this.plugin.events.emit("sidebar-update");
@@ -9974,8 +10849,315 @@ var PomodoroService = class {
   }
 };
 
+// services/calendar-event-service.ts
+var CalendarEventService = class {
+  constructor() {
+    /**
+     * Storage for calendar events
+     */
+    this.events = /* @__PURE__ */ new Map();
+  }
+  /**
+   * Initialize the service with existing events
+   * 
+   * @param events Array of existing events
+   */
+  initialize(events = []) {
+    this.events.clear();
+    events.forEach((event) => {
+      this.events.set(event.id, event);
+    });
+  }
+  /**
+   * Get all events
+   * 
+   * @returns Array of all events
+   */
+  getAllEvents() {
+    return Array.from(this.events.values());
+  }
+  /**
+   * Get event by ID
+   * 
+   * @param id Event ID
+   * @returns Event or null if not found
+   */
+  getEventById(id) {
+    return this.events.get(id) || null;
+  }
+  /**
+   * Create a new event
+   * 
+   * @param eventData Event data (without id, createdAt, updatedAt)
+   * @returns Created event
+   */
+  createEvent(eventData) {
+    const now = Date.now();
+    const event = {
+      ...eventData,
+      id: this.generateId(),
+      createdAt: now,
+      updatedAt: now
+    };
+    this.events.set(event.id, event);
+    return event;
+  }
+  /**
+   * Update an existing event
+   * 
+   * @param id Event ID
+   * @param updates Partial event data to update
+   * @returns Updated event or null if not found
+   */
+  updateEvent(id, updates) {
+    const existingEvent = this.events.get(id);
+    if (!existingEvent) {
+      return null;
+    }
+    const updatedEvent = {
+      ...existingEvent,
+      ...updates,
+      id,
+      // Ensure ID doesn't change
+      createdAt: existingEvent.createdAt,
+      // Preserve creation time
+      updatedAt: Date.now()
+    };
+    this.events.set(id, updatedEvent);
+    return updatedEvent;
+  }
+  /**
+   * Delete an event
+   * 
+   * @param id Event ID
+   * @returns True if deleted, false if not found
+   */
+  deleteEvent(id) {
+    return this.events.delete(id);
+  }
+  /**
+   * Get events for a specific date range
+   * 
+   * @param startDate Start date timestamp
+   * @param endDate End date timestamp
+   * @returns Array of events in the date range
+   */
+  getEventsInRange(startDate, endDate) {
+    return this.getAllEvents().filter((event) => {
+      const eventDate = DateUtils.startOfDay(new Date(event.date));
+      const start = DateUtils.startOfDay(new Date(startDate));
+      const end = DateUtils.startOfDay(new Date(endDate));
+      return eventDate >= start && eventDate <= end;
+    });
+  }
+  /**
+   * Get events for a specific date
+   * 
+   * @param date Date timestamp
+   * @returns Array of events for the date
+   */
+  getEventsForDate(date) {
+    const targetDate = DateUtils.startOfDay(new Date(date));
+    return this.getAllEvents().filter((event) => {
+      const eventDate = DateUtils.startOfDay(new Date(event.date));
+      return eventDate === targetDate;
+    });
+  }
+  /**
+   * Get events grouped by date for a date range
+   * 
+   * @param startDate Start date timestamp
+   * @param endDate End date timestamp
+   * @returns Map of date keys to DateEvents
+   */
+  getEventsGroupedByDate(startDate, endDate) {
+    const eventsByDate = /* @__PURE__ */ new Map();
+    const eventsInRange = this.getEventsInRange(startDate, endDate);
+    eventsInRange.forEach((event) => {
+      const eventDateStart = DateUtils.startOfDay(new Date(event.date));
+      const dateKey = eventDateStart.toString();
+      if (!eventsByDate.has(dateKey)) {
+        eventsByDate.set(dateKey, {
+          timestamp: eventDateStart,
+          events: []
+        });
+      }
+      const dateEvents = eventsByDate.get(dateKey);
+      if (dateEvents) {
+        dateEvents.events.push(event);
+      }
+    });
+    return eventsByDate;
+  }
+  /**
+   * Get upcoming events
+   * 
+   * @param daysAhead Number of days ahead to look
+   * @param fromDate Optional start date (defaults to today)
+   * @returns Array of upcoming events
+   */
+  getUpcomingEvents(daysAhead = 7, fromDate = /* @__PURE__ */ new Date()) {
+    const today = DateUtils.startOfDay(fromDate);
+    const endDate = DateUtils.addDays(today, daysAhead);
+    const eventsInRange = this.getEventsInRange(today, endDate);
+    return eventsInRange.map((event) => {
+      const eventDate = DateUtils.startOfDay(new Date(event.date));
+      const daysUntil = Math.floor((eventDate - today) / (24 * 60 * 60 * 1e3));
+      return {
+        event,
+        daysUntil,
+        isToday: daysUntil === 0,
+        isTomorrow: daysUntil === 1
+      };
+    }).sort((a, b2) => {
+      if (a.daysUntil !== b2.daysUntil) {
+        return a.daysUntil - b2.daysUntil;
+      }
+      if (a.event.isAllDay && !b2.event.isAllDay)
+        return -1;
+      if (!a.event.isAllDay && b2.event.isAllDay)
+        return 1;
+      if (a.event.time && b2.event.time) {
+        return a.event.time.localeCompare(b2.event.time);
+      }
+      return 0;
+    });
+  }
+  /**
+   * Generate recurring event instances
+   * 
+   * @param event Recurring event
+   * @param startDate Start date for generating instances
+   * @param endDate End date for generating instances
+   * @returns Array of event instances
+   */
+  generateRecurringInstances(event, startDate, endDate) {
+    if (event.recurrence === "none" /* None */) {
+      return [event];
+    }
+    const instances = [];
+    const start = DateUtils.startOfDay(new Date(startDate));
+    const end = DateUtils.startOfDay(new Date(endDate));
+    const eventDate = DateUtils.startOfDay(new Date(event.date));
+    const recurrenceEnd = event.recurrenceEndDate ? DateUtils.startOfDay(new Date(event.recurrenceEndDate)) : end;
+    let currentDate = new Date(eventDate);
+    while (currentDate.getTime() <= Math.min(end, recurrenceEnd)) {
+      if (currentDate.getTime() >= start) {
+        const instance = {
+          ...event,
+          date: currentDate.getTime(),
+          id: `${event.id}-${currentDate.getTime()}`
+          // Unique ID for instance
+        };
+        instances.push(instance);
+      }
+      switch (event.recurrence) {
+        case "daily" /* Daily */:
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case "weekly" /* Weekly */:
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case "monthly" /* Monthly */:
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        case "yearly" /* Yearly */:
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+      }
+    }
+    return instances;
+  }
+  /**
+   * Get events by category
+   * 
+   * @param category Event category
+   * @returns Array of events in the category
+   */
+  getEventsByCategory(category) {
+    return this.getAllEvents().filter((event) => event.category === category);
+  }
+  /**
+   * Search events by title or description
+   * 
+   * @param query Search query
+   * @returns Array of matching events
+   */
+  searchEvents(query) {
+    const lowerQuery = query.toLowerCase();
+    return this.getAllEvents().filter(
+      (event) => event.title.toLowerCase().includes(lowerQuery) || event.description && event.description.toLowerCase().includes(lowerQuery)
+    );
+  }
+  /**
+   * Export events to JSON
+   * 
+   * @returns JSON string of all events
+   */
+  exportEvents() {
+    return JSON.stringify(this.getAllEvents(), null, 2);
+  }
+  /**
+   * Import events from JSON
+   * 
+   * @param json JSON string of events
+   * @returns Number of imported events
+   */
+  importEvents(json) {
+    try {
+      const events = JSON.parse(json);
+      let importedCount = 0;
+      events.forEach((event) => {
+        if (event.id && event.title && event.date) {
+          this.events.set(event.id, event);
+          importedCount++;
+        }
+      });
+      return importedCount;
+    } catch (error) {
+      console.error("Failed to import events:", error);
+      return 0;
+    }
+  }
+  /**
+   * Generate a unique ID for new events
+   * 
+   * @returns Unique ID string
+   */
+  generateId() {
+    return `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+  /**
+   * Get event color (custom color or category color)
+   * 
+   * @param event Event
+   * @returns Color hex code
+   */
+  getEventColor(event) {
+    return event.color || this.getCategoryColor(event.category);
+  }
+  /**
+   * Get category color
+   * 
+   * @param category Event category
+   * @returns Color hex code
+   */
+  getCategoryColor(category) {
+    const colors = {
+      ["work" /* Work */]: "#4A90E2",
+      ["personal" /* Personal */]: "#7B68EE",
+      ["study" /* Study */]: "#50C878",
+      ["meeting" /* Meeting */]: "#FF6B6B",
+      ["health" /* Health */]: "#FF9F40",
+      ["social" /* Social */]: "#FF69B4",
+      ["other" /* Other */]: "#95A5A6"
+    };
+    return colors[category] || colors["other" /* Other */];
+  }
+};
+
 // main.ts
-var SpaceforgePlugin = class extends import_obsidian26.Plugin {
+var SpaceforgePlugin = class extends import_obsidian28.Plugin {
   constructor() {
     super(...arguments);
     this.stylesheetPath = "styles.css";
@@ -10004,6 +11186,9 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     await this.loadPluginData();
     this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
     this.pomodoroService = new PomodoroService(this);
+    this.calendarEventService = new CalendarEventService();
+    const eventsArray = Object.values(this.pluginState.calendarEvents);
+    this.calendarEventService.initialize(eventsArray);
     this.registerView(
       "spaceforge-review-schedule",
       (leaf) => new ReviewSidebarView(leaf, this)
@@ -10037,15 +11222,15 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
         const viewWithFile = fileExplorerLeaf == null ? void 0 : fileExplorerLeaf.view;
         if (viewWithFile == null ? void 0 : viewWithFile.file) {
           const selectedFile = viewWithFile.file;
-          if (selectedFile instanceof import_obsidian26.TFile && selectedFile.extension === "md") {
+          if (selectedFile instanceof import_obsidian28.TFile && selectedFile.extension === "md") {
             await this.reviewScheduleService.scheduleNoteForReview(selectedFile.path);
             await this.savePluginData();
-            new import_obsidian26.Notice(`Added "${selectedFile.path}" to review schedule.`);
+            new import_obsidian28.Notice(`Added "${selectedFile.path}" to review schedule.`);
           } else {
-            new import_obsidian26.Notice("Selected item is not a markdown file.");
+            new import_obsidian28.Notice("Selected item is not a markdown file.");
           }
         } else {
-          new import_obsidian26.Notice("No file selected in file explorer.");
+          new import_obsidian28.Notice("No file selected in file explorer.");
         }
       }
     });
@@ -10053,7 +11238,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     }));
     this.registerEvent(this.app.vault.on("delete", async (file) => {
       var _a2;
-      if (file instanceof import_obsidian26.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian28.TFile && file.extension === "md") {
         await this.reviewScheduleService.removeFromReview(file.path);
         await this.savePluginData();
       }
@@ -10061,7 +11246,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     }));
     this.registerEvent(this.app.vault.on("rename", async (file, oldPath) => {
       var _a2;
-      if (file instanceof import_obsidian26.TFile && file.extension === "md") {
+      if (file instanceof import_obsidian28.TFile && file.extension === "md") {
         this.reviewScheduleService.handleNoteRename(oldPath, file.path);
         await this.savePluginData();
       }
@@ -10190,7 +11375,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
         pathForJson += "data.json";
         const vaultBasePath = this.app.vault.getRoot().path;
         let absolutePath = (vaultBasePath ? vaultBasePath + "/" : "") + pathForJson;
-        absolutePath = (0, import_obsidian26.normalizePath)(absolutePath);
+        absolutePath = (0, import_obsidian28.normalizePath)(absolutePath);
         return absolutePath;
       } else {
         return null;
@@ -10215,15 +11400,15 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     try {
       if (effectivePath) {
         const file = this.app.vault.getAbstractFileByPath(effectivePath);
-        if (file instanceof import_obsidian26.TFile) {
+        if (file instanceof import_obsidian28.TFile) {
           const jsonData = await this.app.vault.read(file);
           if (jsonData)
             rawLoadedData = JSON.parse(jsonData);
-          new import_obsidian26.Notice(`Spaceforge: Loaded data from custom path: ${effectivePath}`, 3e3);
+          new import_obsidian28.Notice(`Spaceforge: Loaded data from custom path: ${effectivePath}`, 3e3);
         } else {
           const oldFile = this.app.vault.getAbstractFileByPath(defaultPluginDataPath);
-          if (oldFile instanceof import_obsidian26.TFile) {
-            new import_obsidian26.Notice(`Spaceforge: Custom data file not found at ${effectivePath}. Attempting to migrate from default location.`, 5e3);
+          if (oldFile instanceof import_obsidian28.TFile) {
+            new import_obsidian28.Notice(`Spaceforge: Custom data file not found at ${effectivePath}. Attempting to migrate from default location.`, 5e3);
             try {
               const oldJsonData = await this.app.vault.read(oldFile);
               if (oldJsonData) {
@@ -10233,7 +11418,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
             }
           }
           if (!rawLoadedData) {
-            new import_obsidian26.Notice(`Spaceforge: No data file found at custom path ${effectivePath}. New data file will be created on save.`, 3e3);
+            new import_obsidian28.Notice(`Spaceforge: No data file found at custom path ${effectivePath}. New data file will be created on save.`, 3e3);
           }
         }
       } else {
@@ -10255,6 +11440,9 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
         this.pluginState = { ...this.pluginState, ...rawLoadedData.pluginState };
       } else if (rawLoadedData && !rawLoadedData.pluginState && rawLoadedData.schedules) {
         this.pluginState = { ...this.pluginState, ...rawLoadedData };
+      }
+      if (!this.pluginState.calendarEvents) {
+        this.pluginState.calendarEvents = {};
       }
       this.pluginState.pomodoroCurrentMode = this.pluginState.pomodoroCurrentMode || DEFAULT_PLUGIN_STATE_DATA.pomodoroCurrentMode;
       this.pluginState.pomodoroTimeLeftInSeconds = this.pluginState.pomodoroTimeLeftInSeconds || DEFAULT_PLUGIN_STATE_DATA.pomodoroTimeLeftInSeconds;
@@ -10301,7 +11489,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
       if (this.reviewScheduleService) {
         this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
       }
-      new import_obsidian26.Notice("Spaceforge: Error loading data, initialized with defaults.", 5e3);
+      new import_obsidian28.Notice("Spaceforge: Error loading data, initialized with defaults.", 5e3);
     }
   }
   async savePluginData() {
@@ -10336,6 +11524,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
         pomodoroUserOverrideHours: typeof this.pluginState.pomodoroUserOverrideHours === "number" ? this.pluginState.pomodoroUserOverrideHours : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideHours,
         pomodoroUserOverrideMinutes: typeof this.pluginState.pomodoroUserOverrideMinutes === "number" ? this.pluginState.pomodoroUserOverrideMinutes : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideMinutes,
         pomodoroUserAddToEstimation: typeof this.pluginState.pomodoroUserAddToEstimation === "boolean" ? this.pluginState.pomodoroUserAddToEstimation : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserAddToEstimation,
+        calendarEvents: this.calendarEventService ? Object.fromEntries(this.calendarEventService.getAllEvents().map((event) => [event.id, event])) : {},
         version: this.manifest.version
       };
       this.pluginState = currentPluginState;
@@ -10351,33 +11540,33 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
           const dirPathOnly = effectiveSavePath.substring(0, effectiveSavePath.lastIndexOf("/"));
           if (dirPathOnly && !this.app.vault.getAbstractFileByPath(dirPathOnly)) {
             await this.app.vault.createFolder(dirPathOnly);
-            new import_obsidian26.Notice(`Spaceforge: Created directory for custom data: ${dirPathOnly}`, 3e3);
+            new import_obsidian28.Notice(`Spaceforge: Created directory for custom data: ${dirPathOnly}`, 3e3);
           }
           const file = this.app.vault.getAbstractFileByPath(effectiveSavePath);
-          if (file instanceof import_obsidian26.TFile) {
+          if (file instanceof import_obsidian28.TFile) {
             await this.app.vault.modify(file, JSON.stringify(dataToSave, null, 2));
           } else {
             await this.app.vault.create(effectiveSavePath, JSON.stringify(dataToSave, null, 2));
           }
           const oldFile = this.app.vault.getAbstractFileByPath(defaultPluginDataPath);
-          if (oldFile instanceof import_obsidian26.TFile) {
+          if (oldFile instanceof import_obsidian28.TFile) {
             await this.app.vault.delete(oldFile);
-            new import_obsidian26.Notice(`Spaceforge: Removed old data file from default plugin folder as custom path is active.`, 5e3);
+            new import_obsidian28.Notice(`Spaceforge: Removed old data file from default plugin folder as custom path is active.`, 5e3);
           }
         } catch (writeError) {
-          new import_obsidian26.Notice(`Error saving data to custom path ${effectiveSavePath}: ${writeError.message}. Falling back to default path for this save.`, 1e4);
+          new import_obsidian28.Notice(`Error saving data to custom path ${effectiveSavePath}: ${writeError.message}. Falling back to default path for this save.`, 1e4);
           try {
             await this.saveData(dataToSave);
-            new import_obsidian26.Notice(`Spaceforge: Data saved to default plugin folder due to error with custom path.`, 5e3);
+            new import_obsidian28.Notice(`Spaceforge: Data saved to default plugin folder due to error with custom path.`, 5e3);
           } catch (fallbackError) {
-            new import_obsidian26.Notice(`CRITICAL: Spaceforge failed to save data to both custom and default locations.`, 1e4);
+            new import_obsidian28.Notice(`CRITICAL: Spaceforge failed to save data to both custom and default locations.`, 1e4);
           }
         }
       } else {
         await this.saveData(dataToSave);
       }
     } catch (error) {
-      new import_obsidian26.Notice("Error saving Spaceforge data. Check console for details.", 5e3);
+      new import_obsidian28.Notice("Error saving Spaceforge data. Check console for details.", 5e3);
     }
   }
   async activateSidebarView() {
@@ -10393,7 +11582,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
         });
         this.app.workspace.revealLeaf(leaf);
       } else {
-        new import_obsidian26.Notice("Spaceforge: Could not open sidebar view.");
+        new import_obsidian28.Notice("Spaceforge: Could not open sidebar view.");
       }
     }
   }
@@ -10417,10 +11606,10 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
       name: "Review Current Note",
       callback: () => {
         const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile instanceof import_obsidian26.TFile && activeFile.extension === "md") {
+        if (activeFile && activeFile instanceof import_obsidian28.TFile && activeFile.extension === "md") {
           this.reviewController.reviewNote(activeFile.path);
         } else {
-          new import_obsidian26.Notice("No active markdown file to review.");
+          new import_obsidian28.Notice("No active markdown file to review.");
         }
       }
     });
@@ -10429,12 +11618,12 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
       name: "Add Current Note to Review Schedule",
       callback: async () => {
         const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile instanceof import_obsidian26.TFile && activeFile.extension === "md") {
+        if (activeFile && activeFile instanceof import_obsidian28.TFile && activeFile.extension === "md") {
           await this.reviewScheduleService.scheduleNoteForReview(activeFile.path);
           await this.savePluginData();
-          new import_obsidian26.Notice(`Added "${activeFile.path}" to review schedule.`);
+          new import_obsidian28.Notice(`Added "${activeFile.path}" to review schedule.`);
         } else {
-          new import_obsidian26.Notice("No active markdown file to add to review.");
+          new import_obsidian28.Notice("No active markdown file to add to review.");
         }
       }
     });
@@ -10443,11 +11632,11 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
       name: "Add Current Note's Folder to Review Schedule",
       callback: async () => {
         const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile.parent && activeFile.parent instanceof import_obsidian26.TFolder) {
+        if (activeFile && activeFile.parent && activeFile.parent instanceof import_obsidian28.TFolder) {
           const folder = activeFile.parent;
           await this.contextMenuHandler.addFolderToReview(folder);
         } else {
-          new import_obsidian26.Notice("Could not determine the current note's folder, no active file, or parent is not a folder.");
+          new import_obsidian28.Notice("Could not determine the current note's folder, no active file, or parent is not a folder.");
         }
       }
     });
@@ -10462,7 +11651,7 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
       if (this.mcqGenerationService) {
         this.mcqController = new MCQController(this, this.mcqService, this.mcqGenerationService);
       } else {
-        new import_obsidian26.Notice("MCQ Generation Service could not be initialized. Check API provider settings in Spaceforge settings.");
+        new import_obsidian28.Notice("MCQ Generation Service could not be initialized. Check API provider settings in Spaceforge settings.");
       }
     }
   }
@@ -10470,42 +11659,42 @@ var SpaceforgePlugin = class extends import_obsidian26.Plugin {
     switch (this.settings.mcqApiProvider) {
       case "openrouter" /* OpenRouter */:
         if (!this.settings.openRouterApiKey) {
-          new import_obsidian26.Notice("OpenRouter API key is not set in Spaceforge settings.");
+          new import_obsidian28.Notice("OpenRouter API key is not set in Spaceforge settings.");
           return void 0;
         }
         return new OpenRouterService(this);
       case "openai" /* OpenAI */:
         if (!this.settings.openaiApiKey) {
-          new import_obsidian26.Notice("OpenAI API key is not set in Spaceforge settings.");
+          new import_obsidian28.Notice("OpenAI API key is not set in Spaceforge settings.");
           return void 0;
         }
         return new OpenAIService(this);
       case "ollama" /* Ollama */:
         if (!this.settings.ollamaApiUrl || !this.settings.ollamaModel) {
-          new import_obsidian26.Notice("Ollama API URL or Model is not set in Spaceforge settings.");
+          new import_obsidian28.Notice("Ollama API URL or Model is not set in Spaceforge settings.");
           return void 0;
         }
         return new OllamaService(this);
       case "gemini" /* Gemini */:
         if (!this.settings.geminiApiKey) {
-          new import_obsidian26.Notice("Gemini API key is not set in Spaceforge settings.");
+          new import_obsidian28.Notice("Gemini API key is not set in Spaceforge settings.");
           return void 0;
         }
         return new GeminiService(this);
       case "claude" /* Claude */:
         if (!this.settings.claudeApiKey || !this.settings.claudeModel) {
-          new import_obsidian26.Notice("Claude API key or Model is not set in Spaceforge settings.");
+          new import_obsidian28.Notice("Claude API key or Model is not set in Spaceforge settings.");
           return void 0;
         }
         return new ClaudeService(this);
       case "together" /* Together */:
         if (!this.settings.togetherApiKey || !this.settings.togetherModel) {
-          new import_obsidian26.Notice("Together AI API key or Model is not set in Spaceforge settings.");
+          new import_obsidian28.Notice("Together AI API key or Model is not set in Spaceforge settings.");
           return void 0;
         }
         return new TogetherService(this);
       default:
-        new import_obsidian26.Notice(`Unsupported MCQ API provider selected: ${this.settings.mcqApiProvider}`);
+        new import_obsidian28.Notice(`Unsupported MCQ API provider selected: ${this.settings.mcqApiProvider}`);
         return void 0;
     }
   }

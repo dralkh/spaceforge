@@ -310,6 +310,31 @@ export interface SpaceforgeSettings {
         key: string | null;
     };
     navigationCommandDelay: number; // in milliseconds
+
+    // --- Calendar Events Settings ---
+    /**
+     * Enable calendar events feature
+     * Default: true
+     */
+    enableCalendarEvents: boolean;
+
+    /**
+     * Show upcoming events below calendar
+     * Default: true
+     */
+    showUpcomingEvents: boolean;
+
+    /**
+     * Number of days to show in upcoming events list
+     * Default: 7
+     */
+    upcomingEventsDays: number;
+
+    /**
+     * Default event category
+     * Default: 'personal'
+     */
+    defaultEventCategory: string;
 }
 
 /**
@@ -403,4 +428,10 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
         key: null,
     },
     navigationCommandDelay: 500,
+
+    // Calendar Events Defaults
+    enableCalendarEvents: true,
+    showUpcomingEvents: true,
+    upcomingEventsDays: 7,
+    defaultEventCategory: 'personal',
 };

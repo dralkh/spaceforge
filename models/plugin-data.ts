@@ -2,6 +2,7 @@ import { SpaceforgeSettings, DEFAULT_SETTINGS } from './settings';
 import { ReviewSchedule, ReviewHistoryItem } from './review-schedule';
 import { ReviewSessionStore } from './review-session';
 import { MCQSet, MCQSession } from './mcq';
+import { CalendarEvent } from './calendar-event';
 
 /**
  * Interface for the plugin's operational state (excluding settings).
@@ -34,6 +35,9 @@ export interface PluginStateData {
     pomodoroUserOverrideHours: number; // User-specified hours for override
     pomodoroUserOverrideMinutes: number; // User-specified minutes for override
     pomodoroUserAddToEstimation: boolean; // Whether to add user time to estimation or replace it
+    
+    // Calendar Events
+    calendarEvents: Record<string, CalendarEvent>;
 }
 
 /**
@@ -66,6 +70,9 @@ export const DEFAULT_PLUGIN_STATE_DATA: PluginStateData = {
     pomodoroUserOverrideHours: 0,
     pomodoroUserOverrideMinutes: 0,
     pomodoroUserAddToEstimation: false,
+    
+    // Calendar Events Defaults
+    calendarEvents: {},
 };
 
 /**
