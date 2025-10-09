@@ -7467,7 +7467,7 @@ var SpaceforgeSettingTab = class extends import_obsidian19.PluginSettingTab {
     };
     const createActionButtons = () => {
       const actionsContainer = containerEl.createEl("div", { cls: "sf-settings-actions" });
-      const exportBtn = actionsContainer.createEl("button", { text: "Export all data" });
+      const exportBtn = actionsContainer.createEl("button", { text: "Export all data", cls: "sf-btn sf-btn-primary" });
       exportBtn.addEventListener("click", () => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _i;
         const pluginStateToExport = {
@@ -7508,7 +7508,7 @@ var SpaceforgeSettingTab = class extends import_obsidian19.PluginSettingTab {
         document.body.removeChild(a);
         new import_obsidian19.Notice("All plugin data exported successfully");
       });
-      const importBtn = actionsContainer.createEl("button", { text: "Import all data" });
+      const importBtn = actionsContainer.createEl("button", { text: "Import all data", cls: "sf-btn sf-btn-primary" });
       importBtn.addEventListener("click", () => {
         const input = document.createElement("input");
         input.type = "file";
@@ -7545,7 +7545,7 @@ var SpaceforgeSettingTab = class extends import_obsidian19.PluginSettingTab {
         };
         input.click();
       });
-      const resetBtn = actionsContainer.createEl("button", { text: "Reset to defaults" });
+      const resetBtn = actionsContainer.createEl("button", { text: "Reset to defaults", cls: "sf-btn sf-btn-warning" });
       resetBtn.addEventListener("click", async () => {
         var _a, _b, _c;
         const confirmed = confirm("Are you sure you want to reset all plugin data (settings and state) to defaults? This cannot be undone.");
@@ -7567,12 +7567,12 @@ var SpaceforgeSettingTab = class extends import_obsidian19.PluginSettingTab {
           new import_obsidian19.Notice("All plugin data reset to defaults.");
         }
       });
-      const clearScheduleBtn = actionsContainer.createEl("button", {
-        text: "Clear all schedule data",
-        cls: "sf-button-danger"
-        // Optional: Add a class for dangerous actions
+      const clearReviewsBtn = actionsContainer.createEl("button", {
+        text: "Clear all reviews",
+        cls: "sf-btn sf-btn-danger"
+        // Use existing danger button styling
       });
-      clearScheduleBtn.addEventListener("click", async () => {
+      clearReviewsBtn.addEventListener("click", async () => {
         var _a;
         const confirmed = confirm("Are you sure you want to clear all review schedules, history, and session data? This action cannot be undone.");
         if (confirmed) {
@@ -7592,11 +7592,70 @@ var SpaceforgeSettingTab = class extends import_obsidian19.PluginSettingTab {
               this.plugin.events.emit("sidebar-update");
             }
             await this.plugin.savePluginData();
-            new import_obsidian19.Notice("All schedule data cleared successfully.");
+            new import_obsidian19.Notice("All review data cleared successfully.");
             this.display();
             (_a = this.plugin.getSidebarView()) == null ? void 0 : _a.refresh();
           } catch (error) {
-            new import_obsidian19.Notice("Failed to clear schedule data. Check console for details.");
+            new import_obsidian19.Notice("Failed to clear review data. Check console for details.");
+          }
+        }
+      });
+      const clearEventsBtn = actionsContainer.createEl("button", {
+        text: "Clear all events",
+        cls: "sf-btn sf-btn-danger"
+      });
+      clearEventsBtn.addEventListener("click", async () => {
+        var _a;
+        const confirmed = confirm("Are you sure you want to clear all calendar events? This action cannot be undone.");
+        if (confirmed) {
+          try {
+            this.plugin.pluginState.calendarEvents = { ...DEFAULT_PLUGIN_STATE_DATA.calendarEvents };
+            if (this.plugin.calendarEventService) {
+              this.plugin.calendarEventService.initialize([]);
+            }
+            await this.plugin.savePluginData();
+            new import_obsidian19.Notice("All calendar events cleared successfully.");
+            this.display();
+            (_a = this.plugin.getSidebarView()) == null ? void 0 : _a.refresh();
+          } catch (error) {
+            new import_obsidian19.Notice("Failed to clear calendar events. Check console for details.");
+          }
+        }
+      });
+      const clearAllBtn = actionsContainer.createEl("button", {
+        text: "Clear all data",
+        cls: "sf-btn sf-btn-danger"
+      });
+      clearAllBtn.addEventListener("click", async () => {
+        var _a, _b, _c, _d;
+        const confirmed = confirm("Are you sure you want to clear ALL plugin data (reviews, events, MCQs, Pomodoro state)? This action cannot be undone.");
+        if (confirmed) {
+          try {
+            this.plugin.pluginState = JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA));
+            this.plugin.reviewScheduleService.schedules = this.plugin.pluginState.schedules;
+            this.plugin.reviewHistoryService.history = this.plugin.pluginState.history;
+            this.plugin.reviewSessionService.reviewSessions = this.plugin.pluginState.reviewSessions;
+            this.plugin.mcqService.mcqSets = this.plugin.pluginState.mcqSets;
+            this.plugin.mcqService.mcqSessions = this.plugin.pluginState.mcqSessions;
+            this.plugin.reviewScheduleService.customNoteOrder = this.plugin.pluginState.customNoteOrder;
+            this.plugin.reviewScheduleService.lastLinkAnalysisTimestamp = (_a = this.plugin.pluginState.lastLinkAnalysisTimestamp) != null ? _a : null;
+            if (this.plugin.calendarEventService) {
+              this.plugin.calendarEventService.initialize([]);
+            }
+            (_b = this.plugin.pomodoroService) == null ? void 0 : _b.onSettingsChanged();
+            (_c = this.plugin.pomodoroService) == null ? void 0 : _c.reinitializeTimerFromState();
+            if (this.plugin.reviewController) {
+              await this.plugin.reviewController.updateTodayNotes();
+            }
+            if (this.plugin.events) {
+              this.plugin.events.emit("sidebar-update");
+            }
+            await this.plugin.savePluginData();
+            new import_obsidian19.Notice("All plugin data cleared successfully.");
+            this.display();
+            (_d = this.plugin.getSidebarView()) == null ? void 0 : _d.refresh();
+          } catch (error) {
+            new import_obsidian19.Notice("Failed to clear all data. Check console for details.");
           }
         }
       });

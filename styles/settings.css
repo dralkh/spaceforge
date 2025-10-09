@@ -106,6 +106,17 @@
   transform: translateY(-1px);
 }
 
+/* Ensure button classes work properly in settings actions */
+.sf-settings-actions .sf-btn {
+  flex: 1;
+  min-width: 120px;
+}
+
+.sf-settings-actions .sf-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
 .sf-info-box {
   background-color: var(--sf-bg-secondary);
   padding: var(--sf-space-md);

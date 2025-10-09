@@ -82,7 +82,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             const actionsContainer = containerEl.createEl('div', { cls: 'sf-settings-actions' });
             
             // Export all data button
-            const exportBtn = actionsContainer.createEl('button', { text: 'Export all data' });
+            const exportBtn = actionsContainer.createEl('button', { text: 'Export all data', cls: 'sf-btn sf-btn-primary' });
             exportBtn.addEventListener('click', () => {
                 // Construct the full plugin data for export
                 const pluginStateToExport = {
@@ -127,7 +127,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             });
             
             // Import all data button
-            const importBtn = actionsContainer.createEl('button', { text: 'Import all data' });
+            const importBtn = actionsContainer.createEl('button', { text: 'Import all data', cls: 'sf-btn sf-btn-primary' });
             importBtn.addEventListener('click', () => {
                 const input = document.createElement('input');
                 input.type = 'file';
@@ -181,7 +181,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             });
             
             // Reset to defaults button
-            const resetBtn = actionsContainer.createEl('button', { text: 'Reset to defaults' });
+            const resetBtn = actionsContainer.createEl('button', { text: 'Reset to defaults', cls: 'sf-btn sf-btn-warning' });
             resetBtn.addEventListener('click', async () => {
                 const confirmed = confirm('Are you sure you want to reset all plugin data (settings and state) to defaults? This cannot be undone.');
                 
@@ -214,12 +214,12 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }
             });
 
-            // Clear Schedule Data button
-            const clearScheduleBtn = actionsContainer.createEl('button', { 
-                text: 'Clear all schedule data',
-                cls: 'sf-button-danger' // Optional: Add a class for dangerous actions
+            // Clear Reviews Data button
+            const clearReviewsBtn = actionsContainer.createEl('button', { 
+                text: 'Clear all reviews',
+                cls: 'sf-btn sf-btn-danger' // Use existing danger button styling
             });
-            clearScheduleBtn.addEventListener('click', async () => {
+            clearReviewsBtn.addEventListener('click', async () => {
                 const confirmed = confirm('Are you sure you want to clear all review schedules, history, and session data? This action cannot be undone.');
                 if (confirmed) {
                     try {
@@ -228,8 +228,6 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         this.plugin.pluginState.history = [...DEFAULT_PLUGIN_STATE_DATA.history];
                         this.plugin.pluginState.reviewSessions = { ...DEFAULT_PLUGIN_STATE_DATA.reviewSessions };
                         this.plugin.pluginState.customNoteOrder = [...DEFAULT_PLUGIN_STATE_DATA.customNoteOrder];
-                        // Potentially mcqSets and mcqSessions if they are tied to notes that might be unscheduled
-                        // For now, focusing on explicit schedule data as requested.
 
                         // Update services
                         this.plugin.reviewScheduleService.schedules = this.plugin.pluginState.schedules;
@@ -246,24 +244,105 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         if (this.plugin.events) {
                             this.plugin.events.emit('sidebar-update');
                         }
-                        
-                        // If mcq data should also be cleared when schedules are cleared:
-                        // this.plugin.pluginState.mcqSets = { ...DEFAULT_PLUGIN_STATE_DATA.mcqSets };
-                        // this.plugin.pluginState.mcqSessions = { ...DEFAULT_PLUGIN_STATE_DATA.mcqSessions };
-                        // this.plugin.mcqService.mcqSets = this.plugin.pluginState.mcqSets;
-                        // this.plugin.mcqService.mcqSessions = this.plugin.pluginState.mcqSessions;
 
                         // Save the cleared data first
                         await this.plugin.savePluginData();
                         
-                        new Notice('All schedule data cleared successfully.');
+                        new Notice('All review data cleared successfully.');
 
                         // Then refresh UI elements
                         this.display(); // Refresh settings UI
                         this.plugin.getSidebarView()?.refresh();
 
                     } catch (error) {
-                        new Notice('Failed to clear schedule data. Check console for details.');
+                        new Notice('Failed to clear review data. Check console for details.');
+                    }
+                }
+            });
+
+            // Clear Events Data button
+            const clearEventsBtn = actionsContainer.createEl('button', { 
+                text: 'Clear all events',
+                cls: 'sf-btn sf-btn-danger'
+            });
+            clearEventsBtn.addEventListener('click', async () => {
+                const confirmed = confirm('Are you sure you want to clear all calendar events? This action cannot be undone.');
+                if (confirmed) {
+                    try {
+                        // Reset calendar events in pluginState
+                        this.plugin.pluginState.calendarEvents = { ...DEFAULT_PLUGIN_STATE_DATA.calendarEvents };
+
+                        // Update calendar service if it exists
+                        if (this.plugin.calendarEventService) {
+                            this.plugin.calendarEventService.initialize([]);
+                        }
+
+                        // Save the cleared data
+                        await this.plugin.savePluginData();
+                        
+                        new Notice('All calendar events cleared successfully.');
+
+                        // Then refresh UI elements
+                        this.display(); // Refresh settings UI
+                        this.plugin.getSidebarView()?.refresh();
+
+                    } catch (error) {
+                        new Notice('Failed to clear calendar events. Check console for details.');
+                    }
+                }
+            });
+
+            // Clear All Data button
+            const clearAllBtn = actionsContainer.createEl('button', { 
+                text: 'Clear all data',
+                cls: 'sf-btn sf-btn-danger'
+            });
+            clearAllBtn.addEventListener('click', async () => {
+                const confirmed = confirm('Are you sure you want to clear ALL plugin data (reviews, events, MCQs, Pomodoro state)? This action cannot be undone.');
+                if (confirmed) {
+                    try {
+                        // Reset all plugin state to defaults
+                        this.plugin.pluginState = JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA));
+
+                        // Update all services
+                        this.plugin.reviewScheduleService.schedules = this.plugin.pluginState.schedules;
+                        this.plugin.reviewHistoryService.history = this.plugin.pluginState.history;
+                        this.plugin.reviewSessionService.reviewSessions = this.plugin.pluginState.reviewSessions;
+                        this.plugin.mcqService.mcqSets = this.plugin.pluginState.mcqSets;
+                        this.plugin.mcqService.mcqSessions = this.plugin.pluginState.mcqSessions;
+                        this.plugin.reviewScheduleService.customNoteOrder = this.plugin.pluginState.customNoteOrder;
+                        this.plugin.reviewScheduleService.lastLinkAnalysisTimestamp = this.plugin.pluginState.lastLinkAnalysisTimestamp ?? null;
+
+                        // Update calendar service if it exists
+                        if (this.plugin.calendarEventService) {
+                            this.plugin.calendarEventService.initialize([]);
+                        }
+
+                        // Update Pomodoro service
+                        this.plugin.pomodoroService?.onSettingsChanged();
+                        this.plugin.pomodoroService?.reinitializeTimerFromState();
+
+                        // Explicitly update the review controller's state
+                        if (this.plugin.reviewController) {
+                            await this.plugin.reviewController.updateTodayNotes();
+                        }
+
+                        // Emit an event that the sidebar might be listening to
+                        if (this.plugin.events) {
+                            this.plugin.events.emit('sidebar-update');
+                        }
+
+                        // Save the cleared data
+                        await this.plugin.savePluginData();
+                        
+                        new Notice('All plugin data cleared successfully.');
+
+                        // Then refresh UI elements
+                        this.display(); // Refresh settings UI
+                        this.plugin.getSidebarView()?.refresh();
+
+                    } catch (error) {
+                        new Notice('Failed to clear all data. Check console for details.');
                     }
                 }
             });
