@@ -20,6 +20,10 @@
   letter-spacing: -0.02em;
 }
 
+.mcq-user-answer {
+  font-style: italic;
+  color: var(--text-muted);
+}
 .mcq-refresh-btn {
   display: flex;
   align-items: center;

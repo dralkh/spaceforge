@@ -1,7 +1,7 @@
 import { Notice, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { ReviewSchedule } from "../models/review-schedule";
-import { CalendarEvent } from "../models/calendar-event";
+import { CalendarEvent, EventCategory, EventRecurrence } from "../models/calendar-event";
 import { DateUtils } from "../utils/dates";
 import { EstimationUtils } from "../utils/estimation";
 import { UpcomingEvents } from "./upcoming-events";
@@ -62,7 +62,7 @@ export class CalendarView {
     
     // Tooltip elements
     private tooltipEl: HTMLElement | null = null;
-    private tooltipTimeout: NodeJS.Timeout | null = null;
+    private tooltipTimeout: number | null = null;
     
     /**
      * Initialize calendar view
@@ -331,9 +331,9 @@ export class CalendarView {
                         const eventTab = eventsContainer.createDiv("calendar-event-tab");
                         eventTab.setText(event.title.substring(0, 8) + (event.title.length > 8 ? "..." : ""));
                         
-                        // Set color based on event category or custom color
+                        // Set color based on event category or custom color using CSS custom property
                         const eventColor = this.plugin.calendarEventService?.getEventColor(event) || '#95A5A6';
-                        eventTab.style.backgroundColor = eventColor;
+                        eventTab.style.setProperty('--event-color', eventColor);
                         
                         // Add hover handler for tooltip
                         eventTab.addEventListener("mouseenter", (e) => {
@@ -475,8 +475,8 @@ export class CalendarView {
             title: "",
             date: date.getTime(),
             isAllDay: true,
-            category: this.plugin.settings.defaultEventCategory as any || 'personal',
-            recurrence: 'none' as any
+            category: (this.plugin.settings.defaultEventCategory as EventCategory) || EventCategory.Personal,
+            recurrence: EventRecurrence.None
         };
 
         const modal = new EventModal(
@@ -491,7 +491,7 @@ export class CalendarView {
         modal.open();
         
         // Pre-fill the date in the modal after it opens
-        setTimeout(() => {
+        window.setTimeout(() => {
             const dateInput = modal.contentEl.querySelector('input[type="date"]') as HTMLInputElement;
             if (dateInput) {
                 dateInput.value = date.toISOString().split('T')[0];
@@ -540,11 +540,11 @@ export class CalendarView {
     showEventTooltip(targetEl: HTMLElement, event: CalendarEvent): void {
         // Clear any existing timeout
         if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
+            window.clearTimeout(this.tooltipTimeout);
         }
 
         // Small delay before showing tooltip to avoid flickering
-        this.tooltipTimeout = setTimeout(() => {
+        this.tooltipTimeout = window.setTimeout(() => {
             this.createEventTooltip(targetEl, event);
         }, 300);
     }
@@ -555,7 +555,7 @@ export class CalendarView {
     hideEventTooltip(): void {
         // Clear any pending tooltip
         if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
+            window.clearTimeout(this.tooltipTimeout);
             this.tooltipTimeout = null;
         }
 
@@ -577,7 +577,7 @@ export class CalendarView {
         this.hideEventTooltip();
 
         // Create tooltip element
-        this.tooltipEl = document.createElement("div");
+        this.tooltipEl = document.body.createEl("div");
         this.tooltipEl.className = "calendar-event-tooltip";
         
         // Format event details
@@ -588,24 +588,33 @@ export class CalendarView {
             day: 'numeric' 
         });
         
-        let tooltipContent = `<div class="tooltip-title">${event.title}</div>`;
-        tooltipContent += `<div class="tooltip-date">📅 ${dateStr}</div>`;
+        // Clear existing content
+        this.tooltipEl.empty();
+        
+        // Create tooltip content safely
+        const titleEl = this.tooltipEl.createDiv('tooltip-title');
+        titleEl.textContent = event.title;
+        
+        const dateEl = this.tooltipEl.createDiv('tooltip-date');
+        dateEl.textContent = `📅 ${dateStr}`;
         
         if (event.time) {
-            tooltipContent += `<div class="tooltip-time">🕐 ${event.time}</div>`;
+            const timeEl = this.tooltipEl.createDiv('tooltip-time');
+            timeEl.textContent = `🕐 ${event.time}`;
         }
         
         if (event.description) {
-            tooltipContent += `<div class="tooltip-description">📝 ${event.description}</div>`;
+            const descEl = this.tooltipEl.createDiv('tooltip-description');
+            descEl.textContent = `📝 ${event.description}`;
         }
         
         if (event.location) {
-            tooltipContent += `<div class="tooltip-location">📍 ${event.location}</div>`;
+            const locationEl = this.tooltipEl.createDiv('tooltip-location');
+            locationEl.textContent = `📍 ${event.location}`;
         }
         
-        tooltipContent += `<div class="tooltip-category">🏷️ ${event.category}</div>`;
-        
-        this.tooltipEl.innerHTML = tooltipContent;
+        const categoryEl = this.tooltipEl.createDiv('tooltip-category');
+        categoryEl.textContent = `🏷️ ${event.category}`;
         
         // Position tooltip
         const rect = targetEl.getBoundingClientRect();
@@ -630,14 +639,12 @@ export class CalendarView {
         this.tooltipEl.style.left = `${left}px`;
         this.tooltipEl.style.top = `${top}px`;
         
-        // Add fade-in animation
-        this.tooltipEl.style.opacity = '0';
-        this.tooltipEl.style.transform = 'translateY(-4px)';
+        // Add fade-in animation using CSS class
+        this.tooltipEl.classList.remove('visible');
         
         requestAnimationFrame(() => {
             if (this.tooltipEl) {
-                this.tooltipEl.style.opacity = '1';
-                this.tooltipEl.style.transform = 'translateY(0)';
+                this.tooltipEl.classList.add('visible');
             }
         });
     }

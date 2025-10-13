@@ -1,5 +1,6 @@
 import SpaceforgePlugin from "../main";
 import { PluginStateData } from "../models/plugin-data";
+import { ReviewSchedule } from "../models/review-schedule";
 import { SpaceforgeSettings } from "../models/settings";
 
 export type PomodoroMode = 'work' | 'shortBreak' | 'longBreak' | 'idle';
@@ -127,7 +128,7 @@ export class PomodoroService {
     /**
      * Calculate and set estimation based on reading time
      */
-    public async calculateEstimationFromNotes(notes: any[]): Promise<{
+    public async calculateEstimationFromNotes(notes: ReviewSchedule[]): Promise<{
         totalReadingTimeInSeconds: number;
         totalReadingTimeInMinutes: number;
         pomodorosNeeded: number;
@@ -398,7 +399,8 @@ export class PomodoroService {
     private playSoundNotification(): void {
         // Simple beep sound using AudioContext
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const audioContext = new AudioContextClass();
             if (!audioContext) return;
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();

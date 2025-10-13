@@ -213,7 +213,7 @@ export default class SpaceforgePlugin extends Plugin {
                 };
                 const combinedData = { ...existingData, reviewData };
                 let backupStr = JSON.stringify(combinedData);
-                window.localStorage.setItem('spaceforge-backup', backupStr);
+                this.app.saveLocalStorage('spaceforge-backup', backupStr);
                 (async () => {
                     try {
                         await this.savePluginData();
@@ -222,7 +222,7 @@ export default class SpaceforgePlugin extends Plugin {
             } catch (error) {
                 try {
                     const minimalBackup = JSON.stringify({ settings: this.settings, reviewData: { schedules: this.reviewScheduleService.schedules || {}, customNoteOrder: this.reviewScheduleService.customNoteOrder || [], lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp, version: this.manifest.version }});
-                    window.localStorage.setItem('spaceforge-minimal-backup', minimalBackup);
+                    this.app.saveLocalStorage('spaceforge-minimal-backup', minimalBackup);
                 } catch (minimalError) { /* handle error */ }
             }
         }; // Removed the extra closing parenthesis and semicolon, and moved the declaration.
@@ -264,7 +264,7 @@ export default class SpaceforgePlugin extends Plugin {
             };
             const combinedData = { ...existingData, reviewData };
             const backupStr = JSON.stringify(combinedData);
-            window.localStorage.setItem('spaceforge-backup', backupStr);
+            this.app.saveLocalStorage('spaceforge-backup', backupStr);
         } catch (backupError) { /* handle error */ }
 
         try {

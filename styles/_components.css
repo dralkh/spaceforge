@@ -159,3 +159,37 @@
   color: var(--sf-text-muted);
   margin-top: 2px;
 }
+
+/* ====== Utility Classes ====== */
+.sf-hidden {
+  display: none !important;
+}
+
+.sf-visible {
+  display: block !important;
+}
+
+.sf-flex {
+  display: flex !important;
+}
+
+.sf-invisible {
+  opacity: 0 !important;
+}
+
+.sf-visible-opacity {
+  opacity: 1 !important;
+}
+
+/* ====== Display Utilities ====== */
+.sf-hidden {
+  display: none !important;
+}
+
+.sf-visible {
+  display: block !important;
+}
+
+.sf-flex {
+  display: flex !important;
+}

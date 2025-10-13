@@ -1,4 +1,4 @@
-import { Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
+import { App, Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, ReviewSchedule, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
 import { State as FsrsState } from 'ts-fsrs'; // For displaying FSRS state name
@@ -11,7 +11,7 @@ export class ReviewModal extends Modal {
     plugin: SpaceforgePlugin;
     path: string;
 
-    constructor(app: any, plugin: SpaceforgePlugin, path: string) {
+    constructor(app: App, plugin: SpaceforgePlugin, path: string) {
         super(app);
         this.plugin = plugin;
         this.path = path;

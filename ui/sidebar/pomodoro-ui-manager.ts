@@ -90,7 +90,8 @@ export class PomodoroUIManager {
 
         // Pomodoro section is always "open" now, so pomodoroRootEl should always be visible.
         if (this.pomodoroRootEl) {
-            this.pomodoroRootEl.style.display = ''; 
+            this.pomodoroRootEl.classList.remove('sf-hidden');
+            this.pomodoroRootEl.classList.add('sf-visible');
         }
 
         // If pomodoroRootEl was just created or its children are missing, render its internal timer structure
@@ -108,7 +109,13 @@ export class PomodoroUIManager {
     /** Controls the visibility of the entire attached Pomodoro UI section (e.g. for global plugin enable/disable) */
     public showPomodoroSection(show: boolean): void {
         if (this.attachedContainer) {
-            this.attachedContainer.style.display = show ? '' : 'none';
+            if (show) {
+                this.attachedContainer.classList.remove('sf-hidden');
+                this.attachedContainer.classList.add('sf-visible');
+            } else {
+                this.attachedContainer.classList.remove('sf-visible');
+                this.attachedContainer.classList.add('sf-hidden');
+            }
             // If the section is hidden externally, we might want to ensure controls are visible when it's re-shown.
             // For now, we'll let areMainControlsVisible persist.
         }
@@ -176,8 +183,8 @@ export class PomodoroUIManager {
             });
 
             const handlePressEnd = () => {
-                if (this.veryLongPressTimer) clearTimeout(this.veryLongPressTimer);
-                if (this.longPressTimer) clearTimeout(this.longPressTimer);
+                if (this.veryLongPressTimer) window.clearTimeout(this.veryLongPressTimer);
+                if (this.longPressTimer) window.clearTimeout(this.longPressTimer);
                 this.veryLongPressTimer = null;
                 this.longPressTimer = null;
 
@@ -205,8 +212,8 @@ export class PomodoroUIManager {
             this.pomodoroTimerDisplayEl.addEventListener("touchend", handlePressEnd);
             
             const cancelPress = () => {
-                if (this.veryLongPressTimer) clearTimeout(this.veryLongPressTimer);
-                if (this.longPressTimer) clearTimeout(this.longPressTimer);
+                if (this.veryLongPressTimer) window.clearTimeout(this.veryLongPressTimer);
+                if (this.longPressTimer) window.clearTimeout(this.longPressTimer);
                 this.veryLongPressTimer = null;
                 this.longPressTimer = null;
                 this.didLongPress = false;
@@ -282,7 +289,7 @@ export class PomodoroUIManager {
         if (!this.pomodoroQuickSettingsPanelEl || this.pomodoroQuickSettingsPanelEl.parentElement !== settingsPanelContainer) {
             this.pomodoroQuickSettingsPanelEl?.remove();
             this.pomodoroQuickSettingsPanelEl = settingsPanelContainer.createDiv("pomodoro-quick-settings-panel");
-            this.pomodoroQuickSettingsPanelEl.style.display = 'none'; // Initial state
+            this.pomodoroQuickSettingsPanelEl.classList.add('sf-hidden'); // Initial state
 
             // Recreate inputs and buttons if panel is new
             const createQuickSetting = (labelText: string, inputType: string = 'number'): HTMLInputElement => {
@@ -354,7 +361,7 @@ export class PomodoroUIManager {
             });
 
             this.pomodoroCalculationResultEl = this.pomodoroQuickSettingsPanelEl.createDiv({ cls: "pomodoro-calculation-result" });
-            this.pomodoroCalculationResultEl.style.display = 'none';
+            this.pomodoroCalculationResultEl.classList.add('sf-hidden');
         }
         
         this.updatePomodoroUI(); // Ensure UI reflects current state after potential recreation
@@ -383,7 +390,8 @@ export class PomodoroUIManager {
                 ? `No notes scheduled for ${new Date(activeDate).toLocaleDateString()} to calculate.`
                 : "No notes currently due to calculate.";
             this.pomodoroCalculationResultEl.setText(message);
-            this.pomodoroCalculationResultEl.style.display = 'block';
+            this.pomodoroCalculationResultEl.classList.remove('sf-hidden');
+            this.pomodoroCalculationResultEl.classList.add('sf-visible');
             return;
         }
 
@@ -457,8 +465,14 @@ export class PomodoroUIManager {
     private toggleSettingsPanel(): void {
         const panel = this.pomodoroQuickSettingsPanelEl;
         if (!panel) return;
-        const isCurrentlyHidden = panel.style.display === 'none' || !panel.style.display;
-        panel.style.display = isCurrentlyHidden ? 'flex' : 'none';
+        const isCurrentlyHidden = panel.classList.contains('sf-hidden') || !panel.classList.contains('sf-visible');
+        if (isCurrentlyHidden) {
+            panel.classList.remove('sf-hidden');
+            panel.classList.add('sf-visible');
+        } else {
+            panel.classList.remove('sf-visible');
+            panel.classList.add('sf-hidden');
+        }
 
         if (isCurrentlyHidden) { // Populate inputs when opening
             if(this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);

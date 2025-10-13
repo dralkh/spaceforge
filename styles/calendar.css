@@ -533,6 +533,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+  background-color: var(--event-color, #95A5A6);
   line-height: 1.2;
 }
 
@@ -713,6 +714,7 @@
   flex-shrink: 0;
   margin-top: 2px;
   margin-bottom: 2px;
+  background-color: var(--event-color, #95A5A6);
 }
 
 .upcoming-events-event-content {
@@ -1529,6 +1531,11 @@
   opacity: 0;
   transform: translateY(-4px);
   transition: all 0.2s ease;
+}
+
+.calendar-event-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .calendar-event-tooltip .tooltip-title {

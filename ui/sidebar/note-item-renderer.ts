@@ -93,7 +93,13 @@ export class NoteItemRenderer {
             const noteReviewDayStartTs = DateUtils.startOfDay(new Date(note.nextReviewDate)); // Returns timestamp
             const isEligibleForAdvance = noteReviewDayStartTs > todayStartTs;
             advanceBtn.disabled = !isEligibleForAdvance;
-            advanceBtn.style.display = isEligibleForAdvance ? '' : 'none';
+            if (isEligibleForAdvance) {
+                advanceBtn.classList.remove('sf-hidden');
+                advanceBtn.classList.add('sf-visible');
+            } else {
+                advanceBtn.classList.remove('sf-visible');
+                advanceBtn.classList.add('sf-hidden');
+            }
         }
     }
 

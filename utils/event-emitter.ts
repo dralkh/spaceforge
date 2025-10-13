@@ -27,7 +27,7 @@ export class EventEmitter {
      * @param event Event name
      * @param args Arguments to pass to listeners
      */
-    emit(event: string, ...args: any[]): void {
+    emit(event: string, ...args: unknown[]): void {
         if (!this.listeners[event]) {
             return;
         }

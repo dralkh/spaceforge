@@ -149,7 +149,7 @@ export class MCQModal extends Modal {
                  if (this.selectedAnswerIndex < choiceButtons.length) {
                     const button = choiceButtons[this.selectedAnswerIndex] as HTMLElement;
                     button.classList.add('mcq-key-pressed');
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         button.classList.remove('mcq-key-pressed');
                         this.handleAnswer(this.selectedAnswerIndex);
                         this.selectedAnswerIndex = -1;
@@ -262,8 +262,8 @@ export class MCQModal extends Modal {
                     }
                 });
                 const choicesContainer = this.contentEl.querySelector('.mcq-choices-container'); // Use this.contentEl
-                if (choicesContainer instanceof HTMLElement) choicesContainer.style.display = 'none'; // Keep display:none for dynamic hiding
-                skipButton.style.display = 'none'; // Keep display:none for dynamic hiding
+                if (choicesContainer instanceof HTMLElement) choicesContainer.classList.add('sf-hidden'); // Use CSS class for hiding
+                skipButton.classList.add('sf-hidden'); // Use CSS class for hiding
             });
         }
 
@@ -301,7 +301,7 @@ export class MCQModal extends Modal {
         }
 
         this.highlightAnswer(selectedIndex, isCorrect);
-        setTimeout(() => {
+        window.setTimeout(() => {
             if (isCorrect) {
                 this.session.currentQuestionIndex++;
                 this.questionStartTime = Date.now();
@@ -391,7 +391,7 @@ export class MCQModal extends Modal {
             // Removed the old score indicator text (🎯 Excellent, etc.)
 
             const resultsEl = contentEl.createDiv('mcq-results');
-            resultsEl.createEl('h3', { text: 'Question Results' });
+            new Setting(resultsEl).setHeading().setName('Question Results');
             if (this.session.answers.length === 0) {
                 resultsEl.createDiv({ cls: 'mcq-no-answers', text: 'No questions were answered in this session.' });
             } else {

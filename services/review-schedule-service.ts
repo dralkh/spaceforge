@@ -710,7 +710,7 @@ export class ReviewScheduleService {
 
         // Refresh the sidebar view if available with a slight delay to allow data to settle
         if (this.plugin.events) {
-            setTimeout(() => {
+            window.setTimeout(() => {
                 this.plugin.events.emit('sidebar-update');
             }, 50); // Small delay (e.g., 50ms)
         }
@@ -758,7 +758,7 @@ export class ReviewScheduleService {
 
         if (this.plugin.events) {
             // Use a timeout to allow other operations to complete before UI refresh
-            setTimeout(() => {
+            window.setTimeout(() => {
                 this.plugin.events.emit('sidebar-update');
             }, 50);
         }

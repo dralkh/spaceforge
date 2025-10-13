@@ -151,7 +151,7 @@ export class DataStorage {
                     isValid = false;
                     continue;
                 }
-                const s = schedule as Record<string, any>;
+                const s = schedule as unknown as Record<string, unknown>;
                 if (!('path' in s) || typeof s.path !== 'string' ||
                     !('lastReviewDate' in s) || (s.lastReviewDate !== null && typeof s.lastReviewDate !== 'number') ||
                     !('nextReviewDate' in s) || typeof s.nextReviewDate !== 'number' ||

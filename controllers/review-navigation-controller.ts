@@ -110,7 +110,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
         }
 
         if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
-            setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
+            window.setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
         }
     }
 
@@ -180,7 +180,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
         }
 
         if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
-            setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
+            window.setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
         }
     }
 

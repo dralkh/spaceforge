@@ -326,7 +326,7 @@ export class ConsolidatedMCQModal extends Modal {
         this.highlightAnswer(selectedIndex, isCorrect);
         
         // Wait a moment before proceeding
-        setTimeout(() => {
+        window.setTimeout(() => {
             if (isCorrect) {
                 // Move to next question if correct
                 this.currentQuestionIndex++;
@@ -355,7 +355,7 @@ export class ConsolidatedMCQModal extends Modal {
                 new Notice("Incorrect answer. Try again to proceed to the next question.");
                 
                 // Remove the highlight after a short delay
-                setTimeout(() => {
+                window.setTimeout(() => {
                     const choiceButtons = document.querySelectorAll('.mcq-choice-btn');
                     if (choiceButtons.length <= selectedIndex) return;
                     
@@ -557,7 +557,7 @@ export class ConsolidatedMCQModal extends Modal {
 
         // Display note scores with enhanced styling
         const noteScoresEl = contentEl.createDiv('mcq-note-scores');
-        const scoreHeading = noteScoresEl.createEl('h3', { text: 'Scores by Note', cls: 'mcq-note-scores-heading' });
+        const scoreHeading = new Setting(noteScoresEl).setHeading().setName('Scores by Note').settingEl;
         
         // Sort notes by score for better visualization (highest first)
         const sortedNotes = Object.keys(noteScores).sort((a, b) => noteScores[b].score - noteScores[a].score);
@@ -604,7 +604,7 @@ export class ConsolidatedMCQModal extends Modal {
 
         // --- Detailed Question Breakdown ---
         const breakdownContainer = contentEl.createDiv('mcq-detailed-breakdown');
-        breakdownContainer.createEl('h3', { text: 'Detailed Question Breakdown' });
+        new Setting(breakdownContainer).setHeading().setName('Detailed Question Breakdown');
 
         this.allQuestions.forEach((question, index) => {
             const questionEl = breakdownContainer.createDiv('mcq-breakdown-item');
@@ -640,7 +640,7 @@ export class ConsolidatedMCQModal extends Modal {
                 }
             } else {
                 userAnswerTextEl.createSpan({ text: 'Your answer: ' + userAnswerDisplay });
-                userAnswerTextEl.style.fontStyle = 'italic';
+                userAnswerTextEl.addClass('mcq-user-answer');
             }
 
             const correctAnswerEl = questionEl.createDiv('mcq-correct-answer');

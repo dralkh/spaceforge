@@ -1,6 +1,6 @@
 import { Notice, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
-import { UpcomingEvent } from "../models/calendar-event";
+import { CalendarEvent, UpcomingEvent } from "../models/calendar-event";
 import { DateUtils } from "../utils/dates";
 
 /**
@@ -180,7 +180,7 @@ export class UpcomingEvents {
         // Event color indicator
         const colorIndicator = eventItem.createDiv("upcoming-events-event-color");
         const eventColor = this.plugin.calendarEventService?.getEventColor(event) || '#95A5A6';
-        colorIndicator.style.backgroundColor = eventColor;
+        colorIndicator.style.setProperty('--event-color', eventColor);
         
         // Event content
         const eventContent = eventItem.createDiv("upcoming-events-event-content");
@@ -239,7 +239,7 @@ export class UpcomingEvents {
      * 
      * @param event Event to show details for
      */
-    private showEventDetails(event: any): void {
+    private showEventDetails(event: CalendarEvent): void {
         const eventDate = new Date(event.date);
         const dateStr = eventDate.toLocaleDateString(undefined, { 
             weekday: 'long', 

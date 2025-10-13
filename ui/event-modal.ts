@@ -40,10 +40,10 @@ export class EventModal extends Modal {
         setIcon(headerIcon, this.event ? "edit" : "calendar-plus");
         
         const headerText = header.createDiv("event-modal-header-text");
-        headerText.createEl("h2", { 
-            text: this.event ? "Edit Event" : "New Event",
-            cls: "event-modal-title"
-        });
+        const titleSetting = new Setting(headerText)
+            .setHeading()
+            .setName(this.event ? "Edit Event" : "New Event");
+        titleSetting.settingEl.addClass("event-modal-title");
         
         // Compact form container
         const formContainer = contentEl.createDiv("event-modal-form");

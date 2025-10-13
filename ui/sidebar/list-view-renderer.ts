@@ -1,4 +1,4 @@
-import { Notice, TFile } from "obsidian";
+import { App, TFile, Notice, Setting } from "obsidian";
 import SpaceforgePlugin from "../../main";
 import { ReviewSchedule } from "../../models/review-schedule";
 import { DateUtils } from "../../utils/dates";
@@ -138,14 +138,14 @@ export class ListViewRenderer {
             if (pomodoroSectionContainerEl) {
                 this.pomodoroUIManager.attachAndRender(pomodoroSectionContainerEl);
                 if (this.plugin.settings.pomodoroEnabled) {
-                    pomodoroContainer.style.display = '';
+                    pomodoroContainer.classList.remove('sf-hidden');
                     this.pomodoroUIManager.showPomodoroSection(true);
                     this.pomodoroUIManager.updatePomodoroUI();
                     
                     // Automatically calculate estimation for current notes
                     this.pomodoroUIManager.calculateAndDisplayEstimation();
                 } else {
-                    pomodoroContainer.style.display = 'none';
+                    pomodoroContainer.classList.add('sf-hidden');
                     this.pomodoroUIManager.showPomodoroSection(false);
                 }
             }
@@ -175,7 +175,7 @@ export class ListViewRenderer {
                     reviewAllMCQBtn.addEventListener("click", () => { this.plugin.reviewController.reviewAllNotesWithMCQ(true); });
                 }
             }
-            reviewButtonsContainer.style.display = '';
+            reviewButtonsContainer.classList.remove('sf-hidden');
             
             // Bulk action buttons
             let bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;
@@ -232,7 +232,7 @@ export class ListViewRenderer {
             this.updateBulkActionButtonsVisibility(container); // Update visibility based on current selection
 
         } else if (reviewButtonsContainer) {
-            reviewButtonsContainer.style.display = 'none';
+            reviewButtonsContainer.classList.add('sf-hidden');
             const bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;
             if (bulkActionButtons) bulkActionButtons.style.display = 'none';
         }
@@ -434,7 +434,7 @@ export class ListViewRenderer {
         if (activeSession) {
             if (!sessionSection) {
                 sessionSection = container.createDiv("review-session-section");
-                sessionSection.createEl("h3", { text: "Active Review Session" });
+                new Setting(sessionSection).setHeading().setName("Active Review Session");
                 const sessionInfo = sessionSection.createDiv("review-session-info");
                 sessionInfo.createDiv({ cls: "review-session-name" });
                 sessionInfo.createDiv({ cls: "review-session-progress" });
@@ -476,7 +476,7 @@ export class ListViewRenderer {
         if (upcomingKeys.length > 0) {
             if (!upcomingSection) {
                 upcomingSection = container.createDiv("review-upcoming-section");
-                upcomingSection.createEl("h3", { text: "Upcoming Reviews" });
+                new Setting(upcomingSection).setHeading().setName("Upcoming Reviews");
                 upcomingSection.createDiv("review-upcoming-list"); // List container
             }
             upcomingSection.style.display = '';

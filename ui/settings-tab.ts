@@ -39,21 +39,25 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // Create section container
             const sectionContainer = containerEl.createEl('div', { cls: 'sf-settings-section' });
             
-            // Create header
-            const header = sectionContainer.createEl('div', { cls: 'sf-settings-section-header' });
+            // Create heading using Setting.setHeading()
+            const headingSetting = new Setting(sectionContainer)
+                .setName(title)
+                .setHeading();
             
-            // Add icon
+            // Add icon if provided
             if (iconName) {
-                const iconEl = header.createEl('span', { cls: 'sf-settings-icon' });
+                const iconEl = headingSetting.settingEl.createEl('span', { cls: 'sf-settings-icon' });
                 setIcon(iconEl, iconName);
+                // Insert icon before the name
+                headingSetting.nameEl.prepend(iconEl);
             }
             
-            // Add title and collapse indicator
-            header.createEl('h3', { text: title });
-            const collapseIndicator = header.createEl('span', { 
+            // Add collapse indicator
+            const collapseIndicator = headingSetting.settingEl.createEl('span', { 
                 cls: 'sf-settings-collapse-indicator',
                 text: defaultOpen ? '▾' : '▸'
             });
+            headingSetting.nameEl.appendChild(collapseIndicator);
             
             // Create content container
             const contentContainer = sectionContainer.createEl('div', { 
@@ -62,13 +66,14 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             
             // Initially hide if not defaultOpen
             if (!defaultOpen) {
-                contentContainer.style.display = 'none';
+                contentContainer.classList.add('sf-hidden');
             }
             
             // Add click handler for toggling
-            header.addEventListener('click', () => {
-                const isVisible = contentContainer.style.display !== 'none';
-                contentContainer.style.display = isVisible ? 'none' : 'block';
+            headingSetting.settingEl.addEventListener('click', () => {
+                const isVisible = contentContainer.classList.contains('sf-visible');
+                contentContainer.classList.toggle('sf-hidden');
+                contentContainer.classList.toggle('sf-visible');
                 collapseIndicator.textContent = isVisible ? '▸' : '▾';
             });
             
@@ -116,7 +121,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 const dataJson = JSON.stringify(dataToExport, null, 2);
                 const blob = new Blob([dataJson], { type: 'application/json' });
                 
-                const a = document.createElement('a');
+                const a = document.body.createEl('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = 'spaceforge-data.json'; // Changed filename
                 document.body.appendChild(a);
@@ -129,7 +134,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // Import all data button
             const importBtn = actionsContainer.createEl('button', { text: 'Import all data', cls: 'sf-btn sf-btn-primary' });
             importBtn.addEventListener('click', () => {
-                const input = document.createElement('input');
+                const input = document.body.createEl('input');
                 input.type = 'file';
                 input.accept = 'application/json';
                 
@@ -743,7 +748,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             enableMCQ: value,
                             openRouterModel: this.plugin.settings.openRouterModel
                         };
-                        window.localStorage.setItem('spaceforge-api-settings', JSON.stringify(apiSettings));
+                        this.plugin.app.saveLocalStorage('spaceforge-api-settings', JSON.stringify(apiSettings));
                     } catch (e) {
                     }
                     

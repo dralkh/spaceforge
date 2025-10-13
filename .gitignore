@@ -3,3 +3,8 @@ node_modules/.bin/acorn
 node_modules
 .kilocode
 opencode.json
+
+# Compiled files
+main.js
+styles.css
+docs

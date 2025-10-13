@@ -1,4 +1,4 @@
-import { ItemView, Menu, Notice, TFile, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Notice, TFile, WorkspaceLeaf, setIcon, Setting } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { PomodoroUIManager } from "./sidebar/pomodoro-ui-manager";
 import { NoteItemRenderer } from "./sidebar/note-item-renderer";
@@ -86,7 +86,7 @@ export class ReviewSidebarView extends ItemView {
 
         if (!this.persistentHeaderEl) {
             this.persistentHeaderEl = this.mainContainer.createDiv("review-header");
-            this.persistentHeaderEl.createEl("h2", { text: "Review Schedule" });
+            new Setting(this.persistentHeaderEl).setHeading().setName("Review Schedule");
             const viewToggle = this.persistentHeaderEl.createDiv("review-view-toggle");
 
             const listViewBtn = viewToggle.createDiv("review-view-btn");

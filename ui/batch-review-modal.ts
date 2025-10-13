@@ -1,8 +1,9 @@
-import { Modal, Notice, TFile, Setting } from 'obsidian';
+import { App, Modal, Notice, TFile, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, ReviewSchedule } from '../models/review-schedule';
 import { MCQSet } from '../models/mcq';
 import { EstimationUtils } from '../utils/estimation';
+import { sleep } from '../utils/sleep';
 import { ConsolidatedMCQModal } from './consolidated-mcq-modal'; // Import ConsolidatedMCQModal
 
 /**
@@ -28,7 +29,7 @@ export class BatchReviewModal extends Modal {
     collectingMCQs: boolean = false;
 
     constructor(
-        app: any,
+        app: App,
         plugin: SpaceforgePlugin,
         notes: ReviewSchedule[],
         useMCQ: boolean = false
@@ -124,7 +125,7 @@ export class BatchReviewModal extends Modal {
             const fileName = file instanceof TFile ? file.basename : note.path;
             progressFill.style.width = `${((i + 1) / this.notes.length) * 100}%`;
             statusEl.setText(`Processing ${i + 1}/${this.notes.length}: ${fileName}`);
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await sleep(10);
 
             let mcqSet = this.plugin.dataStorage.getMCQSetForNote(note.path);
             // Use mcqGenerationService instead of openRouterService
@@ -135,7 +136,7 @@ export class BatchReviewModal extends Modal {
                     mcqSet = await this.plugin.mcqController.generateMCQs(note.path);
                 } catch (error) {
                     statusEl.setText(`Error generating MCQs for ${fileName}`);
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await sleep(1000);
                 }
             }
             if (mcqSet) {
@@ -143,7 +144,7 @@ export class BatchReviewModal extends Modal {
             }
         }
         statusEl.setText(`Collected MCQs for ${this.allMCQSets.length}/${this.notes.length} notes`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await sleep(1000);
         this.collectingMCQs = false;
     }
 
@@ -325,7 +326,7 @@ export class BatchReviewModal extends Modal {
         statsEl.createEl("p", { text: `Completed: ${totalNotes}/${this.notes.length} notes` });
         statsEl.createEl("p", { text: `Success rate: ${successRate}% (${successfulNotes}/${totalNotes})`, cls: successRate >= 70 ? "batch-review-success" : "batch-review-needs-improvement" });
         const resultsEl = contentEl.createDiv("batch-review-results");
-        resultsEl.createEl("h3", { text: "Individual Results" });
+        new Setting(resultsEl).setHeading().setName("Individual Results");
         const resultsListEl = resultsEl.createDiv("batch-review-results-list");
 
         for (const result of this.results) {
