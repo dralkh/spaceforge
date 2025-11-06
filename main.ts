@@ -40,6 +40,7 @@ export default class SpaceforgePlugin extends Plugin {
     pomodoroService: PomodoroService;
     calendarEventService: CalendarEventService;
 
+
     private readonly stylesheetPath: string = "styles.css";
     private readonly stylesheetId: string = "spaceforge-styles";
     private lastStylesModTime: number | null = null;
@@ -92,6 +93,8 @@ export default class SpaceforgePlugin extends Plugin {
         this.calendarEventService = new CalendarEventService();
         const eventsArray = Object.values(this.pluginState.calendarEvents);
         this.calendarEventService.initialize(eventsArray);
+
+
 
 
         this.registerView(
@@ -165,7 +168,7 @@ export default class SpaceforgePlugin extends Plugin {
             this.getSidebarView()?.refresh();
         }, 60 * 1000));
 
-        this.app.workspace.onLayoutReady(() => this.activateSidebarView());
+        // this.app.workspace.onLayoutReady(() => this.activateSidebarView()); // Removed automatic activation
         this.addStylesheet();
 
         if (this.app.vault.adapter.stat && typeof this.app.vault.adapter.stat === 'function') {
@@ -427,11 +430,31 @@ export default class SpaceforgePlugin extends Plugin {
             this.reviewScheduleService.lastLinkAnalysisTimestamp = typeof this.pluginState.lastLinkAnalysisTimestamp === 'number' ? this.pluginState.lastLinkAnalysisTimestamp : null;
             
         } catch (error) {
-            // Fallback to complete defaults if any error during loading sequence
-            this.settings = { ...DEFAULT_SETTINGS };
-            this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA };
+            console.error("Spaceforge: Error loading data:", error);
             
-            // Repopulate services with these fresh defaults
+            // SIMPLE RECOVERY: Try localStorage backup once, then use defaults
+            try {
+                const backupData = await this.app.loadLocalStorage('spaceforge-backup');
+                if (backupData && typeof backupData === 'string') {
+                    const parsedBackup = JSON.parse(backupData);
+                    if (parsedBackup.reviewData) {
+                        this.settings = { ...DEFAULT_SETTINGS, ...parsedBackup.settings };
+                        this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA, ...parsedBackup.reviewData };
+                        new Notice("Spaceforge: Recovered data from backup.", 5000);
+                    } else {
+                        throw new Error("Invalid backup format");
+                    }
+                } else {
+                    throw new Error("No backup found");
+                }
+            } catch (backupError) {
+                console.warn("Spaceforge: Backup recovery failed, using defaults:", backupError);
+                this.settings = { ...DEFAULT_SETTINGS };
+                this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA };
+                new Notice("Spaceforge: Error loading data. Using defaults to prevent crash.", 5000);
+            }
+            
+            // Repopulate services
             this.reviewScheduleService.schedules = this.pluginState.schedules || {};
             this.reviewHistoryService.history = this.pluginState.history || [];
             this.reviewSessionService.reviewSessions = this.pluginState.reviewSessions || { sessions: {}, activeSessionId: null };
@@ -440,11 +463,9 @@ export default class SpaceforgePlugin extends Plugin {
             this.reviewScheduleService.customNoteOrder = this.pluginState.customNoteOrder || [];
             this.reviewScheduleService.lastLinkAnalysisTimestamp = this.pluginState.lastLinkAnalysisTimestamp ?? null;
             
-            // Ensure FSRS service is also updated with these default settings
             if (this.reviewScheduleService) {
                 this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
             }
-            new Notice("Spaceforge: Error loading data, initialized with defaults.", 5000);
         }
     }
 
@@ -504,6 +525,7 @@ export default class SpaceforgePlugin extends Plugin {
                         new Notice(`Spaceforge: Created directory for custom data: ${dirPathOnly}`, 3000);
                     }
                     
+                    // SIMPLE SAVE: Use Obsidian's standard file operations
                     const file = this.app.vault.getAbstractFileByPath(effectiveSavePath);
                     if (file instanceof TFile) {
                         await this.app.vault.modify(file, JSON.stringify(dataToSave, null, 2));
@@ -513,14 +535,13 @@ export default class SpaceforgePlugin extends Plugin {
                     // new Notice(`Spaceforge: Data saved to custom path: ${effectiveSavePath}`, 3000); // Removed notice
 
                     // Migration/Cleanup: If we just successfully saved to a custom path,
-                    // and the old default data.json exists, remove it.
+                    // and the old default data.json exists, KEEP IT as backup for safety.
+                    // CRITICAL FIX: Never automatically delete user data to prevent data loss during reloads
                     const oldFile = this.app.vault.getAbstractFileByPath(defaultPluginDataPath);
                     if (oldFile instanceof TFile) {
-                        // Check if this is a migration scenario (old data was loaded and new path was empty)
-                        // This check is a bit implicit. A more robust way would be a flag.
-                        // For now, if custom path is active and default exists, assume it's post-migration or user switched.
-                        await this.app.vault.delete(oldFile);
-                        new Notice(`Spaceforge: Removed old data file from default plugin folder as custom path is active.`, 5000);
+                        // Instead of deleting, we'll keep the old file as a backup
+                        // Users can manually clean it up later if needed
+                        new Notice(`Spaceforge: Successfully saved to custom path. Original data file kept as backup for safety.`, 5000);
                     }
                 } catch (writeError) {
                     new Notice(`Error saving data to custom path ${effectiveSavePath}: ${writeError.message}. Falling back to default path for this save.`, 10000);

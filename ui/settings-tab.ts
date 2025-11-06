@@ -1287,6 +1287,65 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
              });
         }
 
+        // ========= DATA MANAGEMENT SECTION =========
+        const dataSection = createCollapsible('Data Management', 'database', false);
+        
+        const defaultPath = this.plugin.app.vault.configDir + `/plugins/${this.plugin.manifest.id}/data.json`;
+        let locationDesc = `Default: ${defaultPath}`;
+        if (this.plugin.settings.useCustomDataPath && this.plugin.settings.customDataPath) {
+            const customPath = this.plugin.settings.customDataPath.endsWith('/data.json') 
+                ? this.plugin.settings.customDataPath 
+                : `${this.plugin.settings.customDataPath}/data.json`;
+            locationDesc = `Custom: ${customPath}`;
+        }
+        
+        new Setting(dataSection)
+            .setName('Current data location')
+            .setDesc(locationDesc)
+            .addExtraButton(button => button
+                .setIcon('info')
+                .setTooltip('Current location of your Spaceforge data')
+                .onClick(() => {
+                    const message = this.plugin.settings.useCustomDataPath && this.plugin.settings.customDataPath
+                        ? `Your data is stored at: ${this.plugin.settings.customDataPath.endsWith('/data.json') ? this.plugin.settings.customDataPath : `${this.plugin.settings.customDataPath}/data.json`}`
+                        : `Your data is stored at: ${defaultPath}`;
+                    
+                    new Notice(message, 8000);
+                }));
+
+        // Check if old default data file exists when using custom path
+        if (this.plugin.settings.useCustomDataPath) {
+            const oldFile = this.plugin.app.vault.getAbstractFileByPath(defaultPath);
+            
+            if (oldFile) {
+                new Setting(dataSection)
+                    .setName('Legacy data file found')
+                    .setDesc(`A data file exists at the default location. You can safely delete it or keep it as a backup.`)
+                    .addButton(button => button
+                        .setButtonText('Keep as Backup')
+                        .setIcon('save')
+                        .onClick(() => {
+                            new Notice('Legacy data file kept as backup. You can delete it manually when ready.', 5000);
+                        }))
+                    .addButton(button => button
+                        .setButtonText('Delete Legacy File')
+                        .setIcon('trash')
+                        .setWarning()
+                        .onClick(async () => {
+                            const confirmed = confirm('Are you sure you want to delete the legacy data file? Make sure your custom data path is working correctly before proceeding.');
+                            if (confirmed) {
+                                try {
+                                    await this.plugin.app.vault.delete(oldFile);
+                                    new Notice('Legacy data file deleted successfully.', 3000);
+                                    this.display(); // Refresh settings
+                                } catch (error) {
+                                    new Notice('Failed to delete legacy file: ' + error.message, 5000);
+                                }
+                            }
+                        }));
+            }
+        }
+
         // Add global action buttons at the bottom
         createActionButtons();
     }
@@ -1378,5 +1437,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             row4.createEl('td', { text: 'Recalled easily' });
             row4.createEl('td', { text: 'Largest increase in stability' });
         }
+
+
     }
 }
