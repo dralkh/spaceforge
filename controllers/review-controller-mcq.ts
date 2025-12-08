@@ -2,7 +2,7 @@ import { Notice, TFile } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQModal } from '../ui/mcq-modal';
 import { ConsolidatedMCQModal } from '../ui/consolidated-mcq-modal'; // Import ConsolidatedMCQModal
-import { MCQSet, MCQSession, MCQQuestion } from '../models/mcq'; // Corrected import
+import { MCQSet, MCQSession } from '../models/mcq';
 import { ReviewSchedule, ReviewResponse, FsrsRating } from '../models/review-schedule'; // Import rating enums and ReviewSchedule
 import { MCQService } from '../services/mcq-service';
 import { IMCQGenerationService } from '../api/mcq-generation-service';
@@ -63,17 +63,17 @@ export class MCQController {
     }
 
     async startMCQReview(
-        notePath: string, 
+        notePath: string,
         // Keep the external callback signature for now, but we'll use an internal one for our logic
         externalOnCompleteCallback?: (path: string, success: boolean) => void
     ): Promise<void> {
         if (!this.plugin.settings.enableMCQ) {
-            new Notice('MCQ feature is disabled in settings.');
+            new Notice('MCQ feature is disabled in settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
             return;
         }
         if (!this.mcqGenerationService) {
-            new Notice('MCQ generation service is not available. Check API provider settings.');
+            new Notice('MCQ generation service is not available. Check API provider settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
             return;
         }
 
@@ -82,14 +82,14 @@ export class MCQController {
 
             if (mcqSet && mcqSet.needsQuestionRegeneration) {
                 new Notice('Questions for this note are flagged for regeneration. Generating new set...');
-                mcqSet = await this.generateMCQs(notePath, true); 
+                mcqSet = await this.generateMCQs(notePath, true);
                 if (mcqSet) {
-                    mcqSet.needsQuestionRegeneration = false; 
-                    this.mcqService.saveMCQSet(mcqSet); 
+                    mcqSet.needsQuestionRegeneration = false;
+                    this.mcqService.saveMCQSet(mcqSet);
                     await this.plugin.savePluginData();
                 } else {
                     new Notice('Failed to regenerate MCQs. Using existing set if available.');
-                    mcqSet = this.mcqService.getMCQSetForNote(notePath); 
+                    mcqSet = this.mcqService.getMCQSetForNote(notePath);
                 }
             }
 
@@ -102,49 +102,40 @@ export class MCQController {
                 }
             }
 
-            const session: MCQSession = {
-                notePath,
-                mcqSetId: `${mcqSet.notePath}_${mcqSet.generatedAt}`,
-                startedAt: Date.now(),
-                answers: [],
-                completed: false,
-                score: 0,
-                currentQuestionIndex: 0, // Initialize required property
-                completedAt: null       // Initialize required property (removed duplicate)
-            };
-
             // Define the internal callback for MCQModal that includes the score
-            const internalOnComplete = async (path: string, score: number, completed: boolean) => {
-                if (completed) {
-                    const schedule = this.plugin.reviewScheduleService.schedules[path];
-                    if (schedule) {
-                        let rating: ReviewResponse | FsrsRating;
-                        if (schedule.schedulingAlgorithm === 'fsrs') {
-                            rating = this.mapScoreToFsrsRating(score);
-                            new Notice(`MCQ complete for FSRS card. Score: ${(score * 100).toFixed(0)}%. Rating: ${FsrsRating[rating]}(${rating as number}).`);
+            const internalOnComplete = (path: string, score: number, completed: boolean) => {
+                void (async () => {
+                    if (completed) {
+                        const schedule = this.plugin.reviewScheduleService.schedules[path];
+                        if (schedule) {
+                            let rating: ReviewResponse | FsrsRating;
+                            if (schedule.schedulingAlgorithm === 'fsrs') {
+                                rating = this.mapScoreToFsrsRating(score);
+                                new Notice(`MCQ complete for FSRS card.Score: ${(score * 100).toFixed(0)}%.Rating: ${FsrsRating[rating]} (${rating as number}).`);
+                            } else {
+                                rating = this.mapScoreToSm2Response(score);
+                                new Notice(`MCQ complete for SM - 2 card.Score: ${(score * 100).toFixed(0)}%.Rating: ${ReviewResponse[rating]} (${rating as number}).`);
+                            }
+                            // Process the review using the determined rating
+                            await this.plugin.reviewController.processReviewResponse(path, rating);
                         } else {
-                            rating = this.mapScoreToSm2Response(score);
-                            new Notice(`MCQ complete for SM-2 card. Score: ${(score * 100).toFixed(0)}%. Rating: ${ReviewResponse[rating]}(${rating as number}).`);
+                            new Notice(`MCQ complete.Score: ${(score * 100).toFixed(0)}%.Could not find schedule to update review status.`);
                         }
-                        // Process the review using the determined rating
-                        await this.plugin.reviewController.processReviewResponse(path, rating);
                     } else {
-                        new Notice(`MCQ complete. Score: ${(score * 100).toFixed(0)}%. Could not find schedule to update review status.`);
+                        new Notice(`MCQ session for ${path} was not fully completed.Score(partial): ${(score * 100).toFixed(0)}%.Review not recorded.`);
                     }
-                } else {
-                    new Notice(`MCQ session for ${path} was not fully completed. Score (partial): ${(score * 100).toFixed(0)}%. Review not recorded.`);
-                }
 
-                // Call the original external callback if it was provided
-                if (externalOnCompleteCallback) {
-                    externalOnCompleteCallback(path, completed && score >= 0.7);
-                }
+                    // Call the original external callback if it was provided
+                    if (externalOnCompleteCallback) {
+                        externalOnCompleteCallback(path, completed && score >= 0.7);
+                    }
+                })();
             };
 
             // Pass the new internal callback to the modal constructor
-            new MCQModal(this.plugin, notePath, mcqSet, internalOnComplete).open(); 
-        } catch (error) {
-            new Notice('Error starting MCQ review. Please check console for details.');
+            new MCQModal(this.plugin, notePath, mcqSet, internalOnComplete).open();
+        } catch {
+            new Notice('Error starting MCQ review. Please check console for details.'); // eslint-disable-line obsidianmd/ui/sentence-case
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
         }
     }
@@ -158,7 +149,7 @@ export class MCQController {
      */
     async generateMCQs(notePath: string, forceRegeneration = false): Promise<MCQSet | null> {
         if (!this.plugin.settings.enableMCQ || !this.mcqGenerationService) {
-            new Notice('MCQ feature is disabled or the generation service is not available. Check API provider settings.');
+            new Notice('MCQ feature is disabled or the generation service is not available. Check API provider settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
             return null;
         }
 
@@ -172,7 +163,7 @@ export class MCQController {
                 }
             }
         }
-        
+
         const file = this.plugin.app.vault.getAbstractFileByPath(notePath);
         if (!(file instanceof TFile)) {
             new Notice('Cannot generate MCQs: file not found');
@@ -184,7 +175,7 @@ export class MCQController {
 
         if (mcqSet) {
             this.mcqService.saveMCQSet(mcqSet);
-            await this.plugin.savePluginData(); 
+            await this.plugin.savePluginData();
             new Notice('MCQs generated and saved successfully.');
             return mcqSet;
         } else {
@@ -211,11 +202,11 @@ export class MCQController {
      */
     async startConsolidatedMCQReviewForSelectedDate(): Promise<void> {
         if (!this.plugin.settings.enableMCQ) {
-            new Notice('MCQ feature is disabled in settings.');
+            new Notice('MCQ feature is disabled in settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
             return;
         }
         if (!this.mcqGenerationService) {
-            new Notice('MCQ generation service is not available. Check API provider settings.');
+            new Notice('MCQ generation service is not available. Check API provider settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
             return;
         }
 
@@ -245,19 +236,19 @@ export class MCQController {
                     this.mcqService.saveMCQSet(mcqSet);
                     // Overall plugin data save will happen once after the loop
                 } else {
-                    new Notice(`Failed to regenerate MCQs for ${notePath}. Using existing set if available (might be outdated or empty).`);
+                    new Notice(`Failed to regenerate MCQs for ${notePath}.Using existing set if available(might be outdated or empty).`);
                     // mcqSet remains the old one, or null if it didn't exist.
                 }
             }
-            
+
             // If no MCQ set exists after potential regeneration, or if it's empty, try to generate one.
             if (!mcqSet || mcqSet.questions.length === 0) {
-                new Notice(`No MCQs found or set is empty for ${notePath}. Attempting to generate new set...`);
+                new Notice(`No MCQs found or set is empty for ${notePath}.Attempting to generate new set...`);
                 const newMcqSet = await this.generateMCQs(notePath, false); // forceRegeneration = false (respects cache if fresh)
                 if (newMcqSet) {
                     mcqSet = newMcqSet;
                 } else {
-                    new Notice(`Failed to generate MCQs for ${notePath}. This note will be skipped in MCQ review.`);
+                    new Notice(`Failed to generate MCQs for ${notePath}.This note will be skipped in MCQ review.`);
                 }
             }
 
@@ -271,44 +262,43 @@ export class MCQController {
                 notesWithMCQsCount++;
             }
         }
-        
+
         if (mcqSetsForReview.length === 0) {
             new Notice('No MCQs available or generated for the due notes.');
             return;
         }
-        
+
         await this.plugin.savePluginData(); // Save any changes from MCQ generation
 
         new Notice(`Starting consolidated MCQ review for ${notesWithMCQsCount} note(s) with ${mcqSetsForReview.reduce((sum, s) => sum + s.mcqSet.questions.length, 0)} questions.`);
 
-        const onConsolidatedComplete = async (
+        const onConsolidatedComplete = (
             results: Array<{ path: string; success: boolean; response: ReviewResponse; score?: number }>
         ) => {
-            let reviewsProcessed = 0;
-            for (const result of results) {
-                const schedule = this.plugin.reviewScheduleService.schedules[result.path];
-                if (schedule && typeof result.score === 'number') {
-                    let rating: ReviewResponse | FsrsRating;
-                    if (schedule.schedulingAlgorithm === 'fsrs') {
-                        rating = this.mapScoreToFsrsRating(result.score);
-                        new Notice(`MCQ for ${result.path} (FSRS) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${FsrsRating[rating]}(${rating as number})`);
-                    } else { // SM-2
-                        rating = this.mapScoreToSm2Response(result.score);
-                         new Notice(`MCQ for ${result.path} (SM-2) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${ReviewResponse[rating]}(${rating as number})`);
+            void (async () => {
+                let reviewsProcessed = 0;
+                for (const result of results) {
+                    const schedule = this.plugin.reviewScheduleService.schedules[result.path];
+                    if (schedule && typeof result.score === 'number') {
+                        let rating: ReviewResponse | FsrsRating;
+                        if (schedule.schedulingAlgorithm === 'fsrs') {
+                            rating = this.mapScoreToFsrsRating(result.score);
+                            new Notice(`MCQ for ${result.path}(FSRS) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${FsrsRating[rating]} (${rating as number})`);
+                        } else { // SM-2
+                            rating = this.mapScoreToSm2Response(result.score);
+                            new Notice(`MCQ for ${result.path}(SM - 2) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${ReviewResponse[rating]} (${rating as number})`);
+                        }
+                        await this.plugin.reviewController.processReviewResponse(result.path, rating);
+                        reviewsProcessed++;
                     }
-                    await this.plugin.reviewController.processReviewResponse(result.path, rating);
-                    reviewsProcessed++;
-                } else if (schedule) {
-                     // If score is undefined, it might mean the note had no questions or wasn't processed.
-                     // We could use the 'response' from ConsolidatedMCQModal if it's meaningful without a score.
-                     // For now, we only process if a score is present.
                 }
-            }
-            if (reviewsProcessed > 0) {
-                 new Notice(`${reviewsProcessed} note review(s) updated based on consolidated MCQ session.`);
-            } else {
-                new Notice("No note reviews were updated from the MCQ session.");
-            }
+                if (reviewsProcessed > 0) {
+                    new Notice(`${reviewsProcessed} note review(s) updated based on consolidated MCQ session.`);
+                } else {
+                    // eslint-disable-next-line obsidianmd/ui/sentence-case
+                    new Notice("No note reviews were updated from the MCQ session");
+                }
+            })();
         };
 
         new ConsolidatedMCQModal(this.plugin, mcqSetsForReview, onConsolidatedComplete).open();

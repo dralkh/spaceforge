@@ -1,7 +1,7 @@
 import { FSRS, FSRSParameters, Card as FsrsLibCard, State as FsrsState, Rating as TsFsrsRating, createEmptyCard as createFsrsLibEmptyCard, ReviewLog as FsrsReviewLog } from 'ts-fsrs';
 import { SpaceforgeSettings } from '../models/settings';
 import { ReviewSchedule, FsrsRating } from '../models/review-schedule';
-import { DateUtils } from '../utils/dates';
+
 
 export class FsrsScheduleService {
     private fsrsInstance: FSRS;
@@ -56,7 +56,7 @@ export class FsrsScheduleService {
             last_review: fsrsData.last_review ? new Date(fsrsData.last_review) : undefined,
         };
     }
-    
+
     private mapFsrsLibRatingToTsFsrsRating(rating: FsrsRating): TsFsrsRating {
         switch (rating) {
             case FsrsRating.Again: return TsFsrsRating.Again;
@@ -76,12 +76,12 @@ export class FsrsScheduleService {
         const tsFsrsRating = this.mapFsrsLibRatingToTsFsrsRating(rating);
 
         const schedulingResult = this.fsrsInstance.repeat(fsrsLibCardToReview, reviewDateTime);
-        
+
         // Ensure that tsFsrsRating is a valid key for schedulingResult
         // TsFsrsRating.Manual is a valid enum member but not a result of our mapping.
         // The keys of schedulingResult are Again, Hard, Good, Easy.
         const validRatingKey = tsFsrsRating as (TsFsrsRating.Again | TsFsrsRating.Hard | TsFsrsRating.Good | TsFsrsRating.Easy);
-        
+
         const resultCard = schedulingResult[validRatingKey].card;
         const resultLog = schedulingResult[validRatingKey].log;
 

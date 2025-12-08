@@ -68,7 +68,7 @@ export class MCQService {
             }
 
             return null;
-        } catch (error) {
+        } catch {
             return null;
         }
     }
@@ -112,7 +112,8 @@ export class MCQService {
             }
 
             // Data saving is now handled by main.ts after this method returns
-        } catch (error) {
+        } catch {
+            // no-op
         }
     }
 
@@ -151,6 +152,7 @@ export class MCQService {
             mcqSet.needsQuestionRegeneration = true;
             this.saveMCQSet(mcqSet); // Updates the in-memory reference; persistence handled by caller
         } else {
+            // no-op
         }
     }
 }

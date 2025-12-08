@@ -13,26 +13,26 @@ export class BatchReviewModal extends Modal {
     plugin: SpaceforgePlugin;
     notes: ReviewSchedule[];
     useMCQ: boolean;
-    currentIndex: number = 0;
+    currentIndex = 0;
     results: Array<{
         path: string,
         success: boolean,
         response: ReviewResponse,
         score?: number
     }> = [];
-    started: boolean = false;
+    started = false;
     allMCQSets: {
         path: string;
         mcqSet: MCQSet;
         fileName: string;
     }[] = [];
-    collectingMCQs: boolean = false;
+    collectingMCQs = false;
 
     constructor(
         app: App,
         plugin: SpaceforgePlugin,
         notes: ReviewSchedule[],
-        useMCQ: boolean = false
+        useMCQ = false
     ) {
         super(app);
         this.plugin = plugin;
@@ -40,25 +40,27 @@ export class BatchReviewModal extends Modal {
         this.useMCQ = useMCQ;
     }
 
-    async onOpen(): Promise<void> {
+    onOpen(): void {
         const { contentEl } = this;
         this.renderStartScreen(contentEl);
     }
 
     renderStartScreen(contentEl: HTMLElement): void {
         contentEl.empty();
-        new Setting(contentEl).setName("Batch Review").setHeading();
+        new Setting(contentEl).setName("Batch review").setHeading();
         const infoEl = contentEl.createDiv("batch-review-info");
         infoEl.createEl("p", { text: `${this.notes.length} notes scheduled for review` });
-        this.estimateAndShowTime(infoEl);
+        void this.estimateAndShowTime(infoEl); // Explicitly ignore promise to satisfy linter
         const buttonsEl = contentEl.createDiv("batch-review-buttons");
         const startButton = buttonsEl.createEl("button", {
-            text: this.useMCQ ? "Start MCQ Review" : "Start Manual Review",
+            text: this.useMCQ ? "Start MCQ review" : "Start manual review",
             cls: "batch-review-start-button"
         });
-        startButton.addEventListener("click", () => this.startBatchReview());
+        startButton.addEventListener("click", () => {
+            void this.startBatchReview();
+        });
         const toggleMCQButton = buttonsEl.createEl("button", {
-            text: this.useMCQ ? "Switch to Manual Review" : "Switch to MCQ Review",
+            text: this.useMCQ ? "Switch to manual review" : "Switch to MCQ review",
             cls: "batch-review-toggle-button"
         });
         toggleMCQButton.addEventListener("click", () => {
@@ -67,13 +69,13 @@ export class BatchReviewModal extends Modal {
         });
         if (this.useMCQ) {
             const regenerateButton = buttonsEl.createEl("button", {
-                text: "Regenerate All MCQs",
+                text: "Regenerate all MCQs",
                 cls: "batch-review-regenerate-button"
             });
             regenerateButton.addEventListener("click", () => {
                 this.close();
                 if (this.plugin.batchController) {
-                    this.plugin.batchController.regenerateAllMCQs();
+                    void this.plugin.batchController.regenerateAllMCQs();
                 }
             });
         }
@@ -111,7 +113,7 @@ export class BatchReviewModal extends Modal {
     async collectAllMCQs(): Promise<void> {
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("Collecting MCQs").setHeading();
+        new Setting(contentEl).setName("Collecting MCQs").setHeading(); // eslint-disable-line obsidianmd/ui/sentence-case
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Preparing MCQs for ${this.notes.length} notes...` });
         const progressBar = contentEl.createDiv("mcq-collection-progress sf-progress-bar-container-batch");
@@ -134,7 +136,7 @@ export class BatchReviewModal extends Modal {
                 try {
                     // generateMCQs now returns the set or null
                     mcqSet = await this.plugin.mcqController.generateMCQs(note.path);
-                } catch (error) {
+                } catch {
                     statusEl.setText(`Error generating MCQs for ${fileName}`);
                     await sleep(1000);
                 }
@@ -159,23 +161,25 @@ export class BatchReviewModal extends Modal {
                 const consolidatedModal = new ConsolidatedMCQModal(
                     this.plugin,
                     this.allMCQSets,
-                    async (results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>) => {
+                    (results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>) => {
                         this.results = results;
-                        await this.recordAllReviews(results);
-                        this.open();
-                        this.showSummary();
+                        void (async () => {
+                            await this.recordAllReviews(results);
+                            this.open();
+                            this.showSummary();
+                        })();
                     }
                 );
                 consolidatedModal.open();
-            } catch (error) {
-                new Notice("Error showing MCQ review. Falling back to manual review.");
+            } catch (_error) {
+                new Notice("Error showing MCQ review. Falling back to manual review."); // eslint-disable-line obsidianmd/ui/sentence-case
                 this.open();
-                this.processNextManual();
+                void this.processNextManual();
             }
         } else {
-            new Notice("MCQ controller not available. Falling back to manual review.");
+            new Notice("MCQ controller not available. Falling back to manual review."); // eslint-disable-line obsidianmd/ui/sentence-case
             this.open();
-            this.processNextManual();
+            void this.processNextManual();
         }
     }
 
@@ -194,7 +198,7 @@ export class BatchReviewModal extends Modal {
         const note = this.notes[this.currentIndex];
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("MCQ Review in Progress").setHeading();
+        new Setting(contentEl).setName("MCQ review in progress").setHeading(); // eslint-disable-line obsidianmd/ui/sentence-case
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Processing note ${this.currentIndex + 1}/${this.notes.length}` });
         const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -213,7 +217,7 @@ export class BatchReviewModal extends Modal {
 
             if (mcqSet) {
                 // Update the call to startMCQReview - remove the callback argument
-                this.plugin.mcqController.startMCQReview(note.path /* Removed callback */);
+                void this.plugin.mcqController.startMCQReview(note.path /* Removed callback */);
                 // NOTE: The logic to handle the result and move to the next note needs to be
                 // re-implemented if this flow is used instead of the consolidated modal.
                 // The original callback logic is commented out below for reference.
@@ -237,22 +241,22 @@ export class BatchReviewModal extends Modal {
                     this.processNextMCQ(); // Continue
                 }
                 */
-               // Since the callback is removed, we need a way to know when the individual modal closes.
-               // This flow is now broken and relies on the consolidated modal.
-               // Fallback or error handling might be needed here if consolidated fails.
-               this.open(); // Reopen immediately for now, but this won't wait for the MCQ modal.
-               this.showSummary(); // Go to summary as the flow is broken.
+                // Since the callback is removed, we need a way to know when the individual modal closes.
+                // This flow is now broken and relies on the consolidated modal.
+                // Fallback or error handling might be needed here if consolidated fails.
+                this.open(); // Reopen immediately for now, but this won't wait for the MCQ modal.
+                this.showSummary(); // Go to summary as the flow is broken.
 
 
             } else {
-                new Notice(`Couldn't generate MCQs for ${fileName}, falling back to manual review`);
+                new Notice(`Couldn't generate MCQs for ${fileName}, falling back to manual review.`);
                 this.open();
-                this.processNextManual();
+                void this.processNextManual();
             }
         } else {
-            new Notice("MCQ controller not available, falling back to manual review");
+            new Notice("MCQ controller not available, falling back to manual review."); // eslint-disable-line obsidianmd/ui/sentence-case
             this.open();
-            this.processNextManual();
+            void this.processNextManual();
         }
     }
 
@@ -269,7 +273,7 @@ export class BatchReviewModal extends Modal {
         const note = this.notes[this.currentIndex];
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("Manual Review").setHeading();
+        new Setting(contentEl).setName("Manual review").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Note ${this.currentIndex + 1}/${this.notes.length}` });
         const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -281,44 +285,44 @@ export class BatchReviewModal extends Modal {
         }
 
         const buttonsContainer = contentEl.createDiv("batch-review-buttons");
-        const blackoutButton = buttonsContainer.createEl("button", { text: "0: Complete Blackout", cls: "review-button review-button-complete-blackout" });
-        blackoutButton.addEventListener("click", () => this.recordManualResult(note.path, ReviewResponse.CompleteBlackout));
-        const incorrectButton = buttonsContainer.createEl("button", { text: "1: Incorrect Response", cls: "review-button review-button-incorrect" });
-        incorrectButton.addEventListener("click", () => this.recordManualResult(note.path, ReviewResponse.IncorrectResponse));
-        const incorrectFamiliarButton = buttonsContainer.createEl("button", { text: "2: Incorrect but Familiar", cls: "review-button review-button-incorrect-familiar" });
-        incorrectFamiliarButton.addEventListener("click", () => this.recordManualResult(note.path, ReviewResponse.IncorrectButFamiliar));
-        const correctDifficultyButton = buttonsContainer.createEl("button", { text: "3: Correct with Difficulty", cls: "review-button review-button-correct-difficulty" });
-        correctDifficultyButton.addEventListener("click", () => this.recordManualResult(note.path, ReviewResponse.CorrectWithDifficulty));
-        const correctHesitationButton = buttonsContainer.createEl("button", { text: "4: Correct with Hesitation", cls: "review-button review-button-correct-hesitation" });
-        correctHesitationButton.addEventListener("click", () => this.recordManualResult(note.path, ReviewResponse.CorrectWithHesitation));
-        const perfectRecallButton = buttonsContainer.createEl("button", { text: "5: Perfect Recall", cls: "review-button review-button-perfect-recall" });
-        perfectRecallButton.addEventListener("click", () => this.recordManualResult(note.path, ReviewResponse.PerfectRecall));
+        const blackoutButton = buttonsContainer.createEl("button", { text: "0: Complete blackout", cls: "review-button review-button-complete-blackout" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        blackoutButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CompleteBlackout));
+        const incorrectButton = buttonsContainer.createEl("button", { text: "1: Incorrect response", cls: "review-button review-button-incorrect" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        incorrectButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.IncorrectResponse));
+        const incorrectFamiliarButton = buttonsContainer.createEl("button", { text: "2: Incorrect but familiar", cls: "review-button review-button-incorrect-familiar" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        incorrectFamiliarButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.IncorrectButFamiliar));
+        const correctDifficultyButton = buttonsContainer.createEl("button", { text: "3: Correct with difficulty", cls: "review-button review-button-correct-difficulty" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        correctDifficultyButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CorrectWithDifficulty));
+        const correctHesitationButton = buttonsContainer.createEl("button", { text: "4: Correct with hesitation", cls: "review-button review-button-correct-hesitation" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        correctHesitationButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CorrectWithHesitation));
+        const perfectRecallButton = buttonsContainer.createEl("button", { text: "5: Perfect recall", cls: "review-button review-button-perfect-recall" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        perfectRecallButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.PerfectRecall));
         const skipButton = buttonsContainer.createEl("button", { text: "Skip", cls: "review-button review-button-skip" });
         skipButton.addEventListener("click", () => {
             this.currentIndex++;
-            this.processNextManual();
+            void this.processNextManual();
         });
     }
 
     async recordManualResult(path: string, response: ReviewResponse): Promise<void> {
         this.results.push({ path, success: response >= ReviewResponse.CorrectWithDifficulty, response }); // Assuming 3+ is success
-        
+
         // Use the data storage method to get the return value
         const wasRecorded = await this.plugin.dataStorage.recordReview(path, response);
-        
+
         if (!wasRecorded) {
             // Note was not due, this is just a preview
-            new Notice("Note previewed, not recorded");
+            new Notice("Note previewed, not recorded.");
         }
-        
+
         this.currentIndex++;
-        this.processNextManual();
+        void this.processNextManual();
     }
 
     showSummary(): void {
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("Batch Review Complete").setHeading();
+        new Setting(contentEl).setName('MCQ review complete').setHeading().setClass('mcq-review-complete-header'); // eslint-disable-line obsidianmd/ui/sentence-case
         const statsEl = contentEl.createDiv("batch-review-summary-stats");
         const totalNotes = this.results.length;
         const successfulNotes = this.results.filter(r => r.success).length;
@@ -326,7 +330,7 @@ export class BatchReviewModal extends Modal {
         statsEl.createEl("p", { text: `Completed: ${totalNotes}/${this.notes.length} notes` });
         statsEl.createEl("p", { text: `Success rate: ${successRate}% (${successfulNotes}/${totalNotes})`, cls: successRate >= 70 ? "batch-review-success" : "batch-review-needs-improvement" });
         const resultsEl = contentEl.createDiv("batch-review-results");
-        new Setting(resultsEl).setHeading().setName("Individual Results");
+        new Setting(resultsEl).setHeading().setName("Individual results");
         const resultsListEl = resultsEl.createDiv("batch-review-results-list");
 
         for (const result of this.results) {
@@ -335,7 +339,7 @@ export class BatchReviewModal extends Modal {
             const fileName = file instanceof TFile ? file.basename : result.path;
             resultItemEl.createEl("div", { text: fileName, cls: "batch-review-result-filename" });
             let responseText: string; let responseClass: string;
-            switch(result.response) {
+            switch (result.response) {
                 case ReviewResponse.CompleteBlackout: responseText = "Complete Blackout (0)"; responseClass = "batch-review-complete-blackout"; break;
                 case ReviewResponse.IncorrectResponse: responseText = "Incorrect Response (1)"; responseClass = "batch-review-incorrect"; break;
                 case ReviewResponse.IncorrectButFamiliar: responseText = "Incorrect but Familiar (2)"; responseClass = "batch-review-incorrect-familiar"; break;
@@ -352,7 +356,7 @@ export class BatchReviewModal extends Modal {
         const closeButton = contentEl.createEl("button", { text: "Close", cls: "batch-review-close-button" });
         closeButton.addEventListener("click", () => {
             this.close();
-            this.plugin.getSidebarView()?.refresh();
+            void this.plugin.getSidebarView()?.refresh();
         });
     }
 
@@ -360,7 +364,7 @@ export class BatchReviewModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
         if (this.started && this.currentIndex < this.notes.length && this.results.length > 0) {
-            new Notice(`Batch review interrupted after ${this.results.length} notes`);
+            new Notice(`Batch review interrupted after ${this.results.length} notes.`);
         }
     }
 }

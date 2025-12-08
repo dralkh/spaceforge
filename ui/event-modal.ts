@@ -9,7 +9,7 @@ export class EventModal extends Modal {
     plugin: SpaceforgePlugin;
     event: CalendarEvent | null;
     onSave: (event: CalendarEvent) => void;
-    
+
     // Form elements
     titleInput: HTMLInputElement;
     descriptionInput: HTMLTextAreaElement;
@@ -21,7 +21,7 @@ export class EventModal extends Modal {
     isAllDayToggle: HTMLInputElement;
     recurrenceSelect: HTMLSelectElement;
     recurrenceEndDateInput: HTMLInputElement;
-    
+
     constructor(app: App, plugin: SpaceforgePlugin, event: CalendarEvent | null = null, onSave: (event: CalendarEvent) => void) {
         super(app);
         this.plugin = plugin;
@@ -33,26 +33,26 @@ export class EventModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
         contentEl.addClass("event-modal");
-        
+
         // Compact header
         const header = contentEl.createDiv("event-modal-header");
         const headerIcon = header.createDiv("event-modal-header-icon");
         setIcon(headerIcon, this.event ? "edit" : "calendar-plus");
-        
+
         const headerText = header.createDiv("event-modal-header-text");
         const titleSetting = new Setting(headerText)
             .setHeading()
-            .setName(this.event ? "Edit Event" : "New Event");
+            .setName(this.event ? "Edit event" : "New event");
         titleSetting.settingEl.addClass("event-modal-title");
-        
+
         // Compact form container
         const formContainer = contentEl.createDiv("event-modal-form");
-        
+
         // Title row
         const titleRow = formContainer.createDiv("event-modal-row");
         const titleGroup = titleRow.createDiv("event-modal-field-group");
         titleGroup.createEl("label", { text: "Title", cls: "event-modal-label required" });
-        this.titleInput = titleGroup.createEl("input", { 
+        this.titleInput = titleGroup.createEl("input", {
             type: "text",
             cls: "event-modal-input",
             placeholder: "Event title..."
@@ -66,7 +66,7 @@ export class EventModal extends Modal {
         const dateTimeRow = formContainer.createDiv("event-modal-row");
         const dateGroup = dateTimeRow.createDiv("event-modal-field-group");
         dateGroup.createEl("label", { text: "Date", cls: "event-modal-label" });
-        this.dateInput = dateGroup.createEl("input", { 
+        this.dateInput = dateGroup.createEl("input", {
             type: "date",
             cls: "event-modal-input"
         });
@@ -77,10 +77,10 @@ export class EventModal extends Modal {
             this.dateInput.value = new Date().toISOString().split('T')[0];
         }
         this.dateInput.addEventListener("change", () => this.validateForm());
-        
+
         const timeGroup = dateTimeRow.createDiv("event-modal-field-group");
         timeGroup.createEl("label", { text: "Time", cls: "event-modal-label" });
-        this.timeInput = timeGroup.createEl("input", { 
+        this.timeInput = timeGroup.createEl("input", {
             type: "time",
             cls: "event-modal-input"
         });
@@ -92,14 +92,14 @@ export class EventModal extends Modal {
         // All-day toggle row
         const allDayRow = formContainer.createDiv("event-modal-row");
         const allDayGroup = allDayRow.createDiv("event-modal-field-group");
-        this.isAllDayToggle = allDayGroup.createEl("input", { 
+        this.isAllDayToggle = allDayGroup.createEl("input", {
             type: "checkbox",
             cls: "event-modal-checkbox"
         }) as HTMLInputElement;
         this.isAllDayToggle.checked = this.event?.isAllDay ?? false;
         this.isAllDayToggle.addEventListener("change", () => this.toggleTimeInput());
-        
-        const allDayLabel = allDayGroup.createEl("label", { 
+
+        allDayGroup.createEl("label", {
             text: "All-day event",
             cls: "event-modal-checkbox-label"
         });
@@ -108,7 +108,7 @@ export class EventModal extends Modal {
         const locationRow = formContainer.createDiv("event-modal-row");
         const locationGroup = locationRow.createDiv("event-modal-field-group");
         locationGroup.createEl("label", { text: "Location", cls: "event-modal-label" });
-        this.locationInput = locationGroup.createEl("input", { 
+        this.locationInput = locationGroup.createEl("input", {
             type: "text",
             cls: "event-modal-input",
             placeholder: "Location (optional)..."
@@ -121,34 +121,34 @@ export class EventModal extends Modal {
         const categoryColorRow = formContainer.createDiv("event-modal-row");
         const categoryGroup = categoryColorRow.createDiv("event-modal-field-group");
         categoryGroup.createEl("label", { text: "Category", cls: "event-modal-label" });
-        this.categorySelect = categoryGroup.createEl("select", { 
+        this.categorySelect = categoryGroup.createEl("select", {
             cls: "event-modal-select"
         });
-        
+
         Object.values(EventCategory).forEach(category => {
-            const option = this.categorySelect.createEl("option", { 
+            const option = this.categorySelect.createEl("option", {
                 value: category,
                 text: category.charAt(0).toUpperCase() + category.slice(1)
             });
             this.categorySelect.appendChild(option);
         });
-        
+
         if (this.event?.category) {
             this.categorySelect.value = this.event.category;
         } else {
             this.categorySelect.value = this.plugin.settings.defaultEventCategory || 'personal';
         }
-        
+
         this.categorySelect.addEventListener("change", () => this.updateColorFromCategory());
-        
+
         const colorGroup = categoryColorRow.createDiv("event-modal-field-group");
         colorGroup.createEl("label", { text: "Color", cls: "event-modal-label" });
         const colorPickerContainer = colorGroup.createDiv("event-modal-color-picker-compact");
-        this.colorInput = colorPickerContainer.createEl("input", { 
+        this.colorInput = colorPickerContainer.createEl("input", {
             type: "color",
             cls: "event-modal-color-input"
         }) as HTMLInputElement;
-        
+
         if (this.event?.color) {
             this.colorInput.value = this.event.color;
         } else {
@@ -159,7 +159,7 @@ export class EventModal extends Modal {
         const descriptionRow = formContainer.createDiv("event-modal-row event-modal-full-width");
         const descriptionGroup = descriptionRow.createDiv("event-modal-field-group");
         descriptionGroup.createEl("label", { text: "Description", cls: "event-modal-label" });
-        this.descriptionInput = descriptionGroup.createEl("textarea", { 
+        this.descriptionInput = descriptionGroup.createEl("textarea", {
             cls: "event-modal-textarea",
             placeholder: "Event details (optional)..."
         });
@@ -172,31 +172,31 @@ export class EventModal extends Modal {
         const recurrenceRow = formContainer.createDiv("event-modal-row");
         const recurrenceGroup = recurrenceRow.createDiv("event-modal-field-group");
         recurrenceGroup.createEl("label", { text: "Recurrence", cls: "event-modal-label" });
-        this.recurrenceSelect = recurrenceGroup.createEl("select", { 
+        this.recurrenceSelect = recurrenceGroup.createEl("select", {
             cls: "event-modal-select"
         });
-        
+
         Object.values(EventRecurrence).forEach(recurrence => {
-            const option = this.recurrenceSelect.createEl("option", { 
+            const option = this.recurrenceSelect.createEl("option", {
                 value: recurrence,
                 text: this.getRecurrenceDisplayText(recurrence)
             });
             this.recurrenceSelect.appendChild(option);
         });
-        
+
         if (this.event?.recurrence) {
             this.recurrenceSelect.value = this.event.recurrence;
         } else {
             this.recurrenceSelect.value = EventRecurrence.None;
         }
-        
+
         this.recurrenceSelect.addEventListener("change", () => this.toggleRecurrenceEndDate());
-        
+
         // Recurrence end date row (conditional)
         const recurrenceEndRow = formContainer.createDiv("event-modal-row event-modal-recurrence-end-row");
         const recurrenceEndGroup = recurrenceEndRow.createDiv("event-modal-field-group");
-        recurrenceEndGroup.createEl("label", { text: "End Date", cls: "event-modal-label" });
-        this.recurrenceEndDateInput = recurrenceEndGroup.createEl("input", { 
+        recurrenceEndGroup.createEl("label", { text: "End date", cls: "event-modal-label" });
+        this.recurrenceEndDateInput = recurrenceEndGroup.createEl("input", {
             type: "date",
             cls: "event-modal-input"
         });
@@ -207,27 +207,27 @@ export class EventModal extends Modal {
 
         // Enhanced buttons section
         const buttonContainer = contentEl.createDiv("event-modal-actions");
-        
-        const cancelButton = buttonContainer.createEl("button", { 
+
+        const cancelButton = buttonContainer.createEl("button", {
             text: "Cancel",
             cls: "event-modal-btn event-modal-btn-secondary"
         });
         cancelButton.addEventListener("click", () => this.close());
-        
+
         // Add delete button only for existing events
         if (this.event) {
-            const deleteButton = buttonContainer.createEl("button", { 
+            const deleteButton = buttonContainer.createEl("button", {
                 text: "Delete",
                 cls: "event-modal-btn event-modal-btn-danger"
             });
-            deleteButton.addEventListener("click", () => this.deleteEvent());
+            deleteButton.addEventListener("click", () => void this.deleteEvent());
         }
-        
-        const saveButton = buttonContainer.createEl("button", { 
-            text: this.event ? "Update Event" : "Create Event",
+
+        const saveButton = buttonContainer.createEl("button", {
+            text: this.event ? "Update event" : "Create event",
             cls: "event-modal-btn event-modal-btn-primary"
         });
-        saveButton.addEventListener("click", () => this.saveEvent());
+        saveButton.addEventListener("click", () => void this.saveEvent());
 
         // Initial setup
         this.validateForm();
@@ -248,7 +248,7 @@ export class EventModal extends Modal {
     private validateForm(): void {
         const saveButton = this.contentEl.querySelector(".event-modal-btn-primary") as HTMLButtonElement;
         const isValid = this.titleInput.value.trim() !== "" && this.dateInput.value !== "";
-        
+
         if (saveButton) {
             saveButton.disabled = !isValid;
         }
@@ -280,11 +280,11 @@ export class EventModal extends Modal {
     private toggleTimeInput(): void {
         const isAllDay = this.isAllDayToggle.checked;
         const timeContainer = this.timeInput.closest(".event-modal-input-group") as HTMLElement;
-        
+
         if (timeContainer) {
             timeContainer.style.display = isAllDay ? "none" : "block";
         }
-        
+
         if (isAllDay) {
             this.timeInput.value = "";
         }
@@ -307,11 +307,11 @@ export class EventModal extends Modal {
     private toggleRecurrenceEndDate(): void {
         const recurrence = this.recurrenceSelect.value as EventRecurrence;
         const endDateContainer = this.recurrenceEndDateInput.closest(".event-modal-recurrence-end-container") as HTMLElement;
-        
+
         if (endDateContainer) {
             endDateContainer.style.display = recurrence === EventRecurrence.None ? "none" : "block";
         }
-        
+
         if (recurrence === EventRecurrence.None) {
             this.recurrenceEndDateInput.value = "";
         }
@@ -336,17 +336,17 @@ export class EventModal extends Modal {
      */
     private async deleteEvent(): Promise<void> {
         if (!this.event) return;
-        
+
         try {
             const deleted = this.plugin.calendarEventService?.deleteEvent(this.event.id);
-            
+
             if (deleted) {
                 new Notice("Event deleted successfully");
                 await this.plugin.savePluginData();
-                
+
                 // Trigger calendar refresh through the onSave callback
                 this.onSave(this.event);
-                
+
                 this.close();
             } else {
                 new Notice("Failed to delete event");
@@ -396,7 +396,7 @@ export class EventModal extends Modal {
                     recurrence,
                     recurrenceEndDate
                 };
-                
+
                 const updatedEvent = this.plugin.calendarEventService?.updateEvent(this.event.id, eventData);
                 if (updatedEvent) {
                     this.onSave(updatedEvent);
@@ -416,7 +416,7 @@ export class EventModal extends Modal {
                     recurrence,
                     recurrenceEndDate
                 };
-                
+
                 const newEvent = this.plugin.calendarEventService?.createEvent(eventData);
                 if (newEvent) {
                     this.onSave(newEvent);
@@ -426,7 +426,7 @@ export class EventModal extends Modal {
 
             // Save plugin data
             await this.plugin.savePluginData();
-            
+
             this.close();
         } catch (error) {
             console.error("Error saving event:", error);

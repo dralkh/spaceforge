@@ -1,8 +1,6 @@
 import { Notice, TFile } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { IReviewNavigationController } from './interfaces';
-import { LinkAnalyzer } from '../utils/link-analyzer';
-import { DateUtils } from '../utils/dates';
 
 /**
  * Controller for navigating between notes in review
@@ -33,7 +31,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
         const currentNoteIndex = reviewController.getCurrentNoteIndex();
 
         if (todayNotes.length === 0) {
-            await reviewController.updateTodayNotes();
+            void reviewController.updateTodayNotes();
             if (todayNotes.length === 0) {
                 new Notice("No notes due for review today!");
                 return;
@@ -52,11 +50,11 @@ export class ReviewNavigationController implements IReviewNavigationController {
         if (!reviewController) return;
 
         const todayNotes = reviewController.getTodayNotes();
-        let currentNoteIndex = reviewController.getCurrentNoteIndex();
+        const currentNoteIndex = reviewController.getCurrentNoteIndex();
 
         if (todayNotes.length === 0) {
             // Force update notes regardless of custom order
-            await reviewController.updateTodayNotes(false);
+            void reviewController.updateTodayNotes(false);
             if (todayNotes.length === 0) {
                 new Notice("No notes due for review today!");
                 return;
@@ -86,7 +84,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
             const currentFolder = currentFile.parent ? currentFile.parent.path : null;
             const nextFolder = nextFile.parent ? nextFile.parent.path : null;
 
-            if (this.plugin.sessionController && 
+            if (this.plugin.sessionController &&
                 this.plugin.sessionController.getDueLinkedNotes(todayNotes[currentNoteIndex].path).includes(nextPath)) {
                 messageType = "linked note";
             } else if (currentFolder === nextFolder) {
@@ -143,12 +141,12 @@ export class ReviewNavigationController implements IReviewNavigationController {
         if (!reviewController) return;
 
         const todayNotes = reviewController.getTodayNotes();
-        let currentNoteIndex = reviewController.getCurrentNoteIndex();
+        const currentNoteIndex = reviewController.getCurrentNoteIndex();
 
         if (todayNotes.length === 0) {
             // Check for custom order when updating notes
             const hasCustomOrder = this.plugin.reviewScheduleService.customNoteOrder.length > 0;
-            await reviewController.updateTodayNotes(hasCustomOrder);
+            void reviewController.updateTodayNotes(hasCustomOrder);
             if (todayNotes.length === 0) {
                 new Notice("No notes due for review today!");
                 return;
@@ -211,7 +209,6 @@ export class ReviewNavigationController implements IReviewNavigationController {
         if (!reviewController) return;
 
         const todayNotes = reviewController.getTodayNotes();
-        let currentNoteIndex = reviewController.getCurrentNoteIndex();
 
         // Find the indices of these notes in todayNotes
         const index1 = todayNotes.findIndex((n) => n.path === path1);
@@ -228,11 +225,11 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         // Update the custom note order in persistent storage
         const newOrder = newTodayNotes.map(note => note.path);
-        await this.plugin.reviewScheduleService.updateCustomNoteOrder(newOrder);
+        this.plugin.reviewScheduleService.updateCustomNoteOrder(newOrder);
         await this.plugin.savePluginData(); // Add save call
 
         // Force refresh the core controller state
-        await reviewController.updateTodayNotes(true);
+        void reviewController.updateTodayNotes(true);
 
         // Debug log
     }

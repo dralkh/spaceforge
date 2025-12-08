@@ -1,4 +1,4 @@
-import { Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
+import { Modal, Notice, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQSet } from '../models/mcq';
 import { ReviewResponse } from '../models/review-schedule';
@@ -12,7 +12,7 @@ export class ConsolidatedMCQModal extends Modal {
      * Reference to the main plugin
      */
     plugin: SpaceforgePlugin;
-    
+
     /**
      * Collection of all MCQ sets
      */
@@ -21,7 +21,7 @@ export class ConsolidatedMCQModal extends Modal {
         mcqSet: MCQSet;
         fileName: string;
     }[];
-    
+
     /**
      * Callback for when review is completed
      */
@@ -31,7 +31,7 @@ export class ConsolidatedMCQModal extends Modal {
         response: ReviewResponse,
         score?: number
     }>) => void;
-    
+
     /**
      * All questions from all MCQ sets, flattened
      */
@@ -44,12 +44,12 @@ export class ConsolidatedMCQModal extends Modal {
         mcqSetId: string;
         originalIndex: number;
     }[] = [];
-    
+
     /**
      * Current question index
      */
-    currentQuestionIndex: number = 0;
-    
+    currentQuestionIndex = 0;
+
     /**
      * User's answers
      */
@@ -62,12 +62,12 @@ export class ConsolidatedMCQModal extends Modal {
         notePath: string;
         fileName: string;
     }[] = [];
-    
+
     /**
      * Start time for current question
      */
-    questionStartTime: number = 0;
-    
+    questionStartTime = 0;
+
     /**
      * Initialize consolidated MCQ modal
      * 
@@ -93,7 +93,7 @@ export class ConsolidatedMCQModal extends Modal {
         this.plugin = plugin;
         this.mcqSets = mcqSets;
         this.onComplete = onComplete;
-        
+
         // Flatten all questions from all MCQ sets
         for (const set of mcqSets) {
             set.mcqSet.questions.forEach((question, index) => {
@@ -106,37 +106,37 @@ export class ConsolidatedMCQModal extends Modal {
                 });
             });
         }
-        
+
         // Optional: Shuffle questions for better learning
         // this.allQuestions = this.shuffleArray(this.allQuestions);
     }
-    
+
     /**
      * Called when the modal is opened
      */
     onOpen(): void {
         const { contentEl } = this;
         contentEl.empty();
-        
+
         // Add a unique class to the modal content for specific styling
         contentEl.addClass('spaceforge-mcq-modal');
-        
+
         // Create header container
         const headerContainer = contentEl.createDiv('mcq-header-container');
-        
+
         // Add title
-        new Setting(headerContainer).setName('Multiple Choice Review').setHeading();
-        
+        new Setting(headerContainer).setName('Multiple choice review').setHeading();
+
         // Display progress with questions from all notes, with enhanced styling
         const progressEl = contentEl.createDiv('mcq-progress');
-        
+
         // Calculate progress percentage for dynamic styling
         const progressPercent = Math.round(((this.currentQuestionIndex + 1) / this.allQuestions.length) * 100);
         // Set data-progress for proper progress bar display
         contentEl.setAttribute('data-progress', progressPercent.toString());
-        
+
         progressEl.setText(`Question ${this.currentQuestionIndex + 1} of ${this.allQuestions.length}`);
-        
+
         // Display a progress counter badge
         const progressCounter = contentEl.createDiv('mcq-progress-counter');
         progressCounter.setText(`${this.allQuestions.length} questions from ${this.mcqSets.length} notes`);
@@ -144,17 +144,17 @@ export class ConsolidatedMCQModal extends Modal {
         // Display note information with enhanced styling
         const noteInfoEl = contentEl.createDiv('mcq-note-info');
         noteInfoEl.setText(`Question from: ${this.allQuestions[this.currentQuestionIndex].fileName}`);
-        
+
         // Start timing
         this.questionStartTime = Date.now();
-        
+
         // Display current question
         this.displayCurrentQuestion(contentEl);
-        
+
         // Add keyboard shortcuts
         this.registerKeyboardShortcuts();
     }
-    
+
     /**
      * Register keyboard shortcuts for answering questions
      */
@@ -163,17 +163,17 @@ export class ConsolidatedMCQModal extends Modal {
             // Get the current question
             const questionIndex = this.currentQuestionIndex;
             if (questionIndex >= this.allQuestions.length) return;
-            
+
             const question = this.allQuestions[questionIndex];
             if (!question || !question.choices) return;
-            
+
             // Handle number keys 1-9 (for choices)
             const num = parseInt(event.key);
             if (!isNaN(num) && num >= 1 && num <= question.choices.length) {
                 this.handleAnswer(num - 1);
                 return;
             }
-            
+
             // Handle letter keys A-I (for choices)
             if (event.key.length === 1) {
                 const letterCode = event.key.toUpperCase().charCodeAt(0);
@@ -184,10 +184,10 @@ export class ConsolidatedMCQModal extends Modal {
                 }
             }
         };
-        
+
         // Add event listener
         document.addEventListener('keydown', keyDownHandler);
-        
+
         // Clean up when modal is closed
         this.onClose = () => {
             document.removeEventListener('keydown', keyDownHandler);
@@ -195,7 +195,7 @@ export class ConsolidatedMCQModal extends Modal {
             contentEl.empty();
         };
     }
-    
+
     /**
      * Display the current question
      * 
@@ -203,18 +203,18 @@ export class ConsolidatedMCQModal extends Modal {
      */
     displayCurrentQuestion(containerEl: HTMLElement): void {
         const questionIndex = this.currentQuestionIndex;
-        
+
         if (questionIndex >= this.allQuestions.length) {
             this.completeReview();
             return;
         }
-        
+
         const question = this.allQuestions[questionIndex];
-        
+
         // Verify we have a valid question
         if (!question || !question.choices || question.choices.length < 2) {
-            new Notice('Error: Invalid question data. Moving to next question.');
-            
+            new Notice('Error: Invalid question data. Moving to next question.'); // eslint-disable-line obsidianmd/ui/sentence-case
+
             // Skip to next question
             this.currentQuestionIndex++;
             if (this.currentQuestionIndex < this.allQuestions.length) {
@@ -224,51 +224,51 @@ export class ConsolidatedMCQModal extends Modal {
             }
             return;
         }
-        
+
         // Clear previous question
         const questionContainer = containerEl.querySelector('.mcq-question-container');
         if (questionContainer) {
             questionContainer.remove();
         }
-        
+
         // Update note info
         const noteInfoEl = containerEl.querySelector('.mcq-note-info');
         if (noteInfoEl instanceof HTMLElement) {
             noteInfoEl.setText(`Question from: ${question.fileName}`);
         }
-        
+
         // Create question container
         const newQuestionContainer = containerEl.createDiv('mcq-question-container');
-        
+
         // Display question text
         const questionEl = newQuestionContainer.createDiv('mcq-question-text');
         questionEl.setText(question.question);
-        
+
         // Display choices
         const choicesContainer = newQuestionContainer.createDiv('mcq-choices-container');
-        
+
         question.choices.forEach((choice, index) => {
             const choiceEl = choicesContainer.createDiv('mcq-choice');
-            
+
             // Create choice button
             const choiceBtn = choiceEl.createEl('button', {
                 cls: 'mcq-choice-btn'
             });
-            
+
             // Add letter label
             const letterLabel = choiceBtn.createSpan('mcq-choice-letter');
             letterLabel.setText(String.fromCharCode(65 + index) + ') ');
-            
+
             // Add choice text
             const textSpan = choiceBtn.createSpan('mcq-choice-text');
             textSpan.setText(choice || '(Empty choice)'); // Handle empty choices
-            
+
             choiceBtn.addEventListener('click', () => {
                 this.handleAnswer(index);
             });
         });
     }
-    
+
     /**
      * Handle user's answer selection
      * 
@@ -278,15 +278,15 @@ export class ConsolidatedMCQModal extends Modal {
         const questionIndex = this.currentQuestionIndex;
         const question = this.allQuestions[questionIndex];
         const isCorrect = selectedIndex === question.correctAnswerIndex;
-        
+
         // Calculate time to answer
         const timeToAnswer = (Date.now() - this.questionStartTime) / 1000;
-        
+
         // Check if this question has been answered before
         const existingAnswerIndex = this.answers.findIndex(
             a => a.questionIndex === questionIndex
         );
-        
+
         let answer: {
             questionIndex: number;
             selectedAnswerIndex: number;
@@ -296,15 +296,15 @@ export class ConsolidatedMCQModal extends Modal {
             notePath: string;
             fileName: string;
         };
-        
+
         if (existingAnswerIndex >= 0) {
             // Update existing answer
             answer = this.answers[existingAnswerIndex];
-            
+
             // Always update selected index and correctness based on the current attempt
             answer.selectedAnswerIndex = selectedIndex;
-            answer.correct = isCorrect; 
-            
+            answer.correct = isCorrect;
+
             // Always update the timing and attempts
             answer.timeToAnswer = timeToAnswer;
             answer.attempts += 1;
@@ -321,29 +321,29 @@ export class ConsolidatedMCQModal extends Modal {
             };
             this.answers.push(answer);
         }
-        
+
         // Highlight the selected answer
         this.highlightAnswer(selectedIndex, isCorrect);
-        
+
         // Wait a moment before proceeding
         window.setTimeout(() => {
             if (isCorrect) {
                 // Move to next question if correct
                 this.currentQuestionIndex++;
                 this.questionStartTime = Date.now();
-                
+
                 const { contentEl } = this;
-                
+
                 // Update progress
                 const progressEl = contentEl.querySelector('.mcq-progress');
                 if (progressEl instanceof HTMLElement) {
                     progressEl.textContent = `Question ${this.currentQuestionIndex + 1} of ${this.allQuestions.length} (${this.allQuestions.length} questions from ${this.mcqSets.length} notes)`;
                 }
-                
+
                 // Update progress percentage for the progress bar
                 const newProgressPercent = Math.round(((this.currentQuestionIndex + 1) / this.allQuestions.length) * 100);
                 contentEl.setAttribute('data-progress', newProgressPercent.toString());
-                
+
                 // Show next question or complete review
                 if (this.currentQuestionIndex < this.allQuestions.length) {
                     this.displayCurrentQuestion(contentEl);
@@ -353,19 +353,19 @@ export class ConsolidatedMCQModal extends Modal {
             } else {
                 // For incorrect answers, show a hint
                 new Notice("Incorrect answer. Try again to proceed to the next question.");
-                
+
                 // Remove the highlight after a short delay
                 window.setTimeout(() => {
                     const choiceButtons = document.querySelectorAll('.mcq-choice-btn');
                     if (choiceButtons.length <= selectedIndex) return;
-                    
+
                     const selectedBtn = choiceButtons[selectedIndex] as HTMLElement;
                     selectedBtn.classList.remove('mcq-choice-incorrect');
                 }, 500);
             }
         }, 1000);
     }
-    
+
     /**
      * Highlight the selected answer
      * 
@@ -374,11 +374,11 @@ export class ConsolidatedMCQModal extends Modal {
      */
     highlightAnswer(selectedIndex: number, isCorrect: boolean): void {
         const choiceButtons = document.querySelectorAll('.mcq-choice-btn');
-        
+
         if (choiceButtons.length <= selectedIndex) return;
-        
+
         const selectedBtn = choiceButtons[selectedIndex] as HTMLElement;
-        
+
         // Add highlight to selected answer
         if (isCorrect) {
             // For correct answers, highlight it green
@@ -388,7 +388,7 @@ export class ConsolidatedMCQModal extends Modal {
             selectedBtn.classList.add('mcq-choice-incorrect');
         }
     }
-    
+
     /**
      * Complete the review and show results
      */
@@ -401,7 +401,7 @@ export class ConsolidatedMCQModal extends Modal {
             notePath: string;
             fileName: string;
         }> = {};
-        
+
         // Ensure all questions have an answer entry, even if not attempted or skipped
         // This is important for the detailed breakdown later.
         // We assume that if a question is in allQuestions but not in this.answers,
@@ -420,7 +420,7 @@ export class ConsolidatedMCQModal extends Modal {
                     fileName: answer.fileName
                 };
             }
-            
+
             // Each answer corresponds to one question attempt from that note
             // We need to count unique questions from each note that were answered.
             // The current logic for totalQuestions in noteScores might be slightly off
@@ -435,7 +435,7 @@ export class ConsolidatedMCQModal extends Modal {
         // Recalculate totalQuestions per note based on allQuestions
         for (const question of this.allQuestions) {
             if (!noteScores[question.notePath]) {
-                 noteScores[question.notePath] = {
+                noteScores[question.notePath] = {
                     totalQuestions: 0,
                     correctAnswers: 0,
                     score: 0,
@@ -445,7 +445,7 @@ export class ConsolidatedMCQModal extends Modal {
             }
             noteScores[question.notePath].totalQuestions++;
         }
-        
+
         // Calculate correct answers based on the final recorded answer for each question
         const finalAnswersCorrectCount: Record<string, number> = {};
         for (const question of this.allQuestions) {
@@ -459,12 +459,12 @@ export class ConsolidatedMCQModal extends Modal {
             // For scoring, we usually care about first-attempt correctness.
             // The current logic `answer.correct && answer.attempts <= 1` is fine for scoring.
             if (answer.correct && answer.attempts <= 1) {
-                 if (noteScores[answer.notePath]) { // Ensure noteScore entry exists
+                if (noteScores[answer.notePath]) { // Ensure noteScore entry exists
                     noteScores[answer.notePath].correctAnswers++;
                 }
             }
         }
-        
+
         // Calculate scores
         for (const notePath in noteScores) {
             const noteScore = noteScores[notePath];
@@ -475,7 +475,7 @@ export class ConsolidatedMCQModal extends Modal {
                 noteScore.score = 0; // No questions for this note, or no answers recorded
             }
         }
-        
+
         // Convert note scores to results for the callback
         const results: Array<{
             path: string;
@@ -483,29 +483,29 @@ export class ConsolidatedMCQModal extends Modal {
             response: ReviewResponse;
             score?: number;
         }> = [];
-        
+
         for (const notePath in noteScores) {
             const noteScore = noteScores[notePath];
             const score = noteScore.score;
-            
+
             // Determine success and response based on score
             let success = false;
-            let response = ReviewResponse.Hard;
-            
+            let response = ReviewResponse.IncorrectResponse;
+
             if (score >= 0.9) {
                 success = true;
-                response = ReviewResponse.Perfect;
+                response = ReviewResponse.PerfectRecall;
             } else if (score >= 0.7) {
                 success = true;
-                response = ReviewResponse.Good;
+                response = ReviewResponse.CorrectWithHesitation;
             } else if (score >= 0.5) {
                 success = true;
-                response = ReviewResponse.Fair;
+                response = ReviewResponse.CorrectWithDifficulty;
             } else {
                 success = false;
-                response = ReviewResponse.Hard;
+                response = ReviewResponse.IncorrectResponse;
             }
-            
+
             results.push({
                 path: notePath,
                 success,
@@ -513,41 +513,41 @@ export class ConsolidatedMCQModal extends Modal {
                 score
             });
         }
-        
+
         // Call the completion callback
         this.onComplete(results);
-        
+
         // Show results
         const { contentEl } = this;
         contentEl.empty();
-        
+
         // Display results header with stylized heading
-        const headerEl = new Setting(contentEl).setName('MCQ Review Complete').setHeading().setClass('mcq-review-complete-header');
+        new Setting(contentEl).setName('MCQ review complete').setHeading().setClass('mcq-review-complete-header'); // eslint-disable-line obsidianmd/ui/sentence-case
 
         // Display overall score with enhanced styling
         const totalCorrectOverall = this.answers.filter(a => a.correct && a.attempts <= 1).length;
         const totalQuestionsOverall = this.allQuestions.length;
         const overallScore = totalQuestionsOverall > 0 ? totalCorrectOverall / totalQuestionsOverall : 0;
         const scorePercentOverall = Math.round(overallScore * 100);
-        
+
         const scoreEl = contentEl.createDiv('mcq-score');
         const scoreTextEl = scoreEl.createDiv('mcq-score-text');
-        scoreTextEl.setText(`Overall Score: ${scorePercentOverall}%`);
-        
+        scoreTextEl.setText(`Overall score: ${scorePercentOverall}%`);
+
         // Add performance indicator based on score
         const performanceIndicator = scoreEl.createDiv('mcq-performance-indicator');
 
         if (scorePercentOverall >= 90) {
-            performanceIndicator.setText('🎓 Excellent Performance!');
+            performanceIndicator.setText('🎓 Excellent performance!'); // eslint-disable-line obsidianmd/ui/sentence-case
             performanceIndicator.addClass('excellent');
         } else if (scorePercentOverall >= 70) {
-            performanceIndicator.setText('👍 Good Work!');
+            performanceIndicator.setText('👍 Good work!'); // eslint-disable-line obsidianmd/ui/sentence-case
             performanceIndicator.addClass('good');
         } else if (scorePercentOverall >= 50) {
-            performanceIndicator.setText('🔄 Keep Practicing');
+            performanceIndicator.setText('🔄 Keep practicing'); // eslint-disable-line obsidianmd/ui/sentence-case
             performanceIndicator.addClass('needs-improvement');
         } else {
-            performanceIndicator.setText('📚 More Review Recommended');
+            performanceIndicator.setText('📚 More review recommended'); // eslint-disable-line obsidianmd/ui/sentence-case
             performanceIndicator.addClass('review-recommended');
         }
 
@@ -557,22 +557,22 @@ export class ConsolidatedMCQModal extends Modal {
 
         // Display note scores with enhanced styling
         const noteScoresEl = contentEl.createDiv('mcq-note-scores');
-        const scoreHeading = new Setting(noteScoresEl).setHeading().setName('Scores by Note').settingEl;
-        
+        new Setting(noteScoresEl).setHeading().setName('Scores by note');
+
         // Sort notes by score for better visualization (highest first)
         const sortedNotes = Object.keys(noteScores).sort((a, b) => noteScores[b].score - noteScores[a].score);
-        
+
         for (const notePath of sortedNotes) {
             const noteScore = noteScores[notePath];
             if (noteScore.totalQuestions === 0) continue; // Skip notes with no questions in the review set
 
             const noteScoreEl = noteScoresEl.createDiv('mcq-note-score');
-            
+
             noteScoreEl.createEl('div', {
                 text: noteScore.fileName,
                 cls: 'mcq-note-score-title'
             });
-            
+
             const scorePercent = Math.round(noteScore.score * 100);
             const scoreTextValueEl = noteScoreEl.createEl('div', {
                 text: `Score: ${scorePercent}% (${noteScore.correctAnswers}/${noteScore.totalQuestions})`,
@@ -604,7 +604,7 @@ export class ConsolidatedMCQModal extends Modal {
 
         // --- Detailed Question Breakdown ---
         const breakdownContainer = contentEl.createDiv('mcq-detailed-breakdown');
-        new Setting(breakdownContainer).setHeading().setName('Detailed Question Breakdown');
+        new Setting(breakdownContainer).setHeading().setName('Detailed question breakdown');
 
         this.allQuestions.forEach((question, index) => {
             const questionEl = breakdownContainer.createDiv('mcq-breakdown-item');
@@ -647,15 +647,15 @@ export class ConsolidatedMCQModal extends Modal {
             correctAnswerEl.createSpan({ text: 'Correct answer: ' });
             correctAnswerEl.createSpan({ text: question.choices[question.correctAnswerIndex], cls: 'mcq-correct-answer-text' });
         });
-        
+
         // Create close button
-        const closeBtn = contentEl.createEl('button', {cls: 'mcq-close-btn', text: 'Close'});
+        const closeBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
 
         closeBtn.addEventListener('click', () => {
             this.close();
         });
     }
-    
+
     /**
      * Shuffle an array
      * 

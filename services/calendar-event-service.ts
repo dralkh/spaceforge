@@ -107,7 +107,7 @@ export class CalendarEventService {
             const eventDate = DateUtils.startOfDay(new Date(event.date));
             const start = DateUtils.startOfDay(new Date(startDate));
             const end = DateUtils.startOfDay(new Date(endDate));
-            
+
             return eventDate >= start && eventDate <= end;
         });
     }
@@ -164,7 +164,7 @@ export class CalendarEventService {
      * @param fromDate Optional start date (defaults to today)
      * @returns Array of upcoming events
      */
-    getUpcomingEvents(daysAhead: number = 7, fromDate: Date = new Date()): UpcomingEvent[] {
+    getUpcomingEvents(daysAhead = 7, fromDate: Date = new Date()): UpcomingEvent[] {
         const today = DateUtils.startOfDay(fromDate);
         const endDate = DateUtils.addDays(today, daysAhead);
         const eventsInRange = this.getEventsInRange(today, endDate);
@@ -173,7 +173,7 @@ export class CalendarEventService {
             .map(event => {
                 const eventDate = DateUtils.startOfDay(new Date(event.date));
                 const daysUntil = Math.floor((eventDate - today) / (24 * 60 * 60 * 1000));
-                
+
                 return {
                     event,
                     daysUntil,
@@ -186,16 +186,16 @@ export class CalendarEventService {
                 if (a.daysUntil !== b.daysUntil) {
                     return a.daysUntil - b.daysUntil;
                 }
-                
+
                 // If same day, sort by time (all-day events first)
                 if (a.event.isAllDay && !b.event.isAllDay) return -1;
                 if (!a.event.isAllDay && b.event.isAllDay) return 1;
-                
+
                 // If both have times, sort by time
                 if (a.event.time && b.event.time) {
                     return a.event.time.localeCompare(b.event.time);
                 }
-                
+
                 return 0;
             });
     }
@@ -219,8 +219,8 @@ export class CalendarEventService {
         const eventDate = DateUtils.startOfDay(new Date(event.date));
         const recurrenceEnd = event.recurrenceEndDate ? DateUtils.startOfDay(new Date(event.recurrenceEndDate)) : end;
 
-        let currentDate = new Date(eventDate);
-        
+        const currentDate = new Date(eventDate);
+
         while (currentDate.getTime() <= Math.min(end, recurrenceEnd)) {
             if (currentDate.getTime() >= start) {
                 const instance: CalendarEvent = {
@@ -269,7 +269,7 @@ export class CalendarEventService {
      */
     searchEvents(query: string): CalendarEvent[] {
         const lowerQuery = query.toLowerCase();
-        return this.getAllEvents().filter(event => 
+        return this.getAllEvents().filter(event =>
             event.title.toLowerCase().includes(lowerQuery) ||
             (event.description && event.description.toLowerCase().includes(lowerQuery))
         );
@@ -294,14 +294,14 @@ export class CalendarEventService {
         try {
             const events: CalendarEvent[] = JSON.parse(json);
             let importedCount = 0;
-            
+
             events.forEach(event => {
                 if (event.id && event.title && event.date) {
                     this.events.set(event.id, event);
                     importedCount++;
                 }
             });
-            
+
             return importedCount;
         } catch (error) {
             console.error('Failed to import events:', error);
@@ -315,7 +315,7 @@ export class CalendarEventService {
      * @returns Unique ID string
      */
     private generateId(): string {
-        return `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        return `event-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     }
 
     /**
@@ -344,7 +344,7 @@ export class CalendarEventService {
             [EventCategory.Social]: '#FF69B4',
             [EventCategory.Other]: '#95A5A6'
         };
-        
+
         return colors[category] || colors[EventCategory.Other];
     }
 }

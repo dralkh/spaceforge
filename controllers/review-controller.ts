@@ -1,14 +1,10 @@
-import { Notice } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewControllerCore } from './review-controller-core';
 import { ReviewNavigationController } from './review-navigation-controller';
-import { ReviewSessionController } from './review-session-controller';
 import { ReviewBatchController } from './review-batch-controller';
 import { MCQController } from './review-controller-mcq'; // Import MCQController
-import { IReviewController, IReviewNavigationController, IReviewBatchController, IReviewSessionController } from './interfaces';
-import { ReviewResponse, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
-import { LinkAnalyzer } from '../utils/link-analyzer';
-import { DateUtils } from '../utils/dates';
+import { IReviewController } from './interfaces';
+import { ReviewResponse, FsrsRating } from '../models/review-schedule';
 import { MCQService } from '../services/mcq-service'; // Import MCQService
 
 /**
@@ -53,11 +49,11 @@ export class ReviewController implements IReviewController {
         this.navigationController = new ReviewNavigationController(plugin); // Initialize navigation controller
         // Pass the generation service if available
         if (plugin.mcqGenerationService) {
-            this.mcqController = new MCQController(plugin, mcqService, plugin.mcqGenerationService); 
+            this.mcqController = new MCQController(plugin, mcqService, plugin.mcqGenerationService);
         } else {
-             // Handle case where service might not be initialized (e.g., MCQ disabled)
-             // Depending on usage, might need null checks later or ensure it's always initialized when enabled.
-             // this.mcqController = undefined; // Or handle appropriately
+            // Handle case where service might not be initialized (e.g., MCQ disabled)
+            // Depending on usage, might need null checks later or ensure it's always initialized when enabled.
+            // this.mcqController = undefined; // Or handle appropriately
         }
         this.batchController = new ReviewBatchController(plugin); // Initialize batch controller
     }
@@ -68,8 +64,8 @@ export class ReviewController implements IReviewController {
      *
      * @param preserveCurrentIndex Whether to try to preserve the current note index
      */
-    async updateTodayNotes(preserveCurrentIndex: boolean = false): Promise<void> {
-        await this.coreController.updateTodayNotes(preserveCurrentIndex);
+    updateTodayNotes(preserveCurrentIndex = false): void {
+        this.coreController.updateTodayNotes(preserveCurrentIndex);
     }
 
     /**
@@ -123,7 +119,7 @@ export class ReviewController implements IReviewController {
      * @param path Path to the note file
      * @param days Number of days to postpone (default: 1)
      */
-    async postponeNote(path: string, days: number = 1): Promise<void> {
+    async postponeNote(path: string, days = 1): Promise<void> {
         await this.coreController.postponeNote(path, days);
     }
 
@@ -183,8 +179,8 @@ export class ReviewController implements IReviewController {
      * Delegates to core controller.
      * @param date Timestamp of the date to simulate, or null to use actual Date.now().
      */
-    public async setReviewDateOverride(date: number | null): Promise<void> {
-        await this.coreController.setReviewDateOverride(date);
+    public setReviewDateOverride(date: number | null): void {
+        this.coreController.setReviewDateOverride(date);
     }
 
     /**
@@ -251,8 +247,8 @@ export class ReviewController implements IReviewController {
      * @param paths Array of note paths to review
      * @param useMCQ Whether to use MCQs for testing (default: false)
      */
-    async reviewNotes(paths: string[], useMCQ: boolean = false): Promise<void> {
-        await this.batchController.reviewNotes(paths, useMCQ);
+    reviewNotes(paths: string[], useMCQ = false): void {
+        this.batchController.reviewNotes(paths, useMCQ);
     }
 
     /**
@@ -262,7 +258,7 @@ export class ReviewController implements IReviewController {
      * @param paths Array of note paths to postpone
      * @param days Number of days to postpone (default: 1)
      */
-    async postponeNotes(paths: string[], days: number = 1): Promise<void> {
+    async postponeNotes(paths: string[], days = 1): Promise<void> {
         await this.batchController.postponeNotes(paths, days);
     }
 
@@ -313,7 +309,7 @@ export class ReviewController implements IReviewController {
      *
      * @param useMCQ Whether to use MCQs for testing
      */
-    async reviewAllNotesWithMCQ(useMCQ: boolean = true): Promise<void> {
-        await this.batchController.reviewAllNotesWithMCQ(useMCQ);
+    reviewAllNotesWithMCQ(useMCQ = true): void {
+        this.batchController.reviewAllNotesWithMCQ(useMCQ);
     }
 }

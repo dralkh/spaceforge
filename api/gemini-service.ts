@@ -2,12 +2,9 @@ import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
 
-// Define a simple type for Gemini API parts, as it expects an array of these.
-interface GeminiPart {
-    text: string;
-}
+
 
 export class GeminiService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -18,15 +15,18 @@ export class GeminiService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.geminiApiKey) {
-            new Notice('Gemini API key is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Gemini API key is not set, please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.geminiModel) {
-            new Notice('Gemini Model is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Gemini model is not set, please add it in the Spaceforge settings');
             return null;
         }
 
         try {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using Gemini...');
 
             // Determine the number of questions to generate
@@ -43,7 +43,8 @@ export class GeminiService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Gemini. Please try again.');
+                // eslint-disable-next-line obsidianmd/ui/sentence-case
+                new Notice('Failed to generate valid MCQs from Gemini, please try again');
                 return null;
             }
 
@@ -52,8 +53,9 @@ export class GeminiService implements IMCQGenerationService {
                 questions,
                 generatedAt: Date.now()
             };
-        } catch (error) {
-            new Notice('Failed to generate MCQs with Gemini. Please check console for details.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Failed to generate MCQs with Gemini, please check console for details');
             return null;
         }
     }
@@ -67,8 +69,8 @@ export class GeminiService implements IMCQGenerationService {
         let basePrompt = "";
         // Gemini prefers direct instructions. System prompts are handled differently or not at all in simpler SDKs.
         // For direct API calls, we include system-like instructions at the beginning of the user prompt.
-        const systemInstruction = difficulty === 'basic' 
-            ? settings.mcqBasicSystemPrompt 
+        const systemInstruction = difficulty === MCQDifficulty.Basic
+            ? settings.mcqBasicSystemPrompt
             : settings.mcqAdvancedSystemPrompt;
 
         if (promptType === 'basic') {
@@ -76,7 +78,7 @@ export class GeminiService implements IMCQGenerationService {
         } else {
             basePrompt = `${systemInstruction}\n\nGenerate ${questionCount} multiple-choice questions that test understanding of key concepts in the following note. Each question should have ${choiceCount} choices, with only one correct answer. Format the output as a numbered list of questions with lettered choices (A, B, C, etc.). Mark the correct answer by putting [CORRECT] at the end of the line.\n\nFor example:\n1. What is the capital of France?\n   A) London\n   B) Berlin\n   C) Paris [CORRECT]\n   D) Madrid\n   E) Rome`;
         }
-        
+
         // Difficulty instructions are already prepended via systemInstruction.
         return `${basePrompt}\n\nNote Content:\n${noteContent}`;
     }
@@ -126,7 +128,7 @@ export class GeminiService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            let questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
+            const questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
 
             if (questionBlocks.length === 0) {
                 const lines = response.split('\n');
@@ -161,9 +163,9 @@ export class GeminiService implements IMCQGenerationService {
                     if (isCorrect) correctAnswerIndex = choices.length - 1;
                 }
 
-                if (correctAnswerIndex === -1) { 
+                if (correctAnswerIndex === -1) {
                     for (let i = 0; i < choices.length; i++) {
-                        if (lines[i+1] && (lines[i+1].toLowerCase().includes('correct') || lines[i+1].includes('✓') || lines[i+1].includes('✔️'))) {
+                        if (lines[i + 1] && (lines[i + 1].toLowerCase().includes('correct') || lines[i + 1].includes('✓') || lines[i + 1].includes('✔️'))) {
                             correctAnswerIndex = i;
                             break;
                         }
@@ -176,8 +178,9 @@ export class GeminiService implements IMCQGenerationService {
                 }
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
-        } catch (error) {
-            new Notice('Error parsing MCQ response from Gemini. Please try again.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Error parsing MCQ response from Gemini, please try again');
             return [];
         }
     }

@@ -1,11 +1,9 @@
-import { Notice, TFile, TFolder } from 'obsidian';
-import { ReviewHistoryItem, ReviewResponse, ReviewSchedule, toSM2Quality } from './models/review-schedule';
+import { TFile } from 'obsidian';
 import SpaceforgePlugin from './main';
-import { DateUtils } from './utils/dates';
-import { EstimationUtils } from './utils/estimation';
-import { ReviewSession, ReviewSessionStore, generateSessionId, getNextFileInSession, advanceSession, isSessionComplete } from './models/review-session';
-import { LinkAnalyzer } from './utils/link-analyzer';
+import { ReviewHistoryItem, ReviewSchedule, ReviewResponse } from './models/review-schedule';
+import { ReviewSessionStore, ReviewSession } from './models/review-session';
 import { MCQSet, MCQSession } from './models/mcq';
+import { EstimationUtils } from './utils/estimation';
 import { ReviewScheduleService } from './services/review-schedule-service';
 import { ReviewHistoryService } from './services/review-history-service';
 import { ReviewSessionService } from './services/review-session-service';
@@ -142,12 +140,10 @@ export class DataStorage {
             this.reviewScheduleService.schedules = {};
             isValid = false;
         } else {
-            let invalidCount = 0;
             for (const path in this.reviewScheduleService.schedules) {
                 const schedule = this.reviewScheduleService.schedules[path];
                 if (!schedule || typeof schedule !== 'object') {
                     delete this.reviewScheduleService.schedules[path];
-                    invalidCount++;
                     isValid = false;
                     continue;
                 }
@@ -158,7 +154,6 @@ export class DataStorage {
                     !('ease' in s) || typeof s.ease !== 'number') {
 
                     delete this.reviewScheduleService.schedules[path];
-                    invalidCount++;
                     isValid = false;
                 }
             }
@@ -198,11 +193,12 @@ export class DataStorage {
         const hasMCQs = Object.keys(this.mcqService.mcqSets).length > 0;
 
         if (noSchedules && hasMCQs) {
+            // no-op
         }
         return isValid;
     }
 
-    public async cleanupNonExistentFiles(): Promise<boolean> {
+    public cleanupNonExistentFiles(): boolean {
         let changesMade = false;
         if (!this.reviewScheduleService.schedules || typeof this.reviewScheduleService.schedules !== 'object') {
             this.reviewScheduleService.schedules = {};
@@ -228,12 +224,11 @@ export class DataStorage {
             preserved: false
         };
         try {
-            const allSchedules = {...this.reviewScheduleService.schedules};
+            const allSchedules = { ...this.reviewScheduleService.schedules };
             const allFiles = new Set<string>();
             try {
-                const mdFiles = this.plugin.app.vault.getMarkdownFiles();
-                mdFiles.forEach(file => allFiles.add(file.path));
-            } catch (listError) {
+                this.plugin.app.vault.getMarkdownFiles().forEach(file => allFiles.add(file.path));
+            } catch {
                 return changesMade;
             }
             if (allFiles.size === 0 && beforeCount > 0) {
@@ -251,7 +246,8 @@ export class DataStorage {
                         cleanupCount++;
                         changesMade = true;
                     }
-                } catch (checkError) {
+                } catch {
+                    // no-op
                 }
                 if (safetyCheck.missingSchedules > 0 &&
                     safetyCheck.missingSchedules === safetyCheck.checkedSchedules &&
@@ -265,6 +261,7 @@ export class DataStorage {
                 }
             }
             if (cleanupCount > 0 && !safetyCheck.preserved) {
+                // no-op
             }
             const dataState = {
                 schedules: Object.keys(this.reviewScheduleService.schedules).length,
@@ -274,8 +271,10 @@ export class DataStorage {
                 mcqSessions: Object.keys(this.mcqService.mcqSessions || {}).length
             };
             if (dataState.schedules === 0 && (dataState.history > 0 || dataState.reviewSessions > 0 || dataState.mcqSets > 0)) {
+                // no-op
             }
-        } catch (error) {
+        } catch {
+            // no-op
         }
 
         return changesMade; // Return whether cleanup occurred
@@ -287,13 +286,13 @@ export class DataStorage {
     // but they now simply call the corresponding method on the service instance.
     // REMOVED await this.saveData() from all these methods.
 
-    async scheduleNoteForReview(path: string, daysFromNow: number = 0): Promise<void> {
+    async scheduleNoteForReview(path: string, daysFromNow = 0): Promise<void> {
         await this.reviewScheduleService.scheduleNoteForReview(path, daysFromNow);
         // await this.saveData(); // Removed
     }
 
-    async recordReview(path: string, response: ReviewResponse, isSkipped: boolean = false): Promise<boolean> {
-        return await this.reviewScheduleService.recordReview(path, response, isSkipped);
+    recordReview(path: string, response: ReviewResponse, isSkipped = false): boolean {
+        return this.reviewScheduleService.recordReview(path, response, isSkipped);
     }
 
     calculateNewSchedule(
@@ -305,8 +304,8 @@ export class DataStorage {
         // but keeping for potential external use or backward compatibility if needed.
         // It should probably be moved to ReviewScheduleService if kept.
         // For now, just calling the service method.
-         const result = this.reviewScheduleService.calculateNewSchedule(currentInterval, currentEase, response);
-         return { interval: result.interval, ease: result.ease };
+        const result = this.reviewScheduleService.calculateNewSchedule(currentInterval, currentEase, response);
+        return { interval: result.interval, ease: result.ease };
     }
 
     async skipNote(path: string, response: ReviewResponse = ReviewResponse.CorrectWithDifficulty): Promise<void> {
@@ -314,7 +313,7 @@ export class DataStorage {
         // await this.saveData(); // Removed
     }
 
-    async postponeNote(path: string, days: number = 1): Promise<void> {
+    async postponeNote(path: string, days = 1): Promise<void> {
         await this.reviewScheduleService.postponeNote(path, days);
         // await this.saveData(); // Removed
     }
@@ -338,7 +337,7 @@ export class DataStorage {
         try {
             const content = await this.plugin.app.vault.read(file);
             return EstimationUtils.estimateReviewTime(file, content);
-        } catch (error) {
+        } catch {
             return 60; // Default 1 minute
         }
     }
@@ -373,7 +372,7 @@ export class DataStorage {
         return moreFiles;
     }
 
-    async scheduleNotesInOrder(paths: string[], daysFromNow: number = 0): Promise<number> {
+    async scheduleNotesInOrder(paths: string[], daysFromNow = 0): Promise<number> {
         const count = await this.reviewScheduleService.scheduleNotesInOrder(paths, daysFromNow);
         // if (count > 0) { // Removed save call
         //      await this.saveData();
@@ -381,13 +380,13 @@ export class DataStorage {
         return count;
     }
 
-    async scheduleSessionForReview(sessionId: string): Promise<number> {
+    scheduleSessionForReview(sessionId: string): number {
         // This method calls scheduleNotesInOrder internally, which saves data.
         // No need to save again here.
-        return await this.reviewSessionService.scheduleSessionForReview(sessionId);
+        return this.reviewSessionService.scheduleSessionForReview(sessionId);
     }
 
-    async saveMCQSet(mcqSet: MCQSet): Promise<string> {
+    saveMCQSet(mcqSet: MCQSet): string {
         const id = this.mcqService.saveMCQSet(mcqSet);
         // await this.saveData(); // Removed
         return id;
@@ -397,7 +396,7 @@ export class DataStorage {
         return this.mcqService.getMCQSetForNote(notePath);
     }
 
-    async saveMCQSession(session: MCQSession): Promise<void> {
+    saveMCQSession(session: MCQSession): void {
         this.mcqService.saveMCQSession(session);
         // await this.saveData(); // Removed
     }
@@ -415,7 +414,7 @@ export class DataStorage {
         // await this.saveData(); // Removed
     }
 
-    getDueNotesWithCustomOrder(date: number = Date.now(), useCustomOrder: boolean = true): ReviewSchedule[] {
+    getDueNotesWithCustomOrder(date: number = Date.now(), useCustomOrder = true): ReviewSchedule[] {
         return this.reviewScheduleService.getDueNotesWithCustomOrder(date, useCustomOrder);
     }
 

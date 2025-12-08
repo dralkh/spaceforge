@@ -43,7 +43,7 @@ export class PomodoroService {
         this.state.pomodoroEndTimeMs = Date.now() + this.state.pomodoroTimeLeftInSeconds * 1000;
         this.startTimerInterval();
         this.notifyUpdate();
-        this.plugin.savePluginData();
+        void this.plugin.savePluginData();
     }
 
     public stop(): void { // Pause functionality
@@ -61,7 +61,7 @@ export class PomodoroService {
         this.state.pomodoroEndTimeMs = null;
 
         this.notifyUpdate();
-        this.plugin.savePluginData();
+        void this.plugin.savePluginData();
     }
 
     public resetCurrentSession(): void {
@@ -70,9 +70,9 @@ export class PomodoroService {
         this.state.pomodoroEndTimeMs = null; // Clear end time on reset
         this.resetTimeForMode(this.state.pomodoroCurrentMode === 'idle' ? 'work' : this.state.pomodoroCurrentMode);
         this.notifyUpdate();
-        this.plugin.savePluginData();
+        void this.plugin.savePluginData();
     }
-    
+
     public skipSession(): void {
         this.stopTimerInterval();
         this.state.pomodoroIsRunning = false; // Stop current timer before switching
@@ -85,7 +85,7 @@ export class PomodoroService {
             this.startTimerInterval();
         }
         this.notifyUpdate(); // handleTimerEnd also notifies, but an extra one here is fine
-        this.plugin.savePluginData();
+        void this.plugin.savePluginData();
     }
 
     public getFormattedTimeLeft(): string {
@@ -100,14 +100,14 @@ export class PomodoroService {
         const currentShort = this.settings.pomodoroShortBreakDuration;
         const currentLong = this.settings.pomodoroLongBreakDuration;
         const currentSessions = this.settings.pomodoroSessionsUntilLongBreak;
-        
+
         const userChangedSettings = work !== currentWork || short !== currentShort || long !== currentLong || sessions !== currentSessions;
-        
+
         this.settings.pomodoroWorkDuration = work;
         this.settings.pomodoroShortBreakDuration = short;
         this.settings.pomodoroLongBreakDuration = long;
         this.settings.pomodoroSessionsUntilLongBreak = sessions;
-        
+
         // If user manually changed settings, mark as modified and deactivate estimation
         if (userChangedSettings) {
             this.state.pomodoroUserHasModifiedSettings = true;
@@ -115,13 +115,13 @@ export class PomodoroService {
             this.state.pomodoroEstimatedTotalCycles = null;
             this.state.pomodoroEstimatedWorkSessions = null;
         }
-        
+
         // If current session is not running and its mode (which is an active timed mode) had its duration changed, update its timeLeft
         const activeModesForDurationUpdate: PomodoroMode[] = ['work', 'shortBreak', 'longBreak'];
         if (!this.state.pomodoroIsRunning && activeModesForDurationUpdate.includes(this.state.pomodoroCurrentMode)) {
-             this.resetTimeForMode(this.state.pomodoroCurrentMode);
+            this.resetTimeForMode(this.state.pomodoroCurrentMode);
         }
-        this.plugin.savePluginData(); // Save settings and potentially updated state
+        void this.plugin.savePluginData(); // Save settings and potentially updated state
         this.notifyUpdate();
     }
 
@@ -208,10 +208,10 @@ export class PomodoroService {
         this.state.pomodoroEstimatedTotalCycles = Math.ceil(pomodorosNeeded / sessionsUntilLongBreak);
         this.state.pomodoroEstimatedWorkSessions = pomodorosNeeded;
         this.state.pomodoroIsEstimationActive = true;
-        
-        this.plugin.savePluginData();
+
+        void this.plugin.savePluginData();
         this.notifyUpdate();
-        
+
         // Return calculation results for UI display
         return {
             totalReadingTimeInSeconds,
@@ -224,9 +224,9 @@ export class PomodoroService {
     /**
      * Get current cycle progress information
      */
-    public getCycleProgress(): { 
-        current: number; 
-        total: number; 
+    public getCycleProgress(): {
+        current: number;
+        total: number;
         workSessionsRemaining: number;
         totalWorkSessions: number;
         totalTimeMinutes: number;
@@ -248,7 +248,7 @@ export class PomodoroService {
 
         let totalBreakTime = 0;
         let sessionsInCycle = 0;
-        
+
         for (let i = 0; i < totalWorkSessions; i++) {
             sessionsInCycle++;
             if (i < totalWorkSessions - 1) { // Don't add break after last session
@@ -280,7 +280,7 @@ export class PomodoroService {
         this.state.pomodoroEstimatedTotalCycles = null;
         this.state.pomodoroEstimatedWorkSessions = null;
         this.state.pomodoroUserHasModifiedSettings = false;
-        this.plugin.savePluginData();
+        void this.plugin.savePluginData();
         this.notifyUpdate();
     }
 
@@ -327,7 +327,7 @@ export class PomodoroService {
         }
     }
 
-    private handleTimerEnd(skipped: boolean = false): void {
+    private handleTimerEnd(skipped = false): void {
         this.stopTimerInterval(); // Stop the current interval
         // pomodoroIsRunning might still be true if we auto-transition to a new session
 
@@ -351,7 +351,7 @@ export class PomodoroService {
                 this.state.pomodoroSessionsCompletedInCycle = 0; // Reset for new cycle
             }
         } // If currentMode was 'idle' or another unhandled state, nextMode remains 'idle' as initialized.
-        
+
         const wasRunning = this.state.pomodoroIsRunning; // Capture state before potentially changing it
         this.switchToMode(nextMode); // This resets timeLeft based on the new mode
 
@@ -360,17 +360,17 @@ export class PomodoroService {
             // Calculate new end time based on the duration of the *new* mode
             this.state.pomodoroEndTimeMs = Date.now() + this.state.pomodoroTimeLeftInSeconds * 1000;
             if (!wasRunning) { // Only start interval if it wasn't already running (e.g., transitioning from idle)
-                 this.startTimerInterval();
+                this.startTimerInterval();
             } else if (!this.timerInterval) { // Or if interval somehow stopped but should be running
-                 this.startTimerInterval();
+                this.startTimerInterval();
             }
         } else {
             this.state.pomodoroIsRunning = false;
             this.state.pomodoroEndTimeMs = null; // No end time when idle
             this.stopTimerInterval(); // Ensure interval is stopped when idle
         }
-        
-        this.plugin.savePluginData(); // Save state changes
+
+        void this.plugin.savePluginData(); // Save state changes
         this.notifyUpdate();
     }
 
@@ -414,7 +414,7 @@ export class PomodoroService {
 
             oscillator.start();
             oscillator.stop(audioContext.currentTime + 0.5); // Play for 0.5 seconds
-        } catch (e) { /* handle error */ }
+        } catch { /* handle error */ }
     }
 
     private notifyUpdate(): void {
@@ -458,8 +458,8 @@ export class PomodoroService {
                 this.handleTimerEnd(true); // Treat as skipped to avoid sound, force transition logic
             }
         } else if (!this.state.pomodoroIsRunning) {
-             // If not running, ensure end time is null
-             this.state.pomodoroEndTimeMs = null;
+            // If not running, ensure end time is null
+            this.state.pomodoroEndTimeMs = null;
         }
         // If running but no end time (shouldn't happen), maybe log error or reset?
         // For now, assume state is consistent or gets corrected by start/stop.

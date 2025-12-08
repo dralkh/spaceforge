@@ -6,38 +6,38 @@ export interface ReviewSchedule {
      * Path to the note file - unique identifier
      */
     path: string;
-    
+
     /**
      * Timestamp of the last review
      */
     lastReviewDate: number | null;
-    
+
     /**
      * Timestamp of the next scheduled review
      */
     nextReviewDate: number;
-    
+
     /**
      * Ease factor - affects interval growth (higher = longer intervals)
      * In SM-2, this is a value typically starting at 2.5 (stored as 250 internally)
      */
     ease: number;
-    
+
     /**
      * Current interval in days
      */
     interval: number;
-    
+
     /**
      * Number of consecutive successful reviews (for backward compatibility)
      */
     consecutive: number;
-    
+
     /**
      * Total number of completed reviews (for backward compatibility)
      */
     reviewCount: number;
-    
+
     /**
      * SM-2 repetition count - used to determine interval calculation (n)
      * This is 1 for items in "learning" phase and increments for each successful review
@@ -88,54 +88,31 @@ export enum ReviewResponse {
      * Complete blackout (0) - No recognition at all
      */
     CompleteBlackout = 0,
-    
+
     /**
      * Incorrect response (1) - Wrong answer but upon seeing the correct answer, it felt familiar
      */
     IncorrectResponse = 1,
-    
+
     /**
      * Incorrect response (2) - Wrong answer but upon seeing the correct answer, it felt very familiar
      */
     IncorrectButFamiliar = 2,
-    
+
     /**
      * Correct with difficulty (3) - Correct answer but required significant effort to recall
      */
     CorrectWithDifficulty = 3,
-    
+
     /**
      * Correct with hesitation (4) - Correct answer after some hesitation
      */
     CorrectWithHesitation = 4,
-    
+
     /**
      * Perfect recall (5) - Correct answer with no hesitation
      */
-    PerfectRecall = 5,
-    
-    // Legacy response values explicitly mapped to SM-2 equivalents
-    // for backward compatibility
-    
-    /**
-     * Legacy "Hard" response - mapped to IncorrectResponse (1)
-     */
-    Hard = 1,
-    
-    /**
-     * Legacy "Fair" response - mapped to CorrectWithDifficulty (3)
-     */
-    Fair = 3,
-    
-    /**
-     * Legacy "Good" response - mapped to CorrectWithHesitation (4)
-     */
-    Good = 4,
-    
-    /**
-     * Legacy "Perfect" response - mapped to PerfectRecall (5)
-     */
-    Perfect = 5
+    PerfectRecall = 5
 }
 
 /**
@@ -149,21 +126,8 @@ export function toSM2Quality(response: ReviewResponse): number {
     if (response >= 0 && response <= 5) {
         return response;
     }
-    
-    // Map legacy responses to SM-2 quality ratings
-    switch(response) {
-        case ReviewResponse.Hard:
-            return ReviewResponse.IncorrectResponse;
-        case ReviewResponse.Fair:
-            return ReviewResponse.CorrectWithDifficulty;
-        case ReviewResponse.Good:
-            return ReviewResponse.CorrectWithHesitation;
-        case ReviewResponse.Perfect:
-            return ReviewResponse.PerfectRecall;
-        default:
-            // Default to fair recall if unknown
-            return ReviewResponse.CorrectWithDifficulty;
-    }
+    // Default fallback
+    return ReviewResponse.CorrectWithDifficulty;
 }
 
 /**
@@ -174,27 +138,27 @@ export interface ReviewHistoryItem {
      * Path to the note file
      */
     path: string;
-    
+
     /**
      * Timestamp of the review
      */
     timestamp: number;
-    
+
     /**
      * User's response during review
      */
     response: ReviewResponse;
-    
+
     /**
      * Interval at the time of review
      */
     interval: number;
-    
+
     /**
      * Ease at the time of review
      */
     ease: number;
-    
+
     /**
      * Whether this review was explicitly skipped by the user
      */

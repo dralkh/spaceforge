@@ -1,7 +1,8 @@
+
 import { Notice, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { ReviewSchedule } from "../models/review-schedule";
-import { CalendarEvent, EventCategory, EventRecurrence } from "../models/calendar-event";
+import { CalendarEvent } from "../models/calendar-event";
 import { DateUtils } from "../utils/dates";
 import { EstimationUtils } from "../utils/estimation";
 import { UpcomingEvents } from "./upcoming-events";
@@ -32,12 +33,12 @@ export class CalendarView {
      * Reference to the main plugin
      */
     plugin: SpaceforgePlugin;
-    
+
     /**
      * Calendar container element
      */
     containerEl: HTMLElement;
-    
+
     /**
      * Current date being displayed
      */
@@ -59,11 +60,11 @@ export class CalendarView {
     private calendarGridEl: HTMLElement | null = null;
     private upcomingEventsEl: HTMLElement | null = null;
     private upcomingEventsComponent: UpcomingEvents | null = null;
-    
+
     // Tooltip elements
     private tooltipEl: HTMLElement | null = null;
     private tooltipTimeout: number | null = null;
-    
+
     /**
      * Initialize calendar view
      * 
@@ -75,18 +76,18 @@ export class CalendarView {
         this.plugin = plugin;
         this.currentDate = new Date();
     }
-    
+
     /**
      * Render the calendar view
      */
     async render(): Promise<void> {
         this.ensureCalendarBaseStructure(); // Ensures header and grid containers exist
-        
+
         this.updateCalendarHeader(); // Updates month title
-        
+
         await this.loadReviewsData(); // Preloads review data for the current view
         await this.loadEventsData(); // Preloads event data for the current view
-        
+
         if (this.calendarGridEl) {
             this.renderCalendarGridContent(this.calendarGridEl); // Renders/updates the grid
         }
@@ -108,30 +109,30 @@ export class CalendarView {
         if (!this.calendarHeaderEl || !calendarContainer.contains(this.calendarHeaderEl)) {
             this.calendarHeaderEl?.remove();
             this.calendarHeaderEl = calendarContainer.createDiv("calendar-header");
-        
+
             const prevMonthBtn = this.calendarHeaderEl.createDiv("calendar-nav-btn");
             setIcon(prevMonthBtn, "chevron-left");
             prevMonthBtn.addEventListener("click", () => {
                 this.currentDate.setMonth(this.currentDate.getMonth() - 1);
-                this.render(); 
+                void this.render();
             });
-            
+
             this.monthTitleEl = this.calendarHeaderEl.createDiv("calendar-month-title");
-            
+
             const nextMonthBtn = this.calendarHeaderEl.createDiv("calendar-nav-btn");
             setIcon(nextMonthBtn, "chevron-right");
             nextMonthBtn.addEventListener("click", () => {
                 this.currentDate.setMonth(this.currentDate.getMonth() + 1);
-                this.render(); 
+                void this.render();
             });
-            
+
             const todayBtn = this.calendarHeaderEl.createDiv("calendar-today-btn");
             todayBtn.setText("Today");
             todayBtn.addEventListener("click", () => {
                 this.currentDate = new Date();
-                this.render(); 
+                void this.render();
             });
-            
+
             const addEventBtn = this.calendarHeaderEl.createDiv("calendar-add-event-btn");
             setIcon(addEventBtn, "plus");
             addEventBtn.addEventListener("click", () => {
@@ -151,28 +152,28 @@ export class CalendarView {
             this.upcomingEventsComponent = new UpcomingEvents(this.upcomingEventsEl, this.plugin);
         }
     }
-    
+
     /**
      * Update calendar header (month title)
      */
     updateCalendarHeader(): void {
         if (this.monthTitleEl) {
             this.monthTitleEl.setText(
-                this.currentDate.toLocaleString('default', { 
-                    month: 'long', 
-                    year: 'numeric' 
+                this.currentDate.toLocaleString('default', {
+                    month: 'long',
+                    year: 'numeric'
                 })
             );
         }
     }
-    
+
     /**
      * Load and organize review data by date
      */
     async loadReviewsData(): Promise<void> {
         this.reviewsByDate = new Map();
         const allSchedules = Object.values(this.plugin.reviewScheduleService.schedules);
-        
+
         for (const schedule of allSchedules) {
             const scheduleDueDayStart = DateUtils.startOfUTCDay(new Date(schedule.nextReviewDate));
             const dateKey = scheduleDueDayStart.toString(); // Use timestamp as a robust key
@@ -184,7 +185,7 @@ export class CalendarView {
                     totalTime: 0
                 });
             }
-            
+
             const dateReviews = this.reviewsByDate.get(dateKey);
             if (dateReviews) {
                 dateReviews.notes.push(schedule);
@@ -196,9 +197,9 @@ export class CalendarView {
     /**
      * Load and organize event data by date
      */
-    async loadEventsData(): Promise<void> {
+    loadEventsData(): void {
         this.eventsByDate = new Map();
-        
+
         if (!this.plugin.settings.enableCalendarEvents || !this.plugin.calendarEventService) {
             return;
         }
@@ -206,7 +207,7 @@ export class CalendarView {
         const { year, month } = this.getCalendarData();
         const startDate = new Date(year, month, 1);
         const endDate = new Date(year, month + 1, 0); // Last day of month
-        
+
         const eventsInRange = this.plugin.calendarEventService.getEventsInRange(
             startDate.getTime(),
             endDate.getTime()
@@ -222,14 +223,14 @@ export class CalendarView {
                     events: []
                 });
             }
-            
+
             const dateEvents = this.eventsByDate.get(dateKey);
             if (dateEvents) {
                 dateEvents.events.push(event);
             }
         }
     }
-    
+
     /**
      * Render or update the calendar grid content
      * 
@@ -246,7 +247,7 @@ export class CalendarView {
                 dayHeader.setText(day);
             });
         }
-        
+
         const { year, month, firstDay, daysInMonth } = this.getCalendarData();
         const totalCells = 42; // Standard 6 weeks * 7 days grid
         let dayCells = Array.from(gridEl.querySelectorAll(".calendar-day")) as HTMLElement[];
@@ -286,32 +287,34 @@ export class CalendarView {
 
                 const dateReviews = this.reviewsByDate.get(dateKey);
                 const dateEvents = this.eventsByDate.get(dateKey);
-                
+
                 // Render reviews
                 if (dateReviews && dateReviews.notes.length > 0) {
                     dayCell.addClass("has-reviews");
-                    
+
                     const reviewCount = dayCell.createDiv("calendar-review-count");
                     reviewCount.setText(dateReviews.notes.length.toString());
-                    
+
                     const timeEstimate = dayCell.createDiv("calendar-time-estimate");
                     timeEstimate.setText(EstimationUtils.formatTime(dateReviews.totalTime));
-                    
-                    dayCell.addEventListener("click", async () => {
-                        const today = new Date();
-                        const isClickedDateToday = DateUtils.isSameDay(currentDateObj, today);
+
+                    dayCell.addEventListener("click", () => {
+                        // today assignment removed
+
 
                         this.plugin.settings.sidebarViewType = 'list';
                         this.plugin.clickedDateFromCalendar = currentDateObj;
-                        
-                        await this.plugin.savePluginData();
-                        const sidebarView = this.plugin.getSidebarView();
-                        if (sidebarView && typeof sidebarView.refresh === 'function') {
-                            await sidebarView.refresh();
-                        } else {
-                            this.plugin.app.workspace.requestSaveLayout();
-                            new Notice("Switched to list view. Sidebar will update.");
-                        }
+
+                        void (async () => {
+                            await this.plugin.savePluginData();
+                            const sidebarView = this.plugin.getSidebarView();
+                            if (sidebarView && typeof sidebarView.refresh === 'function') {
+                                await sidebarView.refresh();
+                            } else {
+                                this.plugin.app.workspace.requestSaveLayout();
+                                new Notice("Switched to list view. Sidebar will update.");
+                            }
+                        })();
                     });
 
                     if (dateReviews.notes.length > 10) dayCell.addClass("heavy-load");
@@ -322,45 +325,45 @@ export class CalendarView {
                 // Render events as small tabs
                 if (dateEvents && dateEvents.events.length > 0) {
                     dayCell.addClass("has-events");
-                    
+
                     const eventsContainer = dayCell.createDiv("calendar-events-container");
-                    
+
                     // Show up to 3 event tabs
                     const eventsToShow = dateEvents.events.slice(0, 3);
                     eventsToShow.forEach(event => {
                         const eventTab = eventsContainer.createDiv("calendar-event-tab");
                         eventTab.setText(event.title.substring(0, 8) + (event.title.length > 8 ? "..." : ""));
-                        
+
                         // Set color based on event category or custom color using CSS custom property
                         const eventColor = this.plugin.calendarEventService?.getEventColor(event) || '#95A5A6';
                         eventTab.style.setProperty('--event-color', eventColor);
-                        
+
                         // Add hover handler for tooltip
-                        eventTab.addEventListener("mouseenter", (e) => {
+                        eventTab.addEventListener("mouseenter", (_e) => {
                             this.showEventTooltip(eventTab, event);
                         });
-                        
-                        eventTab.addEventListener("mouseleave", (e) => {
+
+                        eventTab.addEventListener("mouseleave", (_e) => {
                             this.hideEventTooltip();
                         });
-                        
+
                         // Add click handler for event
                         eventTab.addEventListener("click", (e) => {
                             e.stopPropagation(); // Prevent day cell click
                             this.showEventDetails(event);
                         });
-                        
+
                         // Add double-click handler for editing
                         eventTab.addEventListener("dblclick", (e) => {
                             e.stopPropagation(); // Prevent day cell click
                             this.openEditEventModal(event);
                         });
                     });
-                    
+
                     // Show "more" indicator if there are more events
                     if (dateEvents.events.length > 3) {
                         const moreIndicator = eventsContainer.createDiv("calendar-events-more");
-                        moreIndicator.setText(`+${dateEvents.events.length - 3}`);
+                        moreIndicator.setText(`+ ${dateEvents.events.length - 3} `);
                     }
                 }
 
@@ -377,7 +380,7 @@ export class CalendarView {
             }
         }
     }
-    
+
     /**
      * Get calendar data for the current month
      * 
@@ -386,16 +389,16 @@ export class CalendarView {
     getCalendarData(): { year: number, month: number, firstDay: number, daysInMonth: number } {
         const year = this.currentDate.getFullYear();
         const month = this.currentDate.getMonth();
-        
+
         // First day of month (0-6, where 0 is Sunday)
         const firstDay = new Date(year, month, 1).getDay();
-        
+
         // Days in month
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
+
         return { year, month, firstDay, daysInMonth };
     }
-    
+
     /**
      * Check if a date is today
      * 
@@ -422,29 +425,29 @@ export class CalendarView {
         // For now, just show a notice with event details
         // TODO: Create a proper modal for event details
         const eventDate = new Date(event.date);
-        const dateStr = eventDate.toLocaleDateString(undefined, { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const dateStr = eventDate.toLocaleDateString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
-        
-        let details = `📅 ${event.title}\n📆 ${dateStr}`;
-        
+
+        let details = `📅 ${event.title} \n📆 ${dateStr} `;
+
         if (event.time) {
-            details += `\n🕐 ${event.time}`;
+            details += `\n🕐 ${event.time} `;
         }
-        
+
         if (event.description) {
-            details += `\n📝 ${event.description}`;
+            details += `\n📝 ${event.description} `;
         }
-        
+
         if (event.location) {
-            details += `\n📍 ${event.location}`;
+            details += `\n📍 ${event.location} `;
         }
-        
-        details += `\n🏷️ ${event.category}`;
-        
+
+        details += `\n🏷️ ${event.category} `;
+
         new Notice(details, 8000);
     }
 
@@ -456,9 +459,9 @@ export class CalendarView {
             this.plugin.app,
             this.plugin,
             null,
-            async (savedEvent) => {
+            (_savedEvent) => {
                 // Refresh the calendar view after saving
-                await this.render();
+                void this.render();
             }
         );
         modal.open();
@@ -470,26 +473,17 @@ export class CalendarView {
      * @param date Date to pre-fill in the modal
      */
     openCreateEventModalForDate(date: Date): void {
-        // Create a default event with the selected date
-        const defaultEvent = {
-            title: "",
-            date: date.getTime(),
-            isAllDay: true,
-            category: (this.plugin.settings.defaultEventCategory as EventCategory) || EventCategory.Personal,
-            recurrence: EventRecurrence.None
-        };
-
         const modal = new EventModal(
             this.plugin.app,
             this.plugin,
             null,
-            async (savedEvent) => {
+            (_savedEvent) => {
                 // Refresh the calendar view after saving
-                await this.render();
+                void this.render();
             }
         );
         modal.open();
-        
+
         // Pre-fill the date in the modal after it opens
         window.setTimeout(() => {
             const dateInput = modal.contentEl.querySelector('input[type="date"]') as HTMLInputElement;
@@ -509,9 +503,9 @@ export class CalendarView {
             this.plugin.app,
             this.plugin,
             event,
-            async (savedEvent) => {
+            (_savedEvent) => {
                 // Refresh the calendar view after saving
-                await this.render();
+                void this.render();
             }
         );
         modal.open();
@@ -522,7 +516,7 @@ export class CalendarView {
      */
     destroy(): void {
         this.hideEventTooltip();
-        
+
         // Clear other references
         this.calendarHeaderEl = null;
         this.monthTitleEl = null;
@@ -579,54 +573,53 @@ export class CalendarView {
         // Create tooltip element
         this.tooltipEl = document.body.createEl("div");
         this.tooltipEl.className = "calendar-event-tooltip";
-        
+
         // Format event details
         const eventDate = new Date(event.date);
-        const dateStr = eventDate.toLocaleDateString(undefined, { 
-            weekday: 'short', 
-            month: 'short', 
-            day: 'numeric' 
+        const dateStr = eventDate.toLocaleDateString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
         });
-        
+
         // Clear existing content
         this.tooltipEl.empty();
-        
+
         // Create tooltip content safely
         const titleEl = this.tooltipEl.createDiv('tooltip-title');
         titleEl.textContent = event.title;
-        
+
         const dateEl = this.tooltipEl.createDiv('tooltip-date');
-        dateEl.textContent = `📅 ${dateStr}`;
-        
+        dateEl.textContent = `📅 ${dateStr} `;
+
         if (event.time) {
             const timeEl = this.tooltipEl.createDiv('tooltip-time');
-            timeEl.textContent = `🕐 ${event.time}`;
+            timeEl.textContent = `🕐 ${event.time} `;
         }
-        
+
         if (event.description) {
             const descEl = this.tooltipEl.createDiv('tooltip-description');
-            descEl.textContent = `📝 ${event.description}`;
+            descEl.textContent = `📝 ${event.description} `;
         }
-        
+
         if (event.location) {
             const locationEl = this.tooltipEl.createDiv('tooltip-location');
-            locationEl.textContent = `📍 ${event.location}`;
+            locationEl.textContent = `📍 ${event.location} `;
         }
-        
+
         const categoryEl = this.tooltipEl.createDiv('tooltip-category');
-        categoryEl.textContent = `🏷️ ${event.category}`;
-        
+        categoryEl.textContent = `🏷️ ${event.category} `;
+
         // Position tooltip
         const rect = targetEl.getBoundingClientRect();
-        const tooltipRect = this.tooltipEl.getBoundingClientRect();
-        
+
         // Add to DOM temporarily to get dimensions
         document.body.appendChild(this.tooltipEl);
-        
+
         // Calculate position
         let left = rect.left + (rect.width / 2) - (this.tooltipEl.offsetWidth / 2);
         let top = rect.bottom + 8;
-        
+
         // Adjust if tooltip goes off screen
         if (left < 8) left = 8;
         if (left + this.tooltipEl.offsetWidth > window.innerWidth - 8) {
@@ -635,13 +628,13 @@ export class CalendarView {
         if (top + this.tooltipEl.offsetHeight > window.innerHeight - 8) {
             top = rect.top - this.tooltipEl.offsetHeight - 8;
         }
-        
-        this.tooltipEl.style.left = `${left}px`;
-        this.tooltipEl.style.top = `${top}px`;
-        
+
+        this.tooltipEl.style.left = `${left} px`;
+        this.tooltipEl.style.top = `${top} px`;
+
         // Add fade-in animation using CSS class
         this.tooltipEl.classList.remove('visible');
-        
+
         requestAnimationFrame(() => {
             if (this.tooltipEl) {
                 this.tooltipEl.classList.add('visible');

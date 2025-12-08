@@ -2,7 +2,7 @@ import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
 
 export class OpenAIService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -13,11 +13,13 @@ export class OpenAIService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.openaiApiKey) {
-            new Notice('OpenAI API key is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('OpenAI API key is not set, please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.openaiModel) {
-            new Notice('OpenAI Model is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('OpenAI model is not set, please add it in the Spaceforge settings');
             return null;
         }
 
@@ -38,7 +40,7 @@ export class OpenAIService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from OpenAI. Please try again.');
+                new Notice('Failed to generate valid MCQs from OpenAI, please try again');
                 return null;
             }
 
@@ -47,8 +49,8 @@ export class OpenAIService implements IMCQGenerationService {
                 questions,
                 generatedAt: Date.now()
             };
-        } catch (error) {
-            new Notice('Failed to generate MCQs with OpenAI. Please check console for details.');
+        } catch {
+            new Notice('Failed to generate MCQs with OpenAI, please check console for details');
             return null;
         }
     }
@@ -66,7 +68,7 @@ export class OpenAIService implements IMCQGenerationService {
             basePrompt = `Generate ${questionCount} multiple-choice questions that test understanding of key concepts in the following note. Each question should have ${choiceCount} choices, with only one correct answer. Format the output as a numbered list of questions with lettered choices (A, B, C, etc.). Mark the correct answer by putting [CORRECT] at the end of the line.\n\nFor example:\n1. What is the capital of France?\n   A) London\n   B) Berlin\n   C) Paris [CORRECT]\n   D) Madrid\n   E) Rome`;
         }
 
-        if (difficulty === 'basic') {
+        if (difficulty === MCQDifficulty.Basic) {
             basePrompt += `\n\nCreate straightforward questions that focus on key facts and basic concepts. Make the questions clear and direct, suitable for beginners or initial review.`;
         } else {
             basePrompt += `\n\nCreate challenging questions that test deeper understanding and application of concepts. Make the incorrect choices plausible to encourage critical thinking.`;
@@ -78,9 +80,9 @@ export class OpenAIService implements IMCQGenerationService {
         const apiKey = settings.openaiApiKey;
         const model = settings.openaiModel;
         const difficulty = settings.mcqDifficulty;
-        
-        const systemPrompt = difficulty === 'basic' 
-            ? settings.mcqBasicSystemPrompt 
+
+        const systemPrompt = difficulty === MCQDifficulty.Basic
+            ? settings.mcqBasicSystemPrompt
             : settings.mcqAdvancedSystemPrompt;
 
         try {
@@ -119,7 +121,7 @@ export class OpenAIService implements IMCQGenerationService {
     private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
-            let questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
+            const questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);
 
             if (questionBlocks.length === 0) {
                 const lines = response.split('\n');
@@ -156,7 +158,7 @@ export class OpenAIService implements IMCQGenerationService {
 
                 if (correctAnswerIndex === -1) { // Fallback if [CORRECT] not found
                     for (let i = 0; i < choices.length; i++) {
-                        if (lines[i+1] && (lines[i+1].toLowerCase().includes('correct') || lines[i+1].includes('✓') || lines[i+1].includes('✔️'))) {
+                        if (lines[i + 1] && (lines[i + 1].toLowerCase().includes('correct') || lines[i + 1].includes('✓') || lines[i + 1].includes('✔️'))) {
                             correctAnswerIndex = i;
                             break;
                         }
@@ -169,8 +171,9 @@ export class OpenAIService implements IMCQGenerationService {
                 }
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
-        } catch (error) {
-            new Notice('Error parsing MCQ response from OpenAI. Please try again.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Error parsing MCQ response from OpenAI, please try again');
             return [];
         }
     }

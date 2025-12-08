@@ -1,6 +1,6 @@
 import { Modal, Notice, setIcon, TFile, Setting } from 'obsidian'; // Ensure TFile is imported, Added Setting
 import SpaceforgePlugin from '../main';
-import { MCQQuestion, MCQSet, MCQAnswer, MCQSession } from '../models/mcq';
+import { MCQSet, MCQAnswer, MCQSession } from '../models/mcq';
 
 /**
  * Modal for displaying and answering MCQs
@@ -10,11 +10,11 @@ export class MCQModal extends Modal {
     notePath: string;
     mcqSet: MCQSet;
     session: MCQSession;
-    questionStartTime: number = 0;
-    isFreshGeneration: boolean = false;
+    questionStartTime = 0;
+    isFreshGeneration = false;
     // Modified callback to include score
     private onCompleteCallback: ((path: string, score: number, completed: boolean) => void) | null;
-    private selectedAnswerIndex: number = -1;
+    private selectedAnswerIndex = -1;
 
     constructor(
         plugin: SpaceforgePlugin,
@@ -45,37 +45,39 @@ export class MCQModal extends Modal {
         contentEl.empty();
         contentEl.addClass('spaceforge-mcq-modal');
         const headerContainer = contentEl.createDiv('mcq-header-container');
-        new Setting(headerContainer).setName('Multiple Choice Review').setHeading();
+        new Setting(headerContainer).setName('Multiple choice review').setHeading();
 
         if (!this.isFreshGeneration) {
             const refreshBtn = headerContainer.createDiv('mcq-refresh-btn');
             setIcon(refreshBtn, 'refresh-cw');
             refreshBtn.setAttribute('aria-label', 'Generate new questions');
-            refreshBtn.addEventListener('click', async () => {
+            refreshBtn.addEventListener('click', () => {
                 this.close();
-                // Use mcqGenerationService
-                const mcqGenerationService = this.plugin.mcqGenerationService;
-                if (mcqGenerationService && this.plugin.mcqController) {
-                    const file = this.plugin.app.vault.getAbstractFileByPath(this.notePath);
-                    // Check if file is TFile before reading
-                    if (file instanceof TFile) {
-                        const content = await this.plugin.app.vault.read(file);
-                        const newMcqSet = await mcqGenerationService.generateMCQs(this.notePath, content, this.plugin.settings);
-                        if (newMcqSet) {
-                            // Save via mcqService, then save plugin data
-                            this.plugin.mcqService.saveMCQSet(newMcqSet);
-                            await this.plugin.savePluginData();
-                            const newModal = new MCQModal(this.plugin, this.notePath, newMcqSet, this.onCompleteCallback);
-                            newModal.open();
+                void (async () => {
+                    // Use mcqGenerationService
+                    const mcqGenerationService = this.plugin.mcqGenerationService;
+                    if (mcqGenerationService && this.plugin.mcqController) {
+                        const file = this.plugin.app.vault.getAbstractFileByPath(this.notePath);
+                        // Check if file is TFile before reading
+                        if (file instanceof TFile) {
+                            const content = await this.plugin.app.vault.read(file);
+                            const newMcqSet = await mcqGenerationService.generateMCQs(this.notePath, content, this.plugin.settings);
+                            if (newMcqSet) {
+                                // Save via mcqService, then save plugin data
+                                this.plugin.mcqService.saveMCQSet(newMcqSet);
+                                await this.plugin.savePluginData();
+                                const newModal = new MCQModal(this.plugin, this.notePath, newMcqSet, this.onCompleteCallback);
+                                newModal.open();
+                            } else {
+                                new Notice('Failed to regenerate MCQs.');
+                            }
                         } else {
-                             new Notice('Failed to regenerate MCQs.');
+                            new Notice('Could not find note file to regenerate MCQs.');
                         }
                     } else {
-                        new Notice('Could not find note file to regenerate MCQs.');
+                        new Notice('MCQ generation service not available.'); // eslint-disable-line obsidianmd/ui/sentence-case
                     }
-                } else {
-                    new Notice('MCQ generation service not available.');
-                }
+                })();
             });
         }
 
@@ -146,7 +148,7 @@ export class MCQModal extends Modal {
             }
 
             if (processAnswer && this.selectedAnswerIndex !== -1) {
-                 if (this.selectedAnswerIndex < choiceButtons.length) {
+                if (this.selectedAnswerIndex < choiceButtons.length) {
                     const button = choiceButtons[this.selectedAnswerIndex] as HTMLElement;
                     button.classList.add('mcq-key-pressed');
                     window.setTimeout(() => {
@@ -155,8 +157,8 @@ export class MCQModal extends Modal {
                         this.selectedAnswerIndex = -1;
                     }, 150);
                 } else {
-                     this.handleAnswer(this.selectedAnswerIndex);
-                     this.selectedAnswerIndex = -1;
+                    this.handleAnswer(this.selectedAnswerIndex);
+                    this.selectedAnswerIndex = -1;
                 }
             }
         };
@@ -170,27 +172,27 @@ export class MCQModal extends Modal {
             this.scope.register([], i.toString(), keyDownHandler);
         }
         for (let i = 0; i < 9; i++) { // A-I
-             this.scope.register([], String.fromCharCode(65 + i), keyDownHandler);
+            this.scope.register([], String.fromCharCode(65 + i), keyDownHandler);
         }
 
         // Cleanup handled by Modal's onClose automatically if using this.scope.register
         // Original onClose logic for saving partial progress:
         const originalOnClose = this.onClose;
         this.onClose = () => {
-            originalOnClose.call(this); 
+            originalOnClose.call(this);
             if (!this.session.completed && this.session.answers.length > 0) {
                 // Session was closed prematurely but some answers were given
-                this.session.completedAt = Date.now(); 
+                this.session.completedAt = Date.now();
                 this.calculateScore(); // Calculate score based on answers so far
                 this.plugin.mcqService.saveMCQSession(this.session);
-                this.plugin.savePluginData(); 
+                void this.plugin.savePluginData();
                 if (this.onCompleteCallback) {
                     // Indicate it was not fully completed if onCompleteCallback expects a 'completed' flag
-                    this.onCompleteCallback(this.notePath, this.session.score, false); 
+                    this.onCompleteCallback(this.notePath, this.session.score, false);
                 }
             } else if (!this.session.completed && this.onCompleteCallback) {
                 // Closed before any answers or completion
-                 this.onCompleteCallback(this.notePath, 0, false);
+                this.onCompleteCallback(this.notePath, 0, false);
             }
         };
     }
@@ -203,7 +205,7 @@ export class MCQModal extends Modal {
         }
         const question = this.mcqSet.questions[questionIndex];
         if (!question || !question.choices || question.choices.length < 2) {
-            new Notice('Error: Invalid question data. Moving to next question.');
+            new Notice('Error: Invalid question data. Moving to next question.'); // eslint-disable-line obsidianmd/ui/sentence-case
             this.session.currentQuestionIndex++;
             if (this.session.currentQuestionIndex < this.mcqSet.questions.length) {
                 this.displayCurrentQuestion(containerEl);
@@ -222,12 +224,12 @@ export class MCQModal extends Modal {
         const existingAnswer = this.session.answers.find(a => a.questionIndex === questionIndex);
         if (existingAnswer && existingAnswer.attempts >= 2) {
             const skipContainer = newQuestionContainer.createDiv('mcq-skip-container');
-            const skipButton = skipContainer.createEl('button', { text: 'Show Answer & Continue', cls: 'mcq-skip-button' });
+            const skipButton = skipContainer.createEl('button', { text: 'Show answer & continue', cls: 'mcq-skip-button' });
             skipButton.addEventListener('click', () => {
                 const correctIndex = question.correctAnswerIndex;
                 const correctAnswerDisplay = newQuestionContainer.createDiv('mcq-correct-answer-display');
                 const correctLabel = correctAnswerDisplay.createDiv({ cls: 'sf-mcq-correct-label' });
-                correctLabel.setText('Correct Answer:');
+                correctLabel.setText('Correct answer:');
                 const correctText = correctAnswerDisplay.createDiv({ cls: 'sf-mcq-correct-text' });
                 correctText.setText(String.fromCharCode(65 + correctIndex) + ') ' + question.choices[correctIndex]);
 
@@ -246,7 +248,7 @@ export class MCQModal extends Modal {
                 }
 
                 const continueBtn = correctAnswerDisplay.createEl('button', {
-                    text: 'Continue to Next Question',
+                    text: 'Continue to next question',
                     cls: 'mcq-continue-button'
                 });
                 continueBtn.addEventListener('click', () => {
@@ -337,9 +339,9 @@ export class MCQModal extends Modal {
             this.session.completedAt = Date.now();
             // Save via mcqService
             this.plugin.mcqService.saveMCQSession(this.session);
-            this.plugin.savePluginData(); // Persist
+            void this.plugin.savePluginData(); // Persist
 
-            new Setting(contentEl).setName('Review Complete').setHeading();
+            new Setting(contentEl).setName('Review complete').setHeading();
             const scoreEl = contentEl.createDiv('mcq-score');
             const scoreTextEl = scoreEl.createDiv('mcq-score-text');
             const scorePercentage = this.session.score; // Score is 0-1
@@ -391,7 +393,7 @@ export class MCQModal extends Modal {
             // Removed the old score indicator text (🎯 Excellent, etc.)
 
             const resultsEl = contentEl.createDiv('mcq-results');
-            new Setting(resultsEl).setHeading().setName('Question Results');
+            new Setting(resultsEl).setHeading().setName('Question results');
             if (this.session.answers.length === 0) {
                 resultsEl.createDiv({ cls: 'mcq-no-answers', text: 'No questions were answered in this session.' });
             } else {
@@ -428,7 +430,7 @@ export class MCQModal extends Modal {
                         resultItem.createDiv({ cls: 'mcq-result-time', text: `Time: ${Math.round(answer.timeToAnswer)} seconds` });
 
                         // FSRS/SM-2 data per question removed from here
-                    } catch (error) { /* Error displaying answer result: ${error} */ }
+                    } catch (_error) { /* Error displaying answer result: ${error} */ }
                 });
             }
             const closeBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
@@ -439,9 +441,9 @@ export class MCQModal extends Modal {
                 }
                 this.close();
             });
-        } catch (error) {
-            new Setting(contentEl).setName('Error Completing Session').setHeading();
-            contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' });
+        } catch (_error) {
+            new Setting(contentEl).setName('Error completing session').setHeading();
+            contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' }); // eslint-disable-line obsidianmd/ui/sentence-case
             const errorCloseBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
             errorCloseBtn.addEventListener('click', () => this.close());
         }
@@ -508,12 +510,12 @@ function getFsrsRatingText(rating: number): string {
 // Helper function to map SM-2 rating number to text
 function getSm2RatingText(rating: number): string {
     switch (rating) {
-        case 0: return "Complete Blackout";
-        case 1: return "Incorrect Response";
-        case 2: return "Incorrect But Familiar";
-        case 3: return "Correct With Difficulty";
-        case 4: return "Correct With Hesitation";
-        case 5: return "Perfect Recall";
+        case 0: return "Complete blackout";
+        case 1: return "Incorrect response";
+        case 2: return "Incorrect but familiar";
+        case 3: return "Correct with difficulty";
+        case 4: return "Correct with hHesitation";
+        case 5: return "Perfect recall";
         default: return "Unknown";
     }
 }

@@ -1,5 +1,4 @@
 import { ReviewResponse, ReviewSchedule } from '../models/review-schedule';
-import { MCQSet } from '../models/mcq';
 
 /**
  * Interface for the core review controller
@@ -10,27 +9,27 @@ export interface IReviewController {
      * 
      * @param preserveCurrentIndex Whether to try to preserve the current note index
      */
-    updateTodayNotes(preserveCurrentIndex?: boolean): Promise<void>;
-    
+    updateTodayNotes(preserveCurrentIndex?: boolean): void;
+
     /**
      * Review the current note
      */
     reviewCurrentNote(): Promise<void>;
-    
+
     /**
      * Review a note
      * 
      * @param path Path to the note file
      */
     reviewNote(path: string): Promise<void>;
-    
+
     /**
      * Show the review modal for a note
      * 
      * @param path Path to the note file
      */
     showReviewModal(path: string): void;
-    
+
     /**
      * Process a review response
      * 
@@ -38,7 +37,7 @@ export interface IReviewController {
      * @param response User's response during review
      */
     processReviewResponse(path: string, response: ReviewResponse): Promise<void>;
-    
+
     /**
      * Skip the review of a note and reschedule for tomorrow with penalty
      * 
@@ -53,14 +52,14 @@ export interface IReviewController {
      * @param days Number of days to postpone (default: 1)
      */
     postponeNote(path: string, days?: number): Promise<void>;
-    
+
     /**
      * Handle a note being postponed, updating navigation state
      * 
      * @param path Path to the postponed note
      */
     handleNotePostponed(path: string): Promise<void>;
-    
+
     /**
      * Get the currently loaded notes due for review
      */
@@ -81,7 +80,7 @@ export interface IReviewController {
      * Sets an override for the current review date.
      * @param date Timestamp of the date to simulate, or null to use actual Date.now().
      */
-    setReviewDateOverride(date: number | null): Promise<void>;
+    setReviewDateOverride(date: number | null): void;
 
     /**
      * Gets the current review date override.
@@ -98,29 +97,29 @@ export interface IReviewNavigationController {
      * Navigate to the next note following the current order
      */
     navigateToNextNote(): Promise<void>;
-    
+
     /**
      * Navigate to the previous note in the current order
      */
     navigateToPreviousNote(): Promise<void>;
-    
+
     /**
      * Navigate to the next note without recording a review
      */
     navigateToNextNoteWithoutRating(): Promise<void>;
-    
+
     /**
      * Navigate to the current note without showing review modal
      */
     navigateToCurrentNoteWithoutModal(): Promise<void>;
-    
+
     /**
      * Open a note without showing the review modal
      * 
      * @param path Path to the note file
      */
     openNoteWithoutReview(path: string): Promise<void>;
-    
+
     /**
      * Swap two notes in the traversal order
      * 
@@ -138,27 +137,27 @@ export interface IReviewBatchController {
      * Start reviewing all of today's notes
      */
     reviewAllTodaysNotes(): Promise<void>;
-    
+
     /**
      * Review a specific set of notes
      * 
      * @param paths Array of note paths to review
      * @param useMCQ Whether to use MCQs for testing
      */
-    reviewNotes(paths: string[], useMCQ?: boolean): Promise<void>;
-    
+    reviewNotes(paths: string[], useMCQ?: boolean): void;
+
     /**
      * Review all notes with MCQs in a batch
      * 
      * @param useMCQ Whether to use MCQs for testing
      */
-    reviewAllNotesWithMCQ(useMCQ?: boolean): Promise<void>;
-    
+    reviewAllNotesWithMCQ(useMCQ?: boolean): void;
+
     /**
      * Regenerate MCQs for all notes due today
      */
     regenerateAllMCQs(): Promise<void>;
-    
+
     /**
      * Postpone a specific set of notes
      * 
@@ -166,7 +165,7 @@ export interface IReviewBatchController {
      * @param days Number of days to postpone
      */
     postponeNotes(paths: string[], days?: number): Promise<void>;
-    
+
     /**
      * Remove a specific set of notes from the review schedule
      * 

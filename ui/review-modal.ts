@@ -1,8 +1,8 @@
 import { App, Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
 import SpaceforgePlugin from '../main';
-import { ReviewResponse, ReviewSchedule, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
+import { ReviewResponse, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
 import { State as FsrsState } from 'ts-fsrs'; // For displaying FSRS state name
-import { MCQController } from '../controllers/review-controller-mcq'; // Import MCQController for type hinting
+
 
 /**
  * Modal for reviewing a note
@@ -19,7 +19,7 @@ export class ReviewModal extends Modal {
 
     onOpen(): void {
         const { contentEl } = this;
-        new Setting(contentEl).setName("Review Note").setHeading();
+        new Setting(contentEl).setName("Review note").setHeading();
 
         const buttonsContainer = contentEl.createDiv("review-buttons-container");
         const schedule = this.plugin.reviewScheduleService.schedules[this.path];
@@ -29,7 +29,7 @@ export class ReviewModal extends Modal {
             const createFsrsButton = (text: string, clsSuffix: string, rating: FsrsRating) => {
                 const button = buttonsContainer.createEl("button", { text, cls: `review-button review-button-fsrs-${clsSuffix}` });
                 button.addEventListener("click", () => {
-                    this.plugin.reviewController.processReviewResponse(this.path, rating);
+                    void this.plugin.reviewController.processReviewResponse(this.path, rating);
                     this.close();
                 });
             };
@@ -42,33 +42,33 @@ export class ReviewModal extends Modal {
             const createSm2Button = (text: string, cls: string, response: ReviewResponse) => {
                 const button = buttonsContainer.createEl("button", { text, cls });
                 button.addEventListener("click", () => {
-                    this.plugin.reviewController.processReviewResponse(this.path, response);
+                    void this.plugin.reviewController.processReviewResponse(this.path, response);
                     this.close();
                 });
             };
-            createSm2Button("0: Complete Blackout", "review-button review-button-complete-blackout", ReviewResponse.CompleteBlackout);
-            createSm2Button("1: Incorrect Response", "review-button review-button-incorrect", ReviewResponse.IncorrectResponse);
-            createSm2Button("2: Incorrect but Familiar", "review-button review-button-incorrect-familiar", ReviewResponse.IncorrectButFamiliar);
-            createSm2Button("3: Correct with Difficulty", "review-button review-button-correct-difficulty", ReviewResponse.CorrectWithDifficulty);
-            createSm2Button("4: Correct with Hesitation", "review-button review-button-correct-hesitation", ReviewResponse.CorrectWithHesitation);
-            createSm2Button("5: Perfect Recall", "review-button review-button-perfect-recall", ReviewResponse.PerfectRecall);
+            createSm2Button("0: Complete blackout", "review-button review-button-complete-blackout", ReviewResponse.CompleteBlackout);
+            createSm2Button("1: Incorrect response", "review-button review-button-incorrect", ReviewResponse.IncorrectResponse);
+            createSm2Button("2: Incorrect but familiar", "review-button review-button-incorrect-familiar", ReviewResponse.IncorrectButFamiliar);
+            createSm2Button("3: Correct with difficulty", "review-button review-button-correct-difficulty", ReviewResponse.CorrectWithDifficulty);
+            createSm2Button("4: Correct with hesitation", "review-button review-button-correct-hesitation", ReviewResponse.CorrectWithHesitation);
+            createSm2Button("5: Perfect recall", "review-button review-button-perfect-recall", ReviewResponse.PerfectRecall);
         }
 
         buttonsContainer.createEl("div", { cls: "review-button-separator" });
 
         // Postpone Button
-        const postponeButton = buttonsContainer.createEl("button", { text: "Postpone to Tomorrow", cls: "review-button review-button-postpone" });
+        const postponeButton = buttonsContainer.createEl("button", { text: "Postpone to tomorrow", cls: "review-button review-button-postpone" });
         postponeButton.addEventListener("click", () => {
-            this.plugin.reviewController.skipReview(this.path); // skipReview handles postponement
+            void this.plugin.reviewController.skipReview(this.path); // skipReview handles postponement
             this.close();
         });
 
         // Skip/Next Button
-        const skipButton = buttonsContainer.createEl("button", { text: "Skip/Next", cls: "review-button review-button-skip" });
-        skipButton.addEventListener("click", async () => {
+        const skipButton = buttonsContainer.createEl("button", { text: "Skip/next", cls: "review-button review-button-skip" });
+        skipButton.addEventListener("click", () => {
             this.close();
             if (this.plugin.navigationController) {
-                await this.plugin.navigationController.navigateToNextNoteWithoutRating();
+                void this.plugin.navigationController.navigateToNextNoteWithoutRating();
             }
         });
 
@@ -76,15 +76,16 @@ export class ReviewModal extends Modal {
         if (this.plugin.settings.enableMCQ) {
             buttonsContainer.createEl("div", { cls: "review-button-separator" });
 
+
             const mcqButton = buttonsContainer.createEl("button", { cls: "review-button review-button-mcq" });
             const mcqIconSpan = mcqButton.createSpan("mcq-button-icon"); setIcon(mcqIconSpan, "mcq-quiz");
-            const textSpan = mcqButton.createSpan("mcq-button-text"); textSpan.setText("Test with MCQs");
+            const textSpan = mcqButton.createSpan("mcq-button-text"); textSpan.setText("Test with MCQs"); // eslint-disable-line obsidianmd/ui/sentence-case
 
             mcqButton.addEventListener("click", () => {
                 const mcqController = this.plugin.mcqController;
                 if (mcqController) {
                     // Call startMCQReview without the callback
-                    mcqController.startMCQReview(this.path);
+                    void mcqController.startMCQReview(this.path);
                     // The logic for handling completion should ideally be managed elsewhere,
                     // perhaps by observing an event or checking state after the modal closes,
                     // or the MCQModal itself could trigger the review processing upon completion.
@@ -96,10 +97,10 @@ export class ReviewModal extends Modal {
                     const initializedMcqController = this.plugin.mcqController;
                     if (initializedMcqController) {
                         // Call startMCQReview without the callback
-                        initializedMcqController.startMCQReview(this.path);
+                        void initializedMcqController.startMCQReview(this.path);
                         this.close();
                     } else {
-                        new Notice("MCQ feature could not be initialized. Please check settings.");
+                        new Notice("MCQ feature could not be initialized. Please check settings."); // eslint-disable-line obsidianmd/ui/sentence-case
                     }
                 }
             });
@@ -109,19 +110,21 @@ export class ReviewModal extends Modal {
             if (mcqController && this.plugin.mcqService.getMCQSetForNote(this.path)) {
                 const refreshMcqButton = buttonsContainer.createEl("button", { cls: "review-button review-button-mcq-refresh" });
                 const refreshIconSpan = refreshMcqButton.createSpan("mcq-button-icon"); setIcon(refreshIconSpan, "refresh-cw");
-                const refreshTextSpan = refreshMcqButton.createSpan("mcq-button-text"); refreshTextSpan.setText("Generate New MCQs");
+                const refreshTextSpan = refreshMcqButton.createSpan("mcq-button-text"); refreshTextSpan.setText("Generate new MCQs"); // eslint-disable-line obsidianmd/ui/sentence-case
 
-                refreshMcqButton.addEventListener("click", async () => {
+                refreshMcqButton.addEventListener("click", () => {
                     if (mcqController) {
                         new Notice("Generating new MCQs...");
-                        const success = await mcqController.generateMCQs(this.path, true); // Force regeneration
-                        if (success) {
-                            // Start review with the newly generated MCQs, without callback
-                            mcqController.startMCQReview(this.path);
-                            this.close();
-                        } else {
-                            new Notice("Failed to generate new MCQs");
-                        }
+                        void (async () => {
+                            const success = await mcqController.generateMCQs(this.path, true); // Force regeneration
+                            if (success) {
+                                // Start review with the newly generated MCQs, without callback
+                                void mcqController.startMCQReview(this.path);
+                                this.close();
+                            } else {
+                                new Notice("Failed to generate new MCQs.");
+                            }
+                        })();
                     }
                 });
             }
@@ -147,13 +150,13 @@ export class ReviewModal extends Modal {
             if (schedule.lastReviewDate) infoText.createEl("p", { text: `Last reviewed: ${new Date(schedule.lastReviewDate).toLocaleDateString()}` });
 
             if (schedule.schedulingAlgorithm === 'fsrs' && schedule.fsrsData) {
-                infoText.createEl("p", { text: `Algorithm: FSRS`, cls: "review-phase-fsrs" });
+                infoText.createEl("p", { text: `Algorithm: FSRS`, cls: "review-phase-fsrs" }); // eslint-disable-line obsidianmd/ui/sentence-case
                 infoText.createEl("p", { text: `Stability: ${schedule.fsrsData.stability.toFixed(2)}` });
                 infoText.createEl("p", { text: `Difficulty: ${schedule.fsrsData.difficulty.toFixed(2)}` });
                 infoText.createEl("p", { text: `State: ${FsrsState[schedule.fsrsData.state]}` }); // Display FSRS state name
                 infoText.createEl("p", { text: `Interval: ${schedule.fsrsData.scheduled_days} days` });
             } else { // SM-2 or fallback
-                infoText.createEl("p", { text: `Algorithm: SM-2`, cls: "review-phase-sm2" });
+                infoText.createEl("p", { text: `Algorithm: SM-2`, cls: "review-phase-sm2" }); // eslint-disable-line obsidianmd/ui/sentence-case
                 let phaseText: string; let phaseClass: string;
                 if (schedule.scheduleCategory === 'initial') {
                     const totalInitialSteps = this.plugin.settings.initialScheduleCustomIntervals.length;

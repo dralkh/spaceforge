@@ -1,4 +1,4 @@
-import { Notice, TFile, TFolder } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 import { ReviewSchedule, ReviewResponse, toSM2Quality, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
 import SpaceforgePlugin from '../main';
 import { DateUtils } from '../utils/dates';
@@ -57,7 +57,7 @@ export class ReviewScheduleService {
         this.schedules = schedules;
         this.customNoteOrder = customNoteOrder;
         this.lastLinkAnalysisTimestamp = lastLinkAnalysisTimestamp;
-        this.history = history; 
+        this.history = history;
         this.fsrsService = new FsrsScheduleService(this.plugin.settings);
     }
 
@@ -72,18 +72,18 @@ export class ReviewScheduleService {
      * @param path Path to the note file
      * @param daysFromNow Days until first review (default: 0, same day)
      */
-    async scheduleNoteForReview(path: string, daysFromNow: number = 0): Promise<void> {
+    scheduleNoteForReview(path: string, daysFromNow = 0): void {
         // Check if file exists and is a markdown file
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
         if (!file || !(file instanceof TFile) || file.extension !== "md") {
-            new Notice("Only markdown files can be added to the review schedule");
+            new Notice("Only markdown files can be added to the review schedule."); // eslint-disable-line obsidianmd/ui/sentence-case
             return;
         }
 
         const now = Date.now();
         const todayUTCStart = DateUtils.startOfUTCDay(new Date(now));
         const defaultAlgorithm = this.plugin.settings.defaultSchedulingAlgorithm;
-        
+
         let newSchedule: ReviewSchedule;
 
         if (defaultAlgorithm === 'fsrs') {
@@ -98,7 +98,7 @@ export class ReviewScheduleService {
                 fsrsData: fsrsData,
                 // SM-2 fields can be undefined or default
                 ease: this.plugin.settings.baseEase, // Keep a base for potential conversion
-                interval: 0, 
+                interval: 0,
                 consecutive: 0,
                 repetitionCount: 0,
                 scheduleCategory: undefined, // Not applicable to FSRS
@@ -143,7 +143,7 @@ export class ReviewScheduleService {
             this.plugin.events.emit('sidebar-update');
         }
 
-        new Notice(`Note added to review schedule`);
+        new Notice(`Note added to review schedule.`);
     }
 
     /**
@@ -156,7 +156,7 @@ export class ReviewScheduleService {
     private isNoteDue(schedule: ReviewSchedule, effectiveReviewDate: number): boolean {
         const reviewDateObj = new Date(effectiveReviewDate);
         const effectiveUTCDayEnd = DateUtils.endOfUTCDay(reviewDateObj);
-        
+
         // Note is due if its nextReviewDate is on or before the effective date
         // Allow notes due today or earlier to be reviewed
         return schedule.nextReviewDate <= effectiveUTCDayEnd;
@@ -171,15 +171,15 @@ export class ReviewScheduleService {
      * @param currentReviewDate Optional timestamp for the current review date (simulated or actual)
      * @returns true if the review was recorded, false if it was just a preview
      */
-    async recordReview(path: string, response: ReviewResponse | FsrsRating, isSkipped: boolean = false, currentReviewDate?: number): Promise<boolean> {
+    recordReview(path: string, response: ReviewResponse | FsrsRating, isSkipped = false, currentReviewDate?: number): boolean {
         const schedule = this.schedules[path];
         if (!schedule) return false;
 
         const effectiveReviewDate = currentReviewDate || Date.now();
-        
+
         // Check if the note is actually due for review
         const isDue = this.isNoteDue(schedule, effectiveReviewDate);
-        
+
         if (!isDue) {
             // Note is not due, this is just a preview - don't record anything
             return false;
@@ -221,50 +221,50 @@ export class ReviewScheduleService {
 
         if (schedule.schedulingAlgorithm === 'fsrs') {
             if (!schedule.fsrsData) { // Should not happen if card is properly initialized
-            // FSRS service expects a Date object for the review time.
-            // reviewDateObj (created from effectiveReviewDate) is correct here.
-            schedule.fsrsData = this.fsrsService.createNewFsrsCardData(reviewDateObj);
-        }
+                // FSRS service expects a Date object for the review time.
+                // reviewDateObj (created from effectiveReviewDate) is correct here.
+                schedule.fsrsData = this.fsrsService.createNewFsrsCardData(reviewDateObj);
+            }
 
-        // --- START FIX: Determine correct FsrsRating ---
-        let actualFsrsRating: FsrsRating;
-        // Check if the response is one of the legacy ReviewResponse values from MCQ modal
-        if (response === ReviewResponse.Perfect) { // Value 5
-            actualFsrsRating = FsrsRating.Easy; // Map to 4
-        } else if (response === ReviewResponse.Good) { // Value 4
-            actualFsrsRating = FsrsRating.Good; // Map to 3
-        } else if (response === ReviewResponse.Fair) { // Value 3
-            actualFsrsRating = FsrsRating.Hard; // Map to 2
-        } else if (response === ReviewResponse.Hard) { // Value 1 (legacy)
-            actualFsrsRating = FsrsRating.Again; // Map to 1
-        } else if (Object.values(FsrsRating).includes(response as FsrsRating)) {
-             // If it's already a valid FsrsRating (1, 2, 3, 4), use it directly
-            actualFsrsRating = response as FsrsRating;
-        } else {
-            // Fallback for unexpected values (e.g., SM-2 specific 0, 2, potentially)
-            // Map based on general difficulty
-            const quality = toSM2Quality(response as ReviewResponse);
-            if (quality >= 4) actualFsrsRating = FsrsRating.Easy; // 4, 5 -> Easy
-            else if (quality === 3) actualFsrsRating = FsrsRating.Good; // 3 -> Good
-            else if (quality === 2) actualFsrsRating = FsrsRating.Hard; // 2 -> Hard
-            else actualFsrsRating = FsrsRating.Again; // 0, 1 -> Again
-        }
-        // --- END FIX ---
+            // --- START FIX: Determine correct FsrsRating ---
+            let actualFsrsRating: FsrsRating;
+            // Check if the response is one of the legacy ReviewResponse values from MCQ modal
+            if (response === ReviewResponse.PerfectRecall) { // Value 5
+                actualFsrsRating = FsrsRating.Easy; // Map to 4
+            } else if (response === ReviewResponse.CorrectWithHesitation) { // Value 4
+                actualFsrsRating = FsrsRating.Good; // Map to 3
+            } else if (response === ReviewResponse.CorrectWithDifficulty) { // Value 3
+                actualFsrsRating = FsrsRating.Hard; // Map to 2
+            } else if (response === ReviewResponse.IncorrectResponse) { // Value 1 (legacy)
+                actualFsrsRating = FsrsRating.Again; // Map to 1
+            } else if (Object.values(FsrsRating).includes(response as FsrsRating)) {
+                // If it's already a valid FsrsRating (1, 2, 3, 4), use it directly
+                actualFsrsRating = response as FsrsRating;
+            } else {
+                // Fallback for unexpected values (e.g., SM-2 specific 0, 2, potentially)
+                // Map based on general difficulty
+                const quality = toSM2Quality(response as ReviewResponse);
+                if (quality >= 4) actualFsrsRating = FsrsRating.Easy; // 4, 5 -> Easy
+                else if (quality === 3) actualFsrsRating = FsrsRating.Good; // 3 -> Good
+                else if (quality === 2) actualFsrsRating = FsrsRating.Hard; // 2 -> Hard
+                else actualFsrsRating = FsrsRating.Again; // 0, 1 -> Again
+            }
+            // --- END FIX ---
 
-        const { updatedData, nextReviewDate: newNextReviewDateFsrs } = this.fsrsService.recordReview(
-            schedule.fsrsData,
-            actualFsrsRating, // Pass the correctly determined FsrsRating
-            reviewDateObj // Pass the exact moment of review
-        );
-        schedule.fsrsData = updatedData;
-        schedule.nextReviewDate = newNextReviewDateFsrs; // This is already a UTC timestamp from FSRS
+            const { updatedData, nextReviewDate: newNextReviewDateFsrs } = this.fsrsService.recordReview(
+                schedule.fsrsData,
+                actualFsrsRating, // Pass the correctly determined FsrsRating
+                reviewDateObj // Pass the exact moment of review
+            );
+            schedule.fsrsData = updatedData;
+            schedule.nextReviewDate = newNextReviewDateFsrs; // This is already a UTC timestamp from FSRS
             // SM-2 specific fields are not updated for FSRS cards
             schedule.interval = updatedData.scheduled_days; // For display consistency if needed
             schedule.ease = Math.round(updatedData.difficulty * 10); // Approximate for display
 
         } else { // SM-2
-            let qualityRating = toSM2Quality(response as ReviewResponse);
-            
+            const qualityRating = toSM2Quality(response as ReviewResponse);
+
             // Initialize SM-2 fields if they are somehow missing (should not happen for SM-2 cards)
             schedule.ease = schedule.ease ?? this.plugin.settings.baseEase;
             schedule.interval = schedule.interval ?? 0;
@@ -323,8 +323,8 @@ export class ReviewScheduleService {
                     schedule.consecutive += 1;
                     if (qualityRating >= 3) {
                         // repetitionCount for initial phase should increment if successful, reset if not.
-                    // This is distinct from the SM-2 n.
-                    schedule.repetitionCount = (schedule.repetitionCount || 0) + 1;
+                        // This is distinct from the SM-2 n.
+                        schedule.repetitionCount = (schedule.repetitionCount || 0) + 1;
                     } else { // q < 3
                         schedule.repetitionCount = 0; // Reset progress in initial steps
                     }
@@ -379,193 +379,122 @@ export class ReviewScheduleService {
         currentInterval: number,
         currentEase: number,
         response: ReviewResponse,
-        repetitionCount: number = 0,
-        daysLate: number = 0,
-        isSkipped: boolean = false
+        repetitionCount = 0,
+        daysLate = 0,
+        isSkipped = false
     ): { interval: number, ease: number, repetitionCount: number } {
-         // Ensure response is in the valid SM-2 range (0-5)
-         let qualityRating = toSM2Quality(response);
-
-         // Handle overdue or skipped items according to modified SM-2 algorithm
-         if (isSkipped || daysLate > 0) {
-             // Determine effective quality rating:
-             // - If explicitly skipped, reduce quality by 1 (but not below 0)
-             // - If overdue, set quality to 0
-             // - If both overdue and explicitly skipped, prioritize the skip logic (user choice)
-             const q_eff = isSkipped ? Math.max(0, qualityRating - 1) : 0;
-
-             // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
-             let ease = currentEase / 100;
-
-             // Calculate new ease factor using SM-2 formula with the effective quality
-             ease = ease + (0.1 - (5 - q_eff) * (0.08 + (5 - q_eff) * 0.02));
-
-             // Apply minimum ease factor (SM-2 specifies 1.3 as the minimum)
-             ease = Math.max(1.3, ease);
-
-             // Force next review to be tomorrow (interval = 1) regardless of computed interval
-             // and reset repetition count to 1
-             return {
-                 interval: 1, // Force next review to be tomorrow
-                 ease: Math.round(ease * 100), // Convert back to internal format
-                 repetitionCount: 1 // Reset repetition count to 1
-             };
-         }
-
-         // For normal reviews, use the regular SM-2 implementation
-         // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
-         let ease = currentEase / 100;
-         let newRepetitionCount = repetitionCount;
-         let interval: number;
-
-         // Calculate new ease factor using SM-2 formula
-         // EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
-         ease = ease + (0.1 - (5 - qualityRating) * (0.08 + (5 - qualityRating) * 0.02));
-
-         // Apply minimum ease factor (SM-2 specifies 1.3 as the minimum)
-         ease = Math.max(1.3, ease);
-
-         // If response is less than 3, reset repetition count to 0 (per strict SM-2)
-         if (qualityRating < 3) {
-             newRepetitionCount = 0;
-             interval = 1; // Next interval is 1 day for failed items
-         } else {
-             // Increment repetition count for correct responses
-             newRepetitionCount += 1;
-
-             // Calculate new interval based on SM-2 rules
-             if (newRepetitionCount === 1) {
-                 interval = 1;
-             } else if (newRepetitionCount === 2) {
-                 interval = 6;
-             } else {
-                 // For n > 2, use the formula I_n = I_(n-1) * EF
-                 interval = Math.round(currentInterval * ease);
-             }
-         }
-
-         // Apply load balancing if enabled (this is an extension to the algorithm)
-         if (this.plugin.settings.loadBalance) {
-             const fuzz = interval > 7 ? Math.min(3, Math.floor(interval * 0.05)) : 0;
-             interval = interval + Math.random() * fuzz * 2 - fuzz;
-         }
-
-         // Ensure interval is at least 1 day
-         interval = Math.max(1, interval);
-
-         // Enforce maximum interval (this is an extension to the algorithm)
-         interval = Math.min(interval, this.plugin.settings.maximumInterval);
-
-         // Convert ease back to internal format before returning
-         return {
-             interval: Math.round(interval), // SM-2 uses whole days
-             ease: Math.round(ease * 100),
-             repetitionCount: newRepetitionCount
-         };
+        return this.calculateSM2Schedule(
+            currentInterval,
+            currentEase,
+            toSM2Quality(response),
+            repetitionCount,
+            daysLate,
+            isSkipped
+        );
     }
 
-     /**
-      * Calculate new schedule parameters using the enhanced SM-2 algorithm with lateness penalty
-      * (This is the core calculation logic used internally by recordReview and skipNote)
-      *
-      * @param currentInterval Current interval in days
-      * @param currentEase Current ease factor (expressed as a number where 2.5 = 250)
-      * @param qualityRating User's response during review, as a numeric quality rating (0-5)
-      * @param repetitionCount Current repetition count (n)
-      * @param daysLate How many days late the review is (0 if on time or early)
-      * @param isSkipped Whether the item was explicitly skipped by the user
-      * @returns New interval, ease, and repetition count
-      */
-     private calculateSM2Schedule(
-         currentInterval: number,
-         currentEase: number,
-         qualityRating: number, // Changed parameter type from ReviewResponse to number
-         repetitionCount: number = 0,
-         daysLate: number = 0,
-         isSkipped: boolean = false
-     ): { interval: number, ease: number, repetitionCount: number } {
-         // qualityRating is now expected to be a number (0-5) directly.
-         // The call to toSM2Quality(response) is removed.
+    /**
+     * Calculate new schedule parameters using the enhanced SM-2 algorithm with lateness penalty
+     * (This is the core calculation logic used internally by recordReview and skipNote)
+     *
+     * @param currentInterval Current interval in days
+     * @param currentEase Current ease factor (expressed as a number where 2.5 = 250)
+     * @param qualityRating User's response during review, as a numeric quality rating (0-5)
+     * @param repetitionCount Current repetition count (n)
+     * @param daysLate How many days late the review is (0 if on time or early)
+     * @param isSkipped Whether the item was explicitly skipped by the user
+     * @returns New interval, ease, and repetition count
+     */
+    private calculateSM2Schedule(
+        currentInterval: number,
+        currentEase: number,
+        qualityRating: number, // Changed parameter type from ReviewResponse to number
+        repetitionCount = 0,
+        daysLate = 0,
+        isSkipped = false
+    ): { interval: number, ease: number, repetitionCount: number } {
+        // qualityRating is now expected to be a number (0-5) directly.
+        // The call to toSM2Quality(response) is removed.
 
-         // Handle overdue or skipped items according to modified SM-2 algorithm
-         if (isSkipped || daysLate > 0) {
-             // Determine effective quality rating:
-             // - If explicitly skipped, reduce quality by 1 (but not below 0)
-             // - If overdue, set quality to 0
-             // - If both overdue and explicitly skipped, prioritize the skip logic (user choice)
-             const q_eff = isSkipped ? Math.max(0, qualityRating - 1) : 0;
+        // Handle overdue or skipped items according to modified SM-2 algorithm
+        if (isSkipped || daysLate > 0) {
+            // Determine effective quality rating:
+            // - If explicitly skipped, reduce quality by 1 (but not below 0)
+            // - If overdue, set quality to 0
+            // - If both overdue and explicitly skipped, prioritize the skip logic (user choice)
+            const q_eff = isSkipped ? Math.max(0, qualityRating - 1) : 0;
 
-             // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
-             let ease = currentEase / 100;
+            // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
+            let ease = currentEase / 100;
 
-             // Calculate new ease factor using SM-2 formula with the effective quality
-             ease = ease + (0.1 - (5 - q_eff) * (0.08 + (5 - q_eff) * 0.02));
+            // Calculate new ease factor using SM-2 formula with the effective quality
+            ease = ease + (0.1 - (5 - q_eff) * (0.08 + (5 - q_eff) * 0.02));
 
-             // Apply minimum ease factor (SM-2 specifies 1.3 as the minimum)
-             ease = Math.max(1.3, ease);
+            // Apply minimum ease factor (SM-2 specifies 1.3 as the minimum)
+            ease = Math.max(1.3, ease);
 
-             // Force next review to be tomorrow (interval = 1) regardless of computed interval
-             // and reset repetition count to 1
-             const result = {
-                 interval: 1, // Force next review to be tomorrow
-                 ease: Math.round(ease * 100), // Convert back to internal format
-                 repetitionCount: 1 // Reset repetition count to 1
-             };
+            // Force next review to be tomorrow (interval = 1) regardless of computed interval
+            // and reset repetition count to 1
+            const result = {
+                interval: 1, // Force next review to be tomorrow
+                ease: Math.round(ease * 100), // Convert back to internal format
+                repetitionCount: 1 // Reset repetition count to 1
+            };
 
-             return result;
-         }
+            return result;
+        }
 
-         // For normal reviews, use the regular SM-2 implementation
-         // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
-         let ease = currentEase / 100;
-         let newRepetitionCount = repetitionCount;
-         let interval: number;
+        // For normal reviews, use the regular SM-2 implementation
+        // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
+        let ease = currentEase / 100;
+        let newRepetitionCount = repetitionCount;
+        let interval: number;
 
-         // Calculate new ease factor using SM-2 formula
-         // EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
-         ease = ease + (0.1 - (5 - qualityRating) * (0.08 + (5 - qualityRating) * 0.02));
+        // Calculate new ease factor using SM-2 formula
+        // EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+        ease = ease + (0.1 - (5 - qualityRating) * (0.08 + (5 - qualityRating) * 0.02));
 
-         // Apply minimum ease factor (SM-2 specifies 1.3 as the minimum)
-         ease = Math.max(1.3, ease);
+        // Apply minimum ease factor (SM-2 specifies 1.3 as the minimum)
+        ease = Math.max(1.3, ease);
 
-         // If response is less than 3, reset repetition count to 0 (per strict SM-2)
-         if (qualityRating < 3) {
-             newRepetitionCount = 0;
-             interval = 1; // Next interval is 1 day for failed items
-         } else {
-             // Increment repetition count for correct responses
-             newRepetitionCount += 1;
+        // If response is less than 3, reset repetition count to 0 (per strict SM-2)
+        if (qualityRating < 3) {
+            newRepetitionCount = 0;
+            interval = 1; // Next interval is 1 day for failed items
+        } else {
+            // Increment repetition count for correct responses
+            newRepetitionCount += 1;
 
-             // Calculate new interval based on SM-2 rules
-             if (newRepetitionCount === 1) {
-                 interval = 1;
-             } else if (newRepetitionCount === 2) {
-                 interval = 6;
-             } else {
-                 // For n > 2, use the formula I_n = I_(n-1) * EF
-                 interval = Math.round(currentInterval * ease);
-             }
-         }
+            // Calculate new interval based on SM-2 rules
+            if (newRepetitionCount === 1) {
+                interval = 1;
+            } else if (newRepetitionCount === 2) {
+                interval = 6;
+            } else {
+                // For n > 2, use the formula I_n = I_(n-1) * EF
+                interval = Math.round(currentInterval * ease);
+            }
+        }
 
-         // Apply load balancing if enabled (this is an extension to the algorithm)
-         if (this.plugin.settings.loadBalance) {
-             const fuzz = interval > 7 ? Math.min(3, Math.floor(interval * 0.05)) : 0;
-             interval = interval + Math.random() * fuzz * 2 - fuzz;
-         }
+        // Apply load balancing if enabled (this is an extension to the algorithm)
+        if (this.plugin.settings.loadBalance) {
+            const fuzz = interval > 7 ? Math.min(3, Math.floor(interval * 0.05)) : 0;
+            interval = interval + Math.random() * fuzz * 2 - fuzz;
+        }
 
-         // Ensure interval is at least 1 day
-         interval = Math.max(1, interval);
+        // Ensure interval is at least 1 day
+        interval = Math.max(1, interval);
 
-         // Enforce maximum interval (this is an extension to the algorithm)
-         interval = Math.min(interval, this.plugin.settings.maximumInterval);
+        // Enforce maximum interval (this is an extension to the algorithm)
+        interval = Math.min(interval, this.plugin.settings.maximumInterval);
 
-         // Convert ease back to internal format before returning
-         return {
-             interval: Math.round(interval), // SM-2 uses whole days
-             ease: Math.round(ease * 100),
-             repetitionCount: newRepetitionCount
-         };
-     }
+        // Convert ease back to internal format before returning
+        return {
+            interval: Math.round(interval), // SM-2 uses whole days
+            ease: Math.round(ease * 100),
+            repetitionCount: newRepetitionCount
+        };
+    }
 
 
     /**
@@ -575,7 +504,7 @@ export class ReviewScheduleService {
      * @param matchExactDate If true, only return notes due exactly on this date (ignoring time). Otherwise, notes due on or before this date.
      * @returns Array of due note schedules sorted by due date
      */
-    getDueNotes(date: number = Date.now(), matchExactDate: boolean = false): ReviewSchedule[] {
+    getDueNotes(date: number = Date.now(), matchExactDate = false): ReviewSchedule[] {
         const targetDate = new Date(date);
         const targetUTCDayStart = DateUtils.startOfUTCDay(targetDate);
         const targetUTCDayEnd = DateUtils.endOfUTCDay(targetDate);
@@ -601,7 +530,7 @@ export class ReviewScheduleService {
      * @param days Number of days to look ahead
      * @returns Array of upcoming review schedules sorted by due date
      */
-    getUpcomingReviews(days: number = 7): ReviewSchedule[] {
+    getUpcomingReviews(days = 7): ReviewSchedule[] {
         const now = Date.now();
         const futureDate = DateUtils.addDays(now, days);
 
@@ -625,10 +554,10 @@ export class ReviewScheduleService {
      * @param response Optional user's response to use for penalty calculation
      * @param currentReviewDate Optional timestamp for the current review date (simulated or actual)
      */
-    async skipNote(path: string, response: ReviewResponse | FsrsRating = ReviewResponse.CorrectWithDifficulty, currentReviewDate?: number): Promise<void> {
+    skipNote(path: string, response: ReviewResponse | FsrsRating = ReviewResponse.CorrectWithDifficulty, currentReviewDate?: number): void {
         const schedule = this.schedules[path];
         if (!schedule) return;
-        
+
         const effectiveReviewDate = currentReviewDate || Date.now();
         const reviewDateObj = new Date(effectiveReviewDate);
 
@@ -639,7 +568,7 @@ export class ReviewScheduleService {
             if (!schedule.fsrsData) { // Should not happen
                 schedule.fsrsData = this.fsrsService.createNewFsrsCardData(reviewDateObj);
             }
-            const { updatedData, nextReviewDate: newNextReviewDateFsrs, log } = this.fsrsService.skipReview(
+            const { updatedData, nextReviewDate: newNextReviewDateFsrs } = this.fsrsService.skipReview(
                 schedule.fsrsData,
                 reviewDateObj // Pass exact moment for FSRS skip
             );
@@ -696,7 +625,7 @@ export class ReviewScheduleService {
      * @param path Path to the note file
      * @param days Number of days to postpone (default: 1)
      */
-    async postponeNote(path: string, days: number = 1): Promise<void> {
+    postponeNote(path: string, days = 1): void {
         const schedule = this.schedules[path];
         if (!schedule) return;
 
@@ -715,7 +644,7 @@ export class ReviewScheduleService {
             }, 50); // Small delay (e.g., 50ms)
         }
 
-        new Notice(`Review postponed for ${days} day${days !== 1 ? 's' : ''}`);
+        new Notice(`Review postponed for ${days} day${days !== 1 ? 's' : ''}.`);
     }
 
     /**
@@ -724,7 +653,7 @@ export class ReviewScheduleService {
      * @param path Path to the note file
      * @returns True if the note was advanced, false otherwise.
      */
-    async advanceNote(path: string): Promise<boolean> {
+    advanceNote(path: string): boolean {
         const schedule = this.schedules[path];
         if (!schedule) {
             return false;
@@ -743,7 +672,7 @@ export class ReviewScheduleService {
         // New potential next review date is one day earlier.
         // If FSRS, it's one day earlier from its exact time. If SM-2, one day earlier from its UTC midnight.
         const newPotentialNextReviewTimestamp = DateUtils.addDays(schedule.nextReviewDate, -1);
-        
+
         // Ensure the new date (if SM-2, its UTC day start) is not before todayUTCMidnight
         if (schedule.schedulingAlgorithm === 'sm2') {
             schedule.nextReviewDate = Math.max(todayUTCMidnight, DateUtils.startOfUTCDay(new Date(newPotentialNextReviewTimestamp)));
@@ -771,7 +700,7 @@ export class ReviewScheduleService {
      *
      * @param path Path to the note file
      */
-    async removeFromReview(path: string): Promise<void> {
+    removeFromReview(path: string): void {
         if (this.schedules[path]) {
             delete this.schedules[path];
 
@@ -779,7 +708,7 @@ export class ReviewScheduleService {
             this.customNoteOrder = this.customNoteOrder.filter(p => p !== path);
 
             // Data saving is now handled by main.ts after this method returns
-            new Notice("Note removed from review schedule");
+            new Notice("Note removed from review schedule.");
 
             // Note: The controller will be notified separately to update its state
             // This prevents immediate reordering based on link analysis after removal.
@@ -793,11 +722,11 @@ export class ReviewScheduleService {
     /**
      * Clear all review schedules
      */
-    async clearAllSchedules(): Promise<void> {
+    clearAllSchedules(): void {
         this.schedules = {};
         this.customNoteOrder = []; // Also clear custom order
         // Data saving is now handled by main.ts after this method returns
-        new Notice("All review schedules have been cleared");
+        new Notice("All review schedules have been cleared.");
 
         // Notify any listeners (for UI updates)
         if (this.plugin.events) {
@@ -807,7 +736,7 @@ export class ReviewScheduleService {
         // Explicitly update the review controller's state
         // This dependency might need to be managed differently, e.g., via events
         if (this.plugin.reviewController) {
-            await this.plugin.reviewController.updateTodayNotes();
+            void this.plugin.reviewController.updateTodayNotes();
         }
     }
 
@@ -824,7 +753,7 @@ export class ReviewScheduleService {
         try {
             const content = await this.plugin.app.vault.read(file);
             return EstimationUtils.estimateReviewTime(file, content);
-        } catch (error) {
+        } catch {
             return 60; // Default 1 minute
         }
     }
@@ -836,14 +765,14 @@ export class ReviewScheduleService {
      * @param daysFromNow Days until first review (default: 0, same day)
      * @returns Number of notes scheduled
      */
-    async scheduleNotesInOrder(paths: string[], daysFromNow: number = 0): Promise<number> {
+    scheduleNotesInOrder(paths: string[], daysFromNow = 0): number {
         let count = 0;
 
         // Schedule each note in the provided order
         for (const path of paths) {
             const file = this.plugin.app.vault.getAbstractFileByPath(path);
             if (!file || !(file instanceof TFile) || file.extension !== "md" || this.schedules[path]) {
-                continue; 
+                continue;
             }
 
             const now = Date.now();
@@ -860,9 +789,9 @@ export class ReviewScheduleService {
                 };
             } else { // sm2
                 newSchedule = {
-                    path, lastReviewDate: null, 
+                    path, lastReviewDate: null,
                     nextReviewDate: DateUtils.addDays(todayUTCStart, daysFromNow), // UTC midnight
-                    ease: this.plugin.settings.baseEase, interval: daysFromNow, 
+                    ease: this.plugin.settings.baseEase, interval: daysFromNow,
                     consecutive: 0, reviewCount: 0, repetitionCount: 0,
                     scheduleCategory: this.plugin.settings.useInitialSchedule ? 'initial' : 'spaced',
                     schedulingAlgorithm: 'sm2', fsrsData: undefined,
@@ -878,7 +807,7 @@ export class ReviewScheduleService {
                 }
             }
             this.schedules[path] = newSchedule;
-            
+
             // Add to custom order if not already present
             if (!this.customNoteOrder.includes(path)) {
                 this.customNoteOrder.push(path);
@@ -902,11 +831,11 @@ export class ReviewScheduleService {
     /**
      * Update the custom note order - used to maintain user-defined ordering
      *
-     * @param order Array of note paths in desired order
+     * @param newOrder Array of note paths in desired order
      */
-    async updateCustomNoteOrder(order: string[]): Promise<void> {
+    updateCustomNoteOrder(newOrder: string[]): void {
         // Filter out duplicate paths and ensure we only store paths that exist in our schedules
-        const uniqueValidPaths = Array.from(new Set(order)).filter(path => this.schedules[path] !== undefined);
+        const uniqueValidPaths = Array.from(new Set(newOrder)).filter(path => this.schedules[path] !== undefined);
         this.customNoteOrder = uniqueValidPaths;
 
         // Data saving is now handled by main.ts after this method returns
@@ -925,7 +854,7 @@ export class ReviewScheduleService {
      * @param matchExactDate Passed to getDueNotes to filter by exact date if true.
      * @returns Array of due note schedules sorted appropriately
      */
-    getDueNotesWithCustomOrder(date: number = Date.now(), useCustomOrder: boolean = true, matchExactDate: boolean = false): ReviewSchedule[] {
+    getDueNotesWithCustomOrder(date: number = Date.now(), useCustomOrder = true, matchExactDate = false): ReviewSchedule[] {
         // First, get all due notes using the modified method
         const dueNotes = this.getDueNotes(date, matchExactDate);
 
@@ -989,7 +918,7 @@ export class ReviewScheduleService {
                     this.customNoteOrder.push(newPath);
                 }
             }
-            
+
 
             // Notify any listeners (for UI updates)
             // Data saving will be handled by the caller in main.ts
@@ -1007,8 +936,7 @@ export class ReviewScheduleService {
         return 2;
     }
 
-    public async convertAllSm2ToFsrs(): Promise<void> {
-        let convertedCount = 0;
+    public convertAllSm2ToFsrs(): void {
         for (const path in this.schedules) {
             if (Object.prototype.hasOwnProperty.call(this.schedules, path)) {
                 const schedule = this.schedules[path];
@@ -1018,15 +946,15 @@ export class ReviewScheduleService {
                     const baseDate = schedule.lastReviewDate ? new Date(schedule.lastReviewDate) : new Date();
                     schedule.fsrsData = this.fsrsService.createNewFsrsCardData(baseDate);
                     // New FSRS cards are typically due 'now' relative to their creation/conversion.
-                    schedule.nextReviewDate = baseDate.getTime(); 
-                    
+                    schedule.nextReviewDate = baseDate.getTime();
+
                     // Clear or nullify SM-2 specific fields
                     schedule.ease = this.plugin.settings.baseEase; // Keep a base ease for potential future conversion back
                     schedule.interval = 0; // Reset SM-2 interval
                     schedule.repetitionCount = 0;
                     schedule.consecutive = 0;
+                    schedule.consecutive = 0;
                     schedule.scheduleCategory = undefined;
-                    convertedCount++;
                 }
             }
         }
@@ -1035,8 +963,7 @@ export class ReviewScheduleService {
         }
     }
 
-    public async convertAllFsrsToSm2(): Promise<void> {
-        let convertedCount = 0;
+    public convertAllFsrsToSm2(): void {
         for (const path in this.schedules) {
             if (Object.prototype.hasOwnProperty.call(this.schedules, path)) {
                 const schedule = this.schedules[path];
@@ -1047,7 +974,7 @@ export class ReviewScheduleService {
                     schedule.repetitionCount = 0;
                     schedule.consecutive = 0;
                     schedule.scheduleCategory = this.plugin.settings.useInitialSchedule ? 'initial' : 'spaced';
-                    
+
                     // Set next review date based on SM-2 initial logic, using UTC days
                     const now = Date.now();
                     const todayUTCStart = DateUtils.startOfUTCDay(new Date(now));
@@ -1057,9 +984,8 @@ export class ReviewScheduleService {
                         nextReview = DateUtils.addDays(todayUTCStart, schedule.interval);
                     }
                     schedule.nextReviewDate = nextReview;
-                    
+
                     schedule.fsrsData = undefined; // Clear FSRS data
-                    convertedCount++;
                 }
             }
         }

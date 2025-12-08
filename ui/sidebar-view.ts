@@ -1,11 +1,11 @@
-import { ItemView, Menu, Notice, TFile, WorkspaceLeaf, setIcon, Setting } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, Setting } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { PomodoroUIManager } from "./sidebar/pomodoro-ui-manager";
 import { NoteItemRenderer } from "./sidebar/note-item-renderer";
 import { ListViewRenderer } from "./sidebar/list-view-renderer"; // Import ListViewRenderer
 import { ReviewSchedule } from "../models/review-schedule";
 import { DateUtils } from "../utils/dates";
-import { EstimationUtils } from "../utils/estimation";
+
 import { CalendarView } from "./calendar-view";
 
 /**
@@ -28,7 +28,7 @@ export class ReviewSidebarView extends ItemView {
     public activeListBaseDate: Date | null = null;
     selectedNotes: string[] = [];
     private lastSelectedNotePath: string | null = null;
-    private lastScrollPosition: number = 0;
+    private lastScrollPosition = 0;
     private expandedUpcomingDayKey: string | null = null; // State for upcoming section
     private resizeObserver: ResizeObserver | null = null;
 
@@ -52,7 +52,7 @@ export class ReviewSidebarView extends ItemView {
     }
 
     getViewType(): string { return "spaceforge-review-schedule"; }
-    getDisplayText(): string { return "Spaceforge Review"; }
+    getDisplayText(): string { return "Spaceforge Review"; } // eslint-disable-line obsidianmd/ui/sentence-case
     getIcon(): string { return "calendar-clock"; }
 
     async onOpen(): Promise<void> {
@@ -64,15 +64,16 @@ export class ReviewSidebarView extends ItemView {
         });
 
         // Ensure structure and render on first open
-        await this.refresh(); 
+        await this.refresh();
     }
 
-    async onClose(): Promise<void> {
+    onClose(): Promise<void> {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
         this.plugin.events.off('sidebar-update', this.refresh.bind(this));
         // No need to explicitly unregister pomodoro-update as the manager handles its own logic
+        return Promise.resolve();
     }
 
     private ensureBaseStructure(): void {
@@ -86,26 +87,30 @@ export class ReviewSidebarView extends ItemView {
 
         if (!this.persistentHeaderEl) {
             this.persistentHeaderEl = this.mainContainer.createDiv("review-header");
-            new Setting(this.persistentHeaderEl).setHeading().setName("Review Schedule");
+            new Setting(this.persistentHeaderEl).setHeading().setName("Review schedule");
             const viewToggle = this.persistentHeaderEl.createDiv("review-view-toggle");
 
             const listViewBtn = viewToggle.createDiv("review-view-btn");
             listViewBtn.setText("List");
-            listViewBtn.addEventListener("click", async () => {
+            listViewBtn.addEventListener("click", () => {
                 if (this.plugin.settings.sidebarViewType === 'list') return;
                 this.plugin.settings.sidebarViewType = 'list';
                 this.activeListBaseDate = null;
-                await this.plugin.savePluginData();
-                await this.refresh();
+                void (async () => {
+                    await this.plugin.savePluginData();
+                    await this.refresh();
+                })();
             });
 
             const calendarViewBtn = viewToggle.createDiv("review-view-btn");
             calendarViewBtn.setText("Calendar");
-            calendarViewBtn.addEventListener("click", async () => {
+            calendarViewBtn.addEventListener("click", () => {
                 if (this.plugin.settings.sidebarViewType === 'calendar') return;
                 this.plugin.settings.sidebarViewType = 'calendar';
-                await this.plugin.savePluginData();
-                await this.refresh();
+                void (async () => {
+                    await this.plugin.savePluginData();
+                    await this.refresh();
+                })();
             });
         }
         this.updateViewToggleButtonsState();
@@ -114,8 +119,8 @@ export class ReviewSidebarView extends ItemView {
             this.listViewContentEl = this.mainContainer.createDiv("list-view-content");
         }
         // Ensure managers are initialized *after* their container exists
-        if (!this.pomodoroUIManager) { 
-             this.pomodoroUIManager = new PomodoroUIManager(this.plugin); 
+        if (!this.pomodoroUIManager) {
+            this.pomodoroUIManager = new PomodoroUIManager(this.plugin);
         }
         if (!this.listViewRenderer) {
             this.listViewRenderer = new ListViewRenderer(this.plugin, this.pomodoroUIManager, this.noteItemRenderer, {
@@ -126,10 +131,10 @@ export class ReviewSidebarView extends ItemView {
                 setExpandedUpcomingDayKey: (key) => { this.expandedUpcomingDayKey = key; },
                 getLastSelectedNotePath: () => this.lastSelectedNotePath,
                 setLastSelectedNotePath: (path) => { this.lastSelectedNotePath = path; },
-                refreshSidebarView: this.refresh.bind(this) 
+                refreshSidebarView: this.refresh.bind(this)
             });
         }
-        
+
         if (!this.calendarViewContentEl) {
             this.calendarViewContentEl = this.mainContainer.createDiv("calendar-view-content");
         }
@@ -152,10 +157,10 @@ export class ReviewSidebarView extends ItemView {
     async refresh(): Promise<void> {
         // Capture the state of activeListBaseDate *before* any potential changes in this refresh cycle.
         const previousActiveListBaseDateEpoch = this.activeListBaseDate ? DateUtils.startOfUTCDay(this.activeListBaseDate) : null;
-        
+
         // Determine the target date for this refresh. It defaults to the current activeListBaseDate
         // unless a calendar click provides a new date.
-        let newTargetDate: Date | null = this.activeListBaseDate; 
+        let newTargetDate: Date | null = this.activeListBaseDate;
 
         if (this.plugin.clickedDateFromCalendar) {
             newTargetDate = this.plugin.clickedDateFromCalendar;
@@ -180,7 +185,7 @@ export class ReviewSidebarView extends ItemView {
             this.activeListBaseDate = newTargetDate; // Update the sidebar's primary date state
             reviewDateChanged = true;
         }
-        
+
         // Synchronize the ReviewController's date override with the sidebar's `activeListBaseDate`.
         // `this.activeListBaseDate` is now the definitive date context for the sidebar's list view.
         const currentControllerOverrideEpoch = this.plugin.reviewController.getCurrentReviewDateOverride();
@@ -204,7 +209,7 @@ export class ReviewSidebarView extends ItemView {
         let storedScrollPosition = this.lastScrollPosition; // Use the stored state
         if (this.mainContainer) {
             // Update storedScrollPosition if the container is currently scrolled
-            storedScrollPosition = this.mainContainer.scrollTop; 
+            storedScrollPosition = this.mainContainer.scrollTop;
         }
 
         this.updateViewToggleButtonsState();
@@ -213,14 +218,14 @@ export class ReviewSidebarView extends ItemView {
         // Apply scroll position *after* rendering is complete
         if (this.mainContainer) {
             requestAnimationFrame(() => {
-                if (this.mainContainer) this.mainContainer.scrollTop = storedScrollPosition; 
+                if (this.mainContainer) this.mainContainer.scrollTop = storedScrollPosition;
                 this.lastScrollPosition = storedScrollPosition; // Update state after applying
             });
         }
     }
 
     private async showCorrectViewPane(): Promise<void> {
-         if (this.plugin.settings.sidebarViewType === 'calendar') {
+        if (this.plugin.settings.sidebarViewType === 'calendar') {
             if (this.listViewContentEl) this.listViewContentEl.hide();
             if (this.calendarViewContentEl) {
                 this.calendarViewContentEl.show();
@@ -231,7 +236,7 @@ export class ReviewSidebarView extends ItemView {
             if (this.listViewContentEl) { // Check if container exists
                 this.listViewContentEl.show();
                 // Now delegate rendering to the ListViewRenderer
-                await this.renderListViewContent(this.listViewContentEl); 
+                await this.renderListViewContent(this.listViewContentEl);
             }
         }
     }
@@ -243,7 +248,7 @@ export class ReviewSidebarView extends ItemView {
         if (this.listViewRenderer) { // Check if renderer is initialized
             await this.listViewRenderer.render(container);
         } else {
-            container.setText("Error: Could not render list view. Renderer not ready.");
+            container.setText("Error: Could not render list view. Renderer not ready."); // eslint-disable-line obsidianmd/ui/sentence-case
         }
     }
 
@@ -254,15 +259,15 @@ export class ReviewSidebarView extends ItemView {
         // container is this.calendarViewContentEl, which is persistent.
         // CalendarView instance is now also persistent and initialized in ensureBaseStructure.
         // It manages its own content within this.calendarViewContentEl.
-        
+
         // No longer empty the container here, CalendarView manages its own content.
         // No longer create a temporary wrapper here.
         // CalendarView instance is already created.
 
         if (this.calendarView) { // Should always exist due to ensureBaseStructure
-            await this.calendarView.render(); 
+            await this.calendarView.render();
         } else {
-            container.setText("Error: Could not render calendar view. CalendarView not ready.");
+            container.setText("Error: Could not render calendar view. CalendarView not ready."); // eslint-disable-line obsidianmd/ui/sentence-case
             return; // Avoid further errors if calendarView is somehow null
         }
 
@@ -278,9 +283,9 @@ export class ReviewSidebarView extends ItemView {
         });
 
         if (this.containerEl) {
-             resizeObserver.observe(this.containerEl);
-             this.resizeObserver = resizeObserver;
-             this.updateCalendarContainerClass();
+            resizeObserver.observe(this.containerEl);
+            this.resizeObserver = resizeObserver;
+            this.updateCalendarContainerClass();
         }
     }
 
@@ -302,19 +307,19 @@ export class ReviewSidebarView extends ItemView {
     // --- Methods moved out ---
 
     // --- Existing methods kept for view lifecycle / state ---
-    
+
     /**
      * Move a note up in the list
      * (Existing Method - Consider moving to controller)
      */
     async moveNoteUp(dateStr: string, note: ReviewSchedule): Promise<void> {
         if (!this.listViewRenderer) {
-             return;
+            return;
         }
-        const notes = await this.listViewRenderer.groupNotesByDate(
+        const notes = this.listViewRenderer.groupNotesByDate(
             this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true),
             false
-        ); 
+        );
         const dateNotes = notes[dateStr];
 
         if (!dateNotes) return;
@@ -324,8 +329,8 @@ export class ReviewSidebarView extends ItemView {
         const path1 = dateNotes[index].path;
         const path2 = dateNotes[index - 1].path;
         await this.plugin.reviewController.swapNotes(path1, path2);
-        await this.refresh(); 
-        new Notice(`Moved note up`);
+        await this.refresh();
+        new Notice(`Moved note up.`);
     }
 
     /**
@@ -333,13 +338,13 @@ export class ReviewSidebarView extends ItemView {
      * (Existing Method - Consider moving to controller)
      */
     async moveNoteDown(dateStr: string, note: ReviewSchedule): Promise<void> {
-         if (!this.listViewRenderer) {
-             return;
-         }
-        const notes = await this.listViewRenderer.groupNotesByDate(
+        if (!this.listViewRenderer) {
+            return;
+        }
+        const notes = this.listViewRenderer.groupNotesByDate(
             this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true),
             false
-        ); 
+        );
         const dateNotes = notes[dateStr];
 
         if (!dateNotes) return;
@@ -349,15 +354,15 @@ export class ReviewSidebarView extends ItemView {
         const path1 = dateNotes[index].path;
         const path2 = dateNotes[index + 1].path;
         await this.plugin.reviewController.swapNotes(path1, path2);
-        await this.refresh(); 
-        new Notice(`Moved note down`);
+        await this.refresh();
+        new Notice(`Moved note down.`);
     }
 
     /**
      * Group notes by their folder
      * (Existing Method - Consider moving to utility/service)
      */
-    async groupNotesByFolder(notes: ReviewSchedule[]): Promise<Record<string, ReviewSchedule[]>> {
+    groupNotesByFolder(notes: ReviewSchedule[]): Record<string, ReviewSchedule[]> {
         const grouped: Record<string, ReviewSchedule[]> = {};
         for (const note of notes) {
             const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -374,14 +379,14 @@ export class ReviewSidebarView extends ItemView {
         // const isPomodoroOpen = this.pomodoroUIManager ? this.pomodoroUIManager.getIsPomodoroSectionOpen() : false; // Removed
         // Capture scroll position just before saving state
         if (this.mainContainer) {
-             this.lastScrollPosition = this.mainContainer.scrollTop;
+            this.lastScrollPosition = this.mainContainer.scrollTop;
         }
         return {
             activeListBaseDateISO: this.activeListBaseDate ? this.activeListBaseDate.toISOString() : null,
             // isPomodoroSectionOpen: isPomodoroOpen, // Removed
             expandedUpcomingDayKey: this.expandedUpcomingDayKey,
             selectedNotes: this.selectedNotes,
-            lastScrollPosition: this.lastScrollPosition, 
+            lastScrollPosition: this.lastScrollPosition,
             sidebarViewType: this.plugin.settings.sidebarViewType,
         };
     }
@@ -400,14 +405,14 @@ export class ReviewSidebarView extends ItemView {
         }
 
         // Refresh the view first to ensure elements and managers are created/initialized
-        await this.refresh(); 
+        await this.refresh();
 
         // Now that elements exist (due to refresh), set the state for components like Pomodoro
         // Ensure pomodoroUIManager is initialized before setting state
         // if (this.pomodoroUIManager) { // Logic related to isPomodoroSectionOpen removed
-            // this.pomodoroUIManager.setIsPomodoroSectionOpen(state.isPomodoroSectionOpen ?? false);
-            // No need to call updatePomodoroUI here, as refresh -> showCorrectViewPane -> renderListViewContent -> render (in ListViewRenderer)
-            // should call pomodoroUIManager.updatePomodoroUI() if the section is enabled.
+        // this.pomodoroUIManager.setIsPomodoroSectionOpen(state.isPomodoroSectionOpen ?? false);
+        // No need to call updatePomodoroUI here, as refresh -> showCorrectViewPane -> renderListViewContent -> render (in ListViewRenderer)
+        // should call pomodoroUIManager.updatePomodoroUI() if the section is enabled.
         // } else {
         // }
 

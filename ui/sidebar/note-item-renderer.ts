@@ -3,6 +3,7 @@ import SpaceforgePlugin from "../../main";
 import { ReviewSchedule } from "../../models/review-schedule";
 import { DateUtils } from "../../utils/dates";
 import { EstimationUtils } from "../../utils/estimation";
+import { ConfirmationModal } from "../confirmation-modal";
 
 export class NoteItemRenderer {
     private plugin: SpaceforgePlugin;
@@ -60,7 +61,7 @@ export class NoteItemRenderer {
                 const currentStepDisplay = note.reviewCount < totalInitialSteps ? note.reviewCount + 1 : totalInitialSteps;
                 phaseEl.createDiv({ title: "Initial", text: "Initial" });
                 phaseEl.createDiv({ title: `${currentStepDisplay}/${totalInitialSteps}`, text: `${currentStepDisplay}/${totalInitialSteps}` });
-                const phaseTimeEl = phaseEl.createDiv({ cls: "phase-time", title: formattedTime, text: formattedTime });
+                phaseEl.createDiv({ cls: "phase-time", title: formattedTime, text: formattedTime });
                 phaseEl.addClass("review-phase-initial");
             } else {
                 phaseEl.setText(note.scheduleCategory === 'graduated' ? "Graduated" : "Spaced");
@@ -71,16 +72,16 @@ export class NoteItemRenderer {
                 EstimationUtils.formatTimeWithColor(estimatedTime, timeElNew);
             }
         }
-        
+
         // Drag handle visibility (buttons are static, drag handle might change)
         const buttonsEl = noteEl.querySelector(".review-note-buttons") as HTMLElement;
-        let dragHandleEl = buttonsEl?.querySelector(".review-note-drag-handle") as HTMLElement;
+        const dragHandleEl = buttonsEl?.querySelector(".review-note-drag-handle") as HTMLElement;
         if (dragHandleEl) { // If it exists, update its state or recreate if logic is complex
             const isDraggable = (dateStr === 'Due notes' || dateStr === 'Today');
             dragHandleEl.classList.toggle("is-disabled", !isDraggable);
             // Ensure draggable attribute is managed if it was set directly
             if (isDraggable && !dragHandleEl.hasAttribute("draggable")) {
-                 // No need to set draggable here, mousedown does it.
+                // No need to set draggable here, mousedown does it.
             } else if (!isDraggable) {
                 noteEl.removeAttribute("draggable"); // Ensure main element is not draggable
             }
@@ -146,7 +147,7 @@ export class NoteItemRenderer {
         const advanceBtn = actionBtnsEl.createEl("button", { cls: "review-note-button review-note-advance" });
         setIcon(advanceBtn, "arrow-left-circle"); // Or 'chevrons-left', 'skip-back'
         advanceBtn.title = "Advance";
-        
+
         const postponeBtn = actionBtnsEl.createEl("button", { cls: "review-note-button review-note-postpone" });
         setIcon(postponeBtn, "arrow-right-circle"); // Or 'chevrons-right', 'skip-forward'
         postponeBtn.title = "Postpone";
@@ -154,7 +155,7 @@ export class NoteItemRenderer {
         const removeBtn = actionBtnsEl.createEl("button", { cls: "review-note-button review-note-remove" });
         setIcon(removeBtn, "trash-2");
         removeBtn.title = "Remove";
-        
+
         const dragHandleEl = buttonsEl.createDiv("review-note-drag-handle"); // Create drag handle structure
         dragHandleEl.setAttribute('aria-label', 'Drag to reorder');
         for (let i = 0; i < 3; i++) {
@@ -164,72 +165,83 @@ export class NoteItemRenderer {
         // --- Attach Event Listeners (once) ---
         // Note: these listeners will use 'noteToRender' from the outer scope at the time of creation.
         // If note data within the item needs to be fresh for these handlers, they might need to re-fetch it via noteEl.dataset.notePath
-        
+
         titleEl.addEventListener("click", (e) => {
             e.stopPropagation();
             const path = noteEl.dataset.notePath; // Get current path from element
-            if (path) this.plugin.reviewController.openNoteWithoutReview(path);
+            if (path) void this.plugin.reviewController.openNoteWithoutReview(path);
         });
 
-        reviewBtn.addEventListener("click", async (e) => {
+        reviewBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             const path = noteEl.dataset.notePath;
             if (path) {
-                await this.plugin.reviewController.reviewNote(path);
-                // onNoteAction is often called by the review process itself,
-                // but calling here ensures refresh if reviewNote doesn't trigger it.
-                await onNoteAction(); 
+                void (async () => {
+                    await this.plugin.reviewController.reviewNote(path);
+                    // onNoteAction is often called by the review process itself,
+                    // but calling here ensures refresh if reviewNote doesn't trigger it.
+                    await onNoteAction();
+                })();
             }
         });
 
-        advanceBtn.addEventListener("click", async (e) => {
+        advanceBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             if (advanceBtn.disabled) return;
             const path = noteEl.dataset.notePath;
             if (path) {
-                await this.plugin.reviewController.advanceNote(path);
-                // The controller's advanceNote method handles notices and sidebar refresh.
-                // onNoteAction ensures this renderer's parent (ListViewRenderer) refreshes.
-                await onNoteAction();
+                void (async () => {
+                    await this.plugin.reviewController.advanceNote(path);
+                    // The controller's advanceNote method handles notices and sidebar refresh.
+                    // onNoteAction ensures this renderer's parent (ListViewRenderer) refreshes.
+                    await onNoteAction();
+                })();
             }
         });
 
-        postponeBtn.addEventListener("click", async (e) => {
+        postponeBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             const path = noteEl.dataset.notePath;
             if (path) {
-                try {
-                    await this.plugin.reviewController.postponeNote(path);
-                    await this.plugin.savePluginData();
-                    new Notice(`Note postponed`);
-                    await onNoteAction();
-                } catch (error) {
-                    new Notice("Failed to postpone note.");
-                    await onNoteAction();
-                }
+                void (async () => {
+                    try {
+                        await this.plugin.reviewController.postponeNote(path);
+                        new Notice(`Note postponed`);
+                        await onNoteAction();
+                    } catch (_error) {
+                        new Notice("Failed to postpone note.");
+                        await onNoteAction();
+                    }
+                })();
             }
         });
 
-        removeBtn.addEventListener("click", async (e) => {
+        removeBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             const path = noteEl.dataset.notePath;
             if (path) {
                 const file = this.plugin.app.vault.getAbstractFileByPath(path);
-                const confirmed = confirm(`Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`);
-                if (!confirmed) return;
-
-                try {
-                    await this.plugin.reviewScheduleService.removeFromReview(path);
-                    await this.plugin.savePluginData();
-                    new Notice(`Note removed from review schedule`);
-                    await onNoteAction();
-                } catch (error) {
-                    new Notice("Failed to remove note from schedule.");
-                    await onNoteAction();
-                }
+                new ConfirmationModal(
+                    this.plugin.app,
+                    'Remove Note',
+                    `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
+                    () => {
+                        void (async () => {
+                            try {
+                                this.plugin.reviewScheduleService.removeFromReview(path);
+                                await this.plugin.savePluginData();
+                                new Notice(`Note removed from review schedule`);
+                                await onNoteAction();
+                            } catch (_error) {
+                                new Notice("Failed to remove note from schedule.");
+                                await onNoteAction();
+                            }
+                        })();
+                    }
+                ).open();
             }
         });
-        
+
         dragHandleEl.addEventListener("mousedown", (e) => {
             e.stopPropagation();
             // Only enable dragging if not disabled (checked by _populateNoteItemDetails via class)
@@ -240,7 +252,7 @@ export class NoteItemRenderer {
         noteEl.addEventListener("dragstart", (e) => {
             const path = noteEl.dataset.notePath;
             if (path && noteEl.getAttribute("draggable") === "true") { // Check if draggable
-                 e.dataTransfer?.setData("text/plain", path);
+                e.dataTransfer?.setData("text/plain", path);
             } else {
                 e.preventDefault(); // Prevent drag if not supposed to be draggable
             }
@@ -291,7 +303,7 @@ export class NoteItemRenderer {
             lastSelectedNotePathRef.current = currentPath;
             onSelectionChange();
         });
-        
+
         noteEl.addEventListener('contextmenu', (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
@@ -306,9 +318,9 @@ export class NoteItemRenderer {
             menu.addItem((item) => item
                 .setTitle("Review note")
                 .setIcon("play-circle")
-                .onClick(async () => {
-                    this.plugin.reviewController.reviewNote(path);
-                    await onNoteAction();
+                .onClick(() => {
+                    void this.plugin.reviewController.reviewNote(path);
+                    void onNoteAction();
                 }));
             menu.addItem((item) => item
                 .setTitle("Postpone by 1 day")
@@ -340,15 +352,21 @@ export class NoteItemRenderer {
             menu.addItem((item) => item
                 .setTitle("Remove from review")
                 .setIcon("trash")
-                .onClick(async () => {
+                .onClick(() => {
                     const file = this.plugin.app.vault.getAbstractFileByPath(path);
-                    const confirmed = confirm(`Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`);
-                    if (confirmed) {
-                        await this.plugin.reviewScheduleService.removeFromReview(path);
-                        await this.plugin.savePluginData();
-                        new Notice("Note removed from review schedule.");
-                        await onNoteAction();
-                    }
+                    new ConfirmationModal(
+                        this.plugin.app,
+                        'Remove Note',
+                        `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
+                        () => {
+                            void (async () => {
+                                this.plugin.reviewScheduleService.removeFromReview(path);
+                                await this.plugin.savePluginData();
+                                new Notice("Note removed from review schedule.");
+                                await onNoteAction();
+                            })();
+                        }
+                    ).open();
                 }));
             menu.showAtMouseEvent(e);
         });

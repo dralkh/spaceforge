@@ -2,7 +2,7 @@ import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
 
 export class TogetherService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -13,15 +13,18 @@ export class TogetherService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.togetherApiKey) {
-            new Notice('Together AI API key is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Together AI API key is not set, please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.togetherModel) {
-            new Notice('Together AI Model is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Together AI model is not set, please add it in the Spaceforge settings');
             return null;
         }
 
         try {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using Together AI...');
 
             // Determine the number of questions to generate
@@ -38,7 +41,8 @@ export class TogetherService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Together AI. Please try again.');
+                // eslint-disable-next-line obsidianmd/ui/sentence-case
+                new Notice('Failed to generate valid MCQs from Together AI, please try again');
                 return null;
             }
 
@@ -47,8 +51,9 @@ export class TogetherService implements IMCQGenerationService {
                 questions,
                 generatedAt: Date.now()
             };
-        } catch (error) {
-            new Notice('Failed to generate MCQs with Together AI. Please check console for details.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Failed to generate MCQs with Together AI, please check console for details');
             return null;
         }
     }
@@ -66,7 +71,7 @@ export class TogetherService implements IMCQGenerationService {
             basePrompt = `Generate ${questionCount} multiple-choice questions that test understanding of key concepts in the following note. Each question should have ${choiceCount} choices, with only one correct answer. Format the output as a numbered list of questions with lettered choices (A, B, C, etc.). Mark the correct answer by putting [CORRECT] at the end of the line.\n\nFor example:\n1. What is the capital of France?\n   A) London\n   B) Berlin\n   C) Paris [CORRECT]\n   D) Madrid\n   E) Rome`;
         }
 
-        if (difficulty === 'basic') {
+        if (difficulty === MCQDifficulty.Basic) {
             basePrompt += `\n\nCreate straightforward questions that focus on key facts and basic concepts. Make the questions clear and direct, suitable for beginners or initial review.`;
         } else {
             basePrompt += `\n\nCreate challenging questions that test deeper understanding and application of concepts. Make the incorrect choices plausible to encourage critical thinking.`;
@@ -78,9 +83,9 @@ export class TogetherService implements IMCQGenerationService {
         const apiKey = settings.togetherApiKey;
         const model = settings.togetherModel;
         const difficulty = settings.mcqDifficulty;
-        
-        const systemPrompt = difficulty === 'basic' 
-            ? settings.mcqBasicSystemPrompt 
+
+        const systemPrompt = difficulty === MCQDifficulty.Basic
+            ? settings.mcqBasicSystemPrompt
             : settings.mcqAdvancedSystemPrompt;
 
         try {
@@ -135,7 +140,7 @@ export class TogetherService implements IMCQGenerationService {
                     }
                 }
             }
-            
+
             if (questionBlocks.length === 0 || (questionBlocks.length < settings.mcqQuestionsPerNote / 2 && response.includes("1."))) {
                 const lines = response.split('\n');
                 let currentQuestionBlock = '';
@@ -173,8 +178,8 @@ export class TogetherService implements IMCQGenerationService {
                     const line = lines[i].trim();
                     const isCorrect = line.includes('[CORRECT]');
                     const cleanedLine = line.replace(/\[CORRECT\]/gi, '')
-                                           .replace(/^([A-Z]\.|[A-Z]\)|\d+\.|\d+\)|-\s*|\*\s*)/, '')
-                                           .trim();
+                        .replace(/^([A-Z]\.|[A-Z]\)|\d+\.|\d+\)|-\s*|\*\s*)/, '')
+                        .trim();
                     if (cleanedLine.length > 0) {
                         choices.push(cleanedLine);
                         if (isCorrect) correctAnswerIndex = choices.length - 1;
@@ -192,15 +197,16 @@ export class TogetherService implements IMCQGenerationService {
                     if (correctAnswerIndex === -1) correctAnswerIndex = 0;
                 }
 
-                if (questionText && choices.length >= settings.mcqChoicesPerQuestion -1 && choices.length > 0) {
+                if (questionText && choices.length >= settings.mcqChoicesPerQuestion - 1 && choices.length > 0) {
                     questions.push({ question: questionText, choices, correctAnswerIndex });
                 } else if (questionText && choices.length >= 2) {
-                     questions.push({ question: questionText, choices, correctAnswerIndex });
+                    questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
-        } catch (error) {
-            new Notice('Error parsing MCQ response from Together AI. Please try again.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Error parsing MCQ response from Together AI, please try again');
             return [];
         }
     }

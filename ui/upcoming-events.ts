@@ -1,7 +1,7 @@
 import { Notice, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { CalendarEvent, UpcomingEvent } from "../models/calendar-event";
-import { DateUtils } from "../utils/dates";
+
 
 /**
  * Upcoming events component for calendar view
@@ -11,12 +11,12 @@ export class UpcomingEvents {
      * Reference to the main plugin
      */
     plugin: SpaceforgePlugin;
-    
+
     /**
      * Container element for upcoming events
      */
     containerEl: HTMLElement;
-    
+
     /**
      * Upcoming events data
      */
@@ -36,7 +36,7 @@ export class UpcomingEvents {
     /**
      * Render upcoming events list
      */
-    async render(): Promise<void> {
+    render(): void {
         if (!this.plugin.settings.enableCalendarEvents || !this.plugin.settings.showUpcomingEvents) {
             this.containerEl.empty();
             return;
@@ -48,7 +48,7 @@ export class UpcomingEvents {
         }
 
         // Load upcoming events data
-        await this.loadUpcomingEvents();
+        this.loadUpcomingEvents();
 
         // Clear container
         this.containerEl.empty();
@@ -64,7 +64,7 @@ export class UpcomingEvents {
     /**
      * Load upcoming events data
      */
-    async loadUpcomingEvents(): Promise<void> {
+    loadUpcomingEvents(): void {
         this.upcomingEvents = this.plugin.calendarEventService.getUpcomingEvents(
             this.plugin.settings.upcomingEventsDays || 7
         );
@@ -75,13 +75,13 @@ export class UpcomingEvents {
      */
     private renderEmptyState(): void {
         const emptyState = this.containerEl.createDiv("upcoming-events-empty");
-        
+
         const emptyIcon = emptyState.createDiv("upcoming-events-empty-icon");
         setIcon(emptyIcon, "calendar");
-        
+
         const emptyText = emptyState.createDiv("upcoming-events-empty-text");
         emptyText.setText("No upcoming events");
-        
+
         const emptySubtext = emptyState.createDiv("upcoming-events-empty-subtext");
         emptySubtext.setText("Events will appear here once you create them");
     }
@@ -92,10 +92,10 @@ export class UpcomingEvents {
     private renderEventsList(): void {
         // Create header
         const header = this.containerEl.createDiv("upcoming-events-header");
-        
+
         const headerTitle = header.createDiv("upcoming-events-title");
-        headerTitle.setText("Upcoming Events");
-        
+        headerTitle.setText("Upcoming events");
+
         const headerSubtitle = header.createDiv("upcoming-events-subtitle");
         const daysText = this.plugin.settings.upcomingEventsDays || 7;
         headerSubtitle.setText(`Next ${daysText} days`);
@@ -120,17 +120,17 @@ export class UpcomingEvents {
 
         this.upcomingEvents.forEach(upcomingEvent => {
             let dayKey: string;
-            
+
             if (upcomingEvent.isToday) {
                 dayKey = "Today";
             } else if (upcomingEvent.isTomorrow) {
                 dayKey = "Tomorrow";
             } else {
                 const eventDate = new Date(upcomingEvent.event.date);
-                dayKey = eventDate.toLocaleDateString(undefined, { 
-                    weekday: 'short', 
-                    month: 'short', 
-                    day: 'numeric' 
+                dayKey = eventDate.toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
                 });
             }
 
@@ -138,7 +138,10 @@ export class UpcomingEvents {
                 eventsByDay.set(dayKey, []);
             }
 
-            eventsByDay.get(dayKey)!.push(upcomingEvent);
+            const dayList = eventsByDay.get(dayKey);
+            if (dayList) {
+                dayList.push(upcomingEvent);
+            }
         });
 
         return eventsByDay;
@@ -149,13 +152,13 @@ export class UpcomingEvents {
      */
     private renderDaySection(container: HTMLElement, dayKey: string, dayEvents: UpcomingEvent[]): void {
         const daySection = container.createDiv("upcoming-events-day-section");
-        
+
         // Day header
         const dayHeader = daySection.createDiv("upcoming-events-day-header");
-        
+
         const dayTitle = dayHeader.createDiv("upcoming-events-day-title");
         dayTitle.setText(dayKey);
-        
+
         if (dayKey === "Today") {
             daySection.addClass("today");
         } else if (dayKey === "Tomorrow") {
@@ -164,7 +167,7 @@ export class UpcomingEvents {
 
         // Events for this day
         const dayEventsContainer = daySection.createDiv("upcoming-events-day-events");
-        
+
         dayEvents.forEach(upcomingEvent => {
             this.renderEventItem(dayEventsContainer, upcomingEvent);
         });
@@ -176,21 +179,21 @@ export class UpcomingEvents {
     private renderEventItem(container: HTMLElement, upcomingEvent: UpcomingEvent): void {
         const event = upcomingEvent.event;
         const eventItem = container.createDiv("upcoming-events-event-item");
-        
+
         // Event color indicator
         const colorIndicator = eventItem.createDiv("upcoming-events-event-color");
         const eventColor = this.plugin.calendarEventService?.getEventColor(event) || '#95A5A6';
         colorIndicator.style.setProperty('--event-color', eventColor);
-        
+
         // Event content
         const eventContent = eventItem.createDiv("upcoming-events-event-content");
-        
+
         // Event title and time
         const eventHeader = eventContent.createDiv("upcoming-events-event-header");
-        
+
         const eventTitle = eventHeader.createDiv("upcoming-events-event-title");
         eventTitle.setText(event.title);
-        
+
         if (event.time) {
             const eventTime = eventHeader.createDiv("upcoming-events-event-time");
             eventTime.setText(event.time);
@@ -198,37 +201,37 @@ export class UpcomingEvents {
             const eventTime = eventHeader.createDiv("upcoming-events-event-time");
             eventTime.setText("All day");
         }
-        
+
         // Event details
         if (event.description || event.location) {
             const eventDetails = eventContent.createDiv("upcoming-events-event-details");
-            
+
             if (event.location) {
                 const eventLocation = eventDetails.createDiv("upcoming-events-event-location");
                 setIcon(eventLocation, "map-pin");
                 eventLocation.appendText(" " + event.location);
             }
-            
+
             if (event.description) {
                 const eventDescription = eventDetails.createDiv("upcoming-events-event-description");
                 eventDescription.setText(event.description.substring(0, 100) + (event.description.length > 100 ? "..." : ""));
             }
         }
-        
+
         // Event category
         const eventCategory = eventContent.createDiv("upcoming-events-event-category");
         eventCategory.setText(event.category);
-        
+
         // Click handler to show event details
         eventItem.addEventListener("click", () => {
             this.showEventDetails(event);
         });
-        
+
         // Add hover effect
         eventItem.addEventListener("mouseenter", () => {
             eventItem.addClass("hover");
         });
-        
+
         eventItem.addEventListener("mouseleave", () => {
             eventItem.removeClass("hover");
         });
@@ -241,29 +244,29 @@ export class UpcomingEvents {
      */
     private showEventDetails(event: CalendarEvent): void {
         const eventDate = new Date(event.date);
-        const dateStr = eventDate.toLocaleDateString(undefined, { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const dateStr = eventDate.toLocaleDateString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
-        
+
         let details = `📅 ${event.title}\n📆 ${dateStr}`;
-        
+
         if (event.time) {
             details += `\n🕐 ${event.time}`;
         }
-        
+
         if (event.description) {
             details += `\n📝 ${event.description}`;
         }
-        
+
         if (event.location) {
             details += `\n📍 ${event.location}`;
         }
-        
+
         details += `\n🏷️ ${event.category}`;
-        
+
         new Notice(details, 8000);
     }
 

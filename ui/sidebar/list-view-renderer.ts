@@ -1,10 +1,12 @@
-import { App, TFile, Notice, Setting } from "obsidian";
+import { Notice, Setting } from "obsidian";
 import SpaceforgePlugin from "../../main";
 import { ReviewSchedule } from "../../models/review-schedule";
 import { DateUtils } from "../../utils/dates";
 import { EstimationUtils } from "../../utils/estimation";
 import { PomodoroUIManager } from "./pomodoro-ui-manager";
+
 import { NoteItemRenderer } from "./note-item-renderer";
+import { ConfirmationModal } from "../confirmation-modal";
 
 /**
  * Manages the rendering of the list view within the sidebar.
@@ -68,9 +70,8 @@ export class ListViewRenderer {
 
         // --- Review Buttons & Pomodoro ---
         // Pass this.plugin.reviewController.getTodayNotes() to ensure Pomodoro uses notes for the selected date context
-        const notesForPomodoro = this.plugin.reviewController.getTodayNotes();
-        await this._ensureAndUpdateReviewButtonsSection(container, notesForPomodoro, selectedNotes);
-        
+        await this._ensureAndUpdateReviewButtonsSection(container, this.plugin.reviewController.getTodayNotes(), selectedNotes);
+
         // --- "All Caught Up" Message ---
         this._ensureAndUpdateAllCaughtUpMessage(container, dueNotesForStats, activeListBaseDate);
 
@@ -85,12 +86,12 @@ export class ListViewRenderer {
             notesToGroup = dueNotesForStats; // Use already fetched due notes
         }
 
-        const groupedNotes = await this.groupNotesByDate(notesToGroup, shouldIncludeFutureInGrouping);
+        const groupedNotes = this.groupNotesByDate(notesToGroup, shouldIncludeFutureInGrouping);
         const sortedDateKeys = this.getSortedDateKeys(groupedNotes);
 
         // --- Render Sections for Main List ---
         await this._ensureAndUpdateDateSections(container, sortedDateKeys, groupedNotes);
-        
+
         // --- Active Session Section ---
         this._ensureAndUpdateActiveSessionSection(container);
 
@@ -101,7 +102,7 @@ export class ListViewRenderer {
             const existingUpcomingSection = container.querySelector(".review-upcoming-section");
             if (existingUpcomingSection) existingUpcomingSection.remove();
         }
-        
+
         this.updateBulkActionButtonsVisibility(container); // Ensure bulk actions visibility is correct at the end
     }
 
@@ -124,14 +125,14 @@ export class ListViewRenderer {
     //     statsCountEl.setText(`${dueNotesForStats.length} notes - ${EstimationUtils.formatTime(totalTime)}${overdueNotes.length > 0 ? ` (${overdueNotes.length} overdue)` : ''}`);
     // }
 
-    private async _ensureAndUpdateReviewButtonsSection(container: HTMLElement, notesForDisplay: ReviewSchedule[], selectedNotes: string[]): Promise<void> {
+    private _ensureAndUpdateReviewButtonsSection(container: HTMLElement, notesForDisplay: ReviewSchedule[], _selectedNotes: string[]): void {
         // --- Pomodoro Section (Always visible when enabled, independent of notes) ---
         let pomodoroContainer = container.querySelector(".sidebar-pomodoro-section") as HTMLElement;
         if (!pomodoroContainer) {
             pomodoroContainer = container.createDiv("sidebar-pomodoro-section");
-            const pomodoroSectionContainerEl = pomodoroContainer.createDiv("sidebar-pomodoro-button-container");
+            pomodoroContainer.createDiv("pomodoro-section-container");
         }
-        
+
         // Update Pomodoro section visibility and content
         if (this.pomodoroUIManager && pomodoroContainer) {
             const pomodoroSectionContainerEl = pomodoroContainer.querySelector(".sidebar-pomodoro-button-container") as HTMLElement;
@@ -141,9 +142,9 @@ export class ListViewRenderer {
                     pomodoroContainer.classList.remove('sf-hidden');
                     this.pomodoroUIManager.showPomodoroSection(true);
                     this.pomodoroUIManager.updatePomodoroUI();
-                    
+
                     // Automatically calculate estimation for current notes
-                    this.pomodoroUIManager.calculateAndDisplayEstimation();
+                    void this.pomodoroUIManager.calculateAndDisplayEstimation();
                 } else {
                     pomodoroContainer.classList.add('sf-hidden');
                     this.pomodoroUIManager.showPomodoroSection(false);
@@ -160,73 +161,84 @@ export class ListViewRenderer {
                 reviewButtonsContainer = container.createDiv("review-buttons-container");
                 // Create all buttons once
                 const navButtonsContainer = reviewButtonsContainer.createDiv("review-nav-buttons");
-                const prevNoteBtn = navButtonsContainer.createEl("button", { text: "Previous", title: "Navigate to Previous Note", cls: "review-all-button" });
-                prevNoteBtn.addEventListener("click", () => { this.plugin.reviewController.navigateToPreviousNote(); });
-                const nextNoteBtn = navButtonsContainer.createEl("button", { text: "Next", title: "Navigate to Next Note", cls: "review-all-button" });
-                nextNoteBtn.addEventListener("click", () => { this.plugin.reviewController.navigateToNextNote(); });
+                const prevNoteBtn = navButtonsContainer.createEl("button", { text: "Previous", title: "Navigate to previous note", cls: "review-all-button" });
+                prevNoteBtn.addEventListener("click", () => { void this.plugin.reviewController.navigateToPreviousNote(); });
+                const nextNoteBtn = navButtonsContainer.createEl("button", { text: "Next", title: "Navigate to next note", cls: "review-all-button" });
+                nextNoteBtn.addEventListener("click", () => { void this.plugin.reviewController.navigateToNextNote(); });
 
-                const reviewCurrentBtn = reviewButtonsContainer.createEl("button", { text: "Review Current Note", title: "Review the currently open note if it's due", cls: "review-all-button" });
-                reviewCurrentBtn.addEventListener("click", () => { this.plugin.reviewController.reviewCurrentNote(); });
-                const reviewAllBtn = reviewButtonsContainer.createEl("button", { text: "Review All", title: "Start Reviewing All Due Notes", cls: "review-all-button" });
-                reviewAllBtn.addEventListener("click", () => { this.plugin.reviewController.reviewAllTodaysNotes(); });
-                
+                const reviewCurrentBtn = reviewButtonsContainer.createEl("button", { text: "Review current note", title: "Review the currently open note if it's due", cls: "review-all-button" });
+                reviewCurrentBtn.addEventListener("click", () => { void this.plugin.reviewController.reviewCurrentNote(); });
+                const reviewAllBtn = reviewButtonsContainer.createEl("button", { text: "Review all", title: "Start reviewing all due notes", cls: "review-all-button" });
+                reviewAllBtn.addEventListener("click", () => { void this.plugin.reviewController.reviewAllTodaysNotes(); });
+
                 if (this.plugin.settings.enableMCQ) {
-                    const reviewAllMCQBtn = reviewButtonsContainer.createEl("button", { text: "Review All with MCQs", cls: "review-all-mcq-button" });
+                    const reviewAllMCQBtn = reviewButtonsContainer.createEl("button", { text: "Review all with MCQs", cls: "review-all-mcq-button" });
                     reviewAllMCQBtn.addEventListener("click", () => { this.plugin.reviewController.reviewAllNotesWithMCQ(true); });
                 }
             }
             reviewButtonsContainer.classList.remove('sf-hidden');
-            
+
             // Bulk action buttons
             let bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;
             if (!bulkActionButtons) {
                 bulkActionButtons = container.createDiv("review-bulk-actions");
-                const reviewSelectedBtn = bulkActionButtons.createEl("button", { text: "Review Selected", cls: "review-bulk-button" });
-                reviewSelectedBtn.addEventListener("click", async () => {
-                    await this.plugin.reviewController.reviewNotes(this.getSelectedNotes(), false); // Use getter
+                const reviewSelectedBtn = bulkActionButtons.createEl("button", { text: "Review selected", cls: "review-bulk-button" });
+                reviewSelectedBtn.addEventListener("click", () => {
+                    void this.plugin.reviewController.reviewNotes(this.getSelectedNotes(), false); // Use getter
                     this.setSelectedNotes([]);
-                    await this.refreshSidebarView();
+                    void this.refreshSidebarView();
                 });
 
-                const advanceSelectedBtn = bulkActionButtons.createEl("button", { text: "Advance Selected", cls: "review-bulk-button review-bulk-advance" });
-                advanceSelectedBtn.addEventListener("click", async () => {
+                const advanceSelectedBtn = bulkActionButtons.createEl("button", { text: "Advance selected", cls: "review-bulk-button review-bulk-advance" });
+                advanceSelectedBtn.addEventListener("click", () => {
                     const pathsToAdvance = [...this.getSelectedNotes()];
                     if (pathsToAdvance.length === 0) {
                         new Notice("No notes selected to advance.");
                         return;
                     }
                     // The controller's advanceNotes will handle eligibility and notices
-                    await this.plugin.reviewController.advanceNotes(pathsToAdvance);
-                    this.setSelectedNotes([]); // Clear selection after action
-                    // advanceNotes in controller already calls savePluginData and refreshSidebarView (via updateTodayNotes)
-                    // A direct refresh here might be redundant but ensures UI update if controller logic changes.
-                    await this.refreshSidebarView(); 
+                    void (async () => {
+                        await this.plugin.reviewController.advanceNotes(pathsToAdvance);
+                        this.setSelectedNotes([]); // Clear selection after action
+                        // advanceNotes in controller already calls savePluginData and refreshSidebarView (via updateTodayNotes)
+                        // A direct refresh here might be redundant but ensures UI update if controller logic changes.
+                        await this.refreshSidebarView();
+                    })();
                 });
 
-                const postponeSelectedBtn = bulkActionButtons.createEl("button", { text: "Postpone Selected", cls: "review-bulk-button review-bulk-postpone" });
-                postponeSelectedBtn.addEventListener("click", async () => {
+                const postponeSelectedBtn = bulkActionButtons.createEl("button", { text: "Postpone selected", cls: "review-bulk-button review-bulk-postpone" });
+                postponeSelectedBtn.addEventListener("click", () => {
                     const pathsToPostpone = [...this.getSelectedNotes()];
                     if (pathsToPostpone.length === 0) {
                         new Notice("No notes selected to postpone.");
                         return;
                     }
                     this.setSelectedNotes([]);
-                    await this.plugin.reviewController.postponeNotes(pathsToPostpone);
-                    // postponeNotes in controller handles save and refresh.
-                    await this.refreshSidebarView(); 
-                    // Notice is handled by controller/service for postpone.
+                    void (async () => {
+                        await this.plugin.reviewController.postponeNotes(pathsToPostpone);
+                        // postponeNotes in controller handles save and refresh.
+                        await this.refreshSidebarView();
+                        // Notice is handled by controller/service for postpone.
+                    })();
                 });
 
-                const removeSelectedBtn = bulkActionButtons.createEl("button", { text: "Remove Selected", cls: "review-bulk-button review-bulk-remove" });
-                removeSelectedBtn.addEventListener("click", async () => {
+                const removeSelectedBtn = bulkActionButtons.createEl("button", { text: "Remove selected", cls: "review-bulk-button review-bulk-remove" });
+                removeSelectedBtn.addEventListener("click", () => {
                     const pathsToRemove = [...this.getSelectedNotes()]; // Use getter
-                    const confirmed = confirm(`Remove ${pathsToRemove.length} selected notes from review schedule?`);
-                    if (!confirmed) return;
-                    this.setSelectedNotes([]);
-                    await this.plugin.reviewController.removeNotes(pathsToRemove);
-                    await this.plugin.savePluginData();
-                    await this.refreshSidebarView();
-                    new Notice(`Removed ${pathsToRemove.length} selected notes.`);
+                    new ConfirmationModal(
+                        this.plugin.app,
+                        'Remove Selected Notes',
+                        `Remove ${pathsToRemove.length} selected notes from review schedule?`,
+                        () => {
+                            this.setSelectedNotes([]);
+                            void (async () => {
+                                await this.plugin.reviewController.removeNotes(pathsToRemove);
+                                await this.plugin.savePluginData();
+                                await this.refreshSidebarView();
+                                new Notice(`Removed ${pathsToRemove.length} selected notes.`);
+                            })();
+                        }
+                    ).open();
                 });
             }
             this.updateBulkActionButtonsVisibility(container); // Update visibility based on current selection
@@ -234,7 +246,7 @@ export class ListViewRenderer {
         } else if (reviewButtonsContainer) {
             reviewButtonsContainer.classList.add('sf-hidden');
             const bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;
-            if (bulkActionButtons) bulkActionButtons.style.display = 'none';
+            if (bulkActionButtons) bulkActionButtons.toggleClass('sf-hidden', true);
         }
     }
 
@@ -252,29 +264,29 @@ export class ListViewRenderer {
                 } else if (anchor) {
                     container.appendChild(caughtUpEl);
                 } else {
-                     container.prepend(caughtUpEl); // Fallback
+                    container.prepend(caughtUpEl); // Fallback
                 }
             }
             caughtUpEl.setText("All caught up! No notes due for review.");
-            caughtUpEl.style.display = '';
+            caughtUpEl.toggleClass('sf-hidden', false);
         } else if (caughtUpEl) {
-            caughtUpEl.style.display = 'none';
+            caughtUpEl.toggleClass('sf-hidden', true);
         }
     }
-    
+
     private async _ensureAndUpdateDateSections(container: HTMLElement, sortedDateKeys: string[], groupedNotes: Record<string, ReviewSchedule[]>): Promise<void> {
         const existingSectionElements = Array.from(container.querySelectorAll(".review-date-section")) as HTMLElement[];
-        const dataKeysInDom = new Set(existingSectionElements.map(el => el.dataset.dateKey).filter(Boolean));
         const dataKeysFromData = new Set(sortedDateKeys);
         let notesDisplayed = false;
 
         // Remove stale sections
         for (const sectionEl of existingSectionElements) {
-            if (!dataKeysFromData.has(sectionEl.dataset.dateKey!)) {
+            const key = sectionEl.dataset.dateKey;
+            if (key && !dataKeysFromData.has(key)) {
                 sectionEl.remove();
             }
         }
-        
+
         // Update existing or create new sections
         for (const dateStr of sortedDateKeys) {
             const notesForSection = groupedNotes[dateStr];
@@ -291,41 +303,45 @@ export class ListViewRenderer {
                 const headerRow = dateSectionEl.createDiv("review-date-header");
                 const headerContainer = headerRow.createDiv("review-date-header-container");
                 headerContainer.createEl("h3"); // Placeholder for heading
-                
+
                 // "Advance All" button for future sections
                 const todayStart = DateUtils.startOfDay(new Date()); // Returns timestamp
-                const sectionDateKeyIsFuture = !["Due notes", "Today"].includes(dateStr) && 
-                                               (notesForSection[0] && DateUtils.startOfDay(new Date(notesForSection[0].nextReviewDate)) > todayStart);
+                const sectionDateKeyIsFuture = !["Due notes", "Today"].includes(dateStr) &&
+                    (notesForSection[0] && DateUtils.startOfDay(new Date(notesForSection[0].nextReviewDate)) > todayStart);
 
                 if (sectionDateKeyIsFuture) {
-                    const advanceAllBtn = headerContainer.createEl("button", { text: "Advance All", cls: "review-date-action-button review-date-advance-all" });
+                    const advanceAllBtn = headerContainer.createEl("button", { text: "Advance all", cls: "review-date-action-button review-date-advance-all" });
                     advanceAllBtn.title = `Advance all notes in this section by 1 day`;
-                    advanceAllBtn.addEventListener("click", async () => {
+                    advanceAllBtn.addEventListener("click", () => {
                         const currentNotesForSection = groupedNotes[dateStr] || [];
                         if (currentNotesForSection.length === 0) return;
-                        const confirmed = confirm(`Advance all ${currentNotesForSection.length} notes from "${dateStr}" by 1 day? (Only future notes will be affected)`);
-                        if (!confirmed) return;
-                        
-                        const paths = currentNotesForSection.map(note => note.path);
-                        await this.plugin.reviewController.advanceNotes(paths);
-                        // Notices and refresh are handled by advanceNotes in controller.
-                        // await this.refreshSidebarView(); // May be redundant
+                        new ConfirmationModal(
+                            this.plugin.app,
+                            'Advance All Notes',
+                            `Advance all ${currentNotesForSection.length} notes from "${dateStr}" by 1 day? (Only future notes will be affected)`,
+                            () => {
+                                const paths = currentNotesForSection.map(note => note.path);
+                                void this.plugin.reviewController.advanceNotes(paths);
+                            }
+                        ).open();
                     });
                 }
 
-                const postponeAllBtn = headerContainer.createEl("button", { text: "Postpone All", cls: "review-date-action-button review-date-postpone-all" });
+                const postponeAllBtn = headerContainer.createEl("button", { text: "Postpone all", cls: "review-date-action-button review-date-postpone-all" });
                 postponeAllBtn.title = `Postpone all notes in this section by 1 day`;
-                postponeAllBtn.addEventListener("click", async () => {
+                postponeAllBtn.addEventListener("click", () => {
                     const currentNotesForSection = groupedNotes[dateStr] || [];
                     if (currentNotesForSection.length === 0) return;
                     const daysToPostpone = 1;
-                    const confirmed = confirm(`Postpone all ${currentNotesForSection.length} notes from "${dateStr}" by ${daysToPostpone} day(s)?`);
-                    if (!confirmed) return;
-                    
-                    const paths = currentNotesForSection.map(note => note.path);
-                    await this.plugin.reviewController.postponeNotes(paths, daysToPostpone);
-                    // Notices and refresh are handled by postponeNotes in controller.
-                    // await this.refreshSidebarView(); // May be redundant
+                    new ConfirmationModal(
+                        this.plugin.app,
+                        'Postpone All Notes',
+                        `Postpone all ${currentNotesForSection.length} notes from "${dateStr}" by ${daysToPostpone} day(s)?`,
+                        () => {
+                            const paths = currentNotesForSection.map(note => note.path);
+                            void this.plugin.reviewController.postponeNotes(paths, daysToPostpone);
+                        }
+                    ).open();
                 });
 
                 headerRow.createSpan("review-date-time"); // Placeholder for time
@@ -336,11 +352,10 @@ export class ListViewRenderer {
                     notesContainerEl = dateSectionEl.createDiv("review-notes-container");
                 }
             }
-            
+
             // Update header content
             dateSectionEl.removeClass("review-date-section-overdue");
-            const actualTodayStart = DateUtils.startOfDay(new Date());
-            const isDefaultTodayView = !this.getActiveListBaseDate();
+            // const isDefaultTodayView = !this.getActiveListBaseDate(); // Unused
 
             // A section is considered "overdue" if its category key is "Due notes".
             // This applies whether in default view (actual overdue notes)
@@ -385,7 +400,8 @@ export class ListViewRenderer {
                         // - If viewing a specific past date from calendar (isDefaultTodayView = false),
                         //   "Due notes" might be the category for notes *on* that day.
                         //   In this case, overdue days relative to that selected past date will be 0.
-                        const referenceDateForDiff = isDefaultTodayView ? todayActualStart : DateUtils.startOfDay(this.getActiveListBaseDate()!);
+                        const baseDate = this.getActiveListBaseDate();
+                        const referenceDateForDiff = baseDate ? DateUtils.startOfDay(baseDate) : todayActualStart;
                         return Math.floor((referenceDateForDiff - new Date(note.nextReviewDate).getTime()) / (24 * 60 * 60 * 1000));
                     });
                     const maxDays = Math.max(0, ...daysDiff.filter(d => d >= 0 && !isNaN(d))); // Ensure positive days and filter NaN
@@ -395,15 +411,15 @@ export class ListViewRenderer {
                             overdueBadge = dateHeading.createSpan("review-overdue-badge sf-overdue-badge");
                         }
                         overdueBadge.setText(` (${maxDays} ${maxDays === 1 ? 'day' : 'days'} overdue)`);
-                        overdueBadge.style.display = '';
+                        overdueBadge.toggleClass('sf-hidden', false);
                     } else if (overdueBadge) {
-                        overdueBadge.style.display = 'none'; // No positive overdue days
+                        overdueBadge.toggleClass('sf-hidden', true); // No positive overdue days
                     }
                 } else if (overdueBadge) {
-                     overdueBadge.style.display = 'none'; // No overdue notes in section
+                    overdueBadge.toggleClass('sf-hidden', true); // No overdue notes in section
                 }
             } else if (overdueBadge) {
-                overdueBadge.style.display = 'none'; // Conditions for badge not met
+                overdueBadge.toggleClass('sf-hidden', true); // Conditions for badge not met
             }
 
             let sectionTime = 0;
@@ -412,7 +428,7 @@ export class ListViewRenderer {
 
             await this._updateOrRenderNoteList(notesContainerEl, notesForSection, dateStr, container);
         }
-        
+
         // Message for activeListBaseDate with no notes
         let noNotesForDateMsg = container.querySelector(".review-no-notes-for-date") as HTMLElement;
         const activeListBaseDate = this.getActiveListBaseDate();
@@ -421,9 +437,9 @@ export class ListViewRenderer {
                 noNotesForDateMsg = container.createDiv("review-no-notes-for-date"); // Similar to all-caught-up
             }
             noNotesForDateMsg.setText(`No notes scheduled on or after ${activeListBaseDate.toLocaleDateString()}.`);
-            noNotesForDateMsg.style.display = '';
+            noNotesForDateMsg.toggleClass('sf-hidden', false);
         } else if (noNotesForDateMsg) {
-            noNotesForDateMsg.style.display = 'none';
+            noNotesForDateMsg.toggleClass('sf-hidden', true);
         }
     }
 
@@ -434,28 +450,28 @@ export class ListViewRenderer {
         if (activeSession) {
             if (!sessionSection) {
                 sessionSection = container.createDiv("review-session-section");
-                new Setting(sessionSection).setHeading().setName("Active Review Session");
+                new Setting(sessionSection).setHeading().setName("Active review session");
                 const sessionInfo = sessionSection.createDiv("review-session-info");
                 sessionInfo.createDiv({ cls: "review-session-name" });
                 sessionInfo.createDiv({ cls: "review-session-progress" });
                 const progressBarContainer = sessionInfo.createDiv("review-session-progress-bar-container");
                 progressBarContainer.createDiv("review-session-progress-bar");
-                const continueBtn = sessionSection.createEl("button", { text: "Continue Session", cls: "review-session-continue" });
+                const continueBtn = sessionSection.createEl("button", { text: "Continue session", cls: "review-session-continue" });
                 continueBtn.addEventListener("click", () => { /* ... continue logic ... */ }); // TODO: Implement continue logic if not already present
-                const endBtn = sessionSection.createEl("button", { text: "End Session", cls: "review-session-end" });
-                endBtn.addEventListener("click", () => { 
-                    this.plugin.reviewSessionService.setActiveSession(null); 
-                    this.refreshSidebarView(); 
+                const endBtn = sessionSection.createEl("button", { text: "End session", cls: "review-session-end" });
+                endBtn.addEventListener("click", () => {
+                    this.plugin.reviewSessionService.setActiveSession(null);
+                    void this.refreshSidebarView();
                 });
             }
-            sessionSection.style.display = '';
+            sessionSection.toggleClass('sf-hidden', false);
             (sessionSection.querySelector(".review-session-name") as HTMLElement).setText(activeSession.name);
             (sessionSection.querySelector(".review-session-progress") as HTMLElement).setText(`Progress: ${activeSession.currentIndex}/${activeSession.hierarchy.traversalOrder.length}`);
             const progressBar = sessionSection.querySelector(".review-session-progress-bar") as HTMLElement;
             const progressPercent = Math.min(100, Math.round((activeSession.currentIndex / activeSession.hierarchy.traversalOrder.length) * 100));
             progressBar.style.width = `${progressPercent}%`;
         } else if (sessionSection) {
-            sessionSection.style.display = 'none';
+            sessionSection.toggleClass('sf-hidden', true);
         }
     }
 
@@ -476,19 +492,20 @@ export class ListViewRenderer {
         if (upcomingKeys.length > 0) {
             if (!upcomingSection) {
                 upcomingSection = container.createDiv("review-upcoming-section");
-                new Setting(upcomingSection).setHeading().setName("Upcoming Reviews");
+                new Setting(upcomingSection).setHeading().setName("Upcoming reviews");
                 upcomingSection.createDiv("review-upcoming-list"); // List container
             }
-            upcomingSection.style.display = '';
+            upcomingSection.toggleClass('sf-hidden', false);
             const upcomingListEl = upcomingSection.querySelector(".review-upcoming-list") as HTMLElement;
             if (!upcomingListEl) return; // Should not happen
 
             const existingDayItemElements = Array.from(upcomingListEl.querySelectorAll(".review-upcoming-day")) as HTMLElement[];
-            const dayKeysInDom = new Set(existingDayItemElements.map(el => el.dataset.dayKey).filter(Boolean));
+
 
             // Remove stale day items
             for (const dayItemEl of existingDayItemElements) {
-                if (!upcomingKeys.includes(dayItemEl.dataset.dayKey!)) {
+                const key = dayItemEl.dataset.dayKey;
+                if (key && !upcomingKeys.includes(key)) {
                     dayItemEl.remove();
                 }
             }
@@ -511,21 +528,21 @@ export class ListViewRenderer {
                     const daySummary = dayItemEl.createDiv("review-upcoming-day-summary");
                     daySummary.createEl("span", { cls: "review-upcoming-day-name" }); // Placeholder for name
 
-                    dayItemEl.addEventListener("click", async () => { // Attach listener once
+                    dayItemEl.addEventListener("click", () => { // Attach listener once
                         const currentDayKey = dayItemEl.dataset.dayKey;
                         if (!currentDayKey) return;
                         const expandedUpcomingDayKey = this.getExpandedUpcomingDayKey();
                         const isCurrentlyExpanded = expandedUpcomingDayKey === currentDayKey;
                         this.setExpandedUpcomingDayKey(isCurrentlyExpanded ? null : currentDayKey);
                         // Visual state and note list rendering will be handled by the main render pass
-                        await this.refreshSidebarView(); // Trigger a re-render to reflect expansion
+                        void this.refreshSidebarView(); // Trigger a re-render to reflect expansion
                     });
                 }
-                
+
                 // Update summary
                 const daySummaryNameEl = dayItemEl.querySelector(".review-upcoming-day-summary .review-upcoming-day-name") as HTMLElement;
                 let upcomingDisplayHeader = dayKey;
-                 if (notesForDay.length > 0) { // Should always be true here
+                if (notesForDay.length > 0) { // Should always be true here
                     const sampleUpcomingDate = new Date(notesForDay[0].nextReviewDate);
                     const formattedUpcomingDate = DateUtils.formatDate(sampleUpcomingDate.getTime(), 'medium');
                     if (["Today", "Tomorrow"].includes(dayKey) || dayKey.startsWith("In ")) {
@@ -545,15 +562,15 @@ export class ListViewRenderer {
                     if (!notesContainerEl) {
                         notesContainerEl = dayItemEl.createDiv("review-upcoming-notes-container");
                     }
-                    notesContainerEl.style.display = '';
+                    notesContainerEl.toggleClass('sf-hidden', false);
                     await this._updateOrRenderNoteList(notesContainerEl, notesForDay, dayKey, container);
                 } else if (notesContainerEl) {
-                    notesContainerEl.style.display = 'none'; // Hide instead of removing
+                    notesContainerEl.toggleClass('sf-hidden', true); // Hide instead of removing
                 }
             }
 
         } else if (upcomingSection) {
-            upcomingSection.style.display = 'none';
+            upcomingSection.toggleClass('sf-hidden', true);
         }
     }
 
@@ -561,9 +578,9 @@ export class ListViewRenderer {
      * Renders or updates a list of notes within a given container.
      */
     private async _updateOrRenderNoteList(
-        notesContainer: HTMLElement, 
-        notes: ReviewSchedule[], 
-        dateStr: string, 
+        notesContainer: HTMLElement,
+        notes: ReviewSchedule[],
+        dateStr: string,
         parentContainerForBulkActions: HTMLElement
     ): Promise<void> {
         const existingNoteElements = Array.from(notesContainer.querySelectorAll('.review-note-item[data-note-path]')) as HTMLElement[];
@@ -608,7 +625,7 @@ export class ListViewRenderer {
         for (const noteEl of notesInOrder) {
             notesContainer.appendChild(noteEl);
         }
-        
+
         this.setLastSelectedNotePath(lastSelectedNotePathRef.current);
     }
 
@@ -653,9 +670,9 @@ export class ListViewRenderer {
     private updateBulkActionButtonsVisibility(container: HTMLElement): void {
         const selectedNotesPaths = this.getSelectedNotes();
         const bulkActionsContainer = container.querySelector('.review-bulk-actions') as HTMLElement;
-        
+
         if (bulkActionsContainer) {
-            bulkActionsContainer.style.display = selectedNotesPaths.length > 1 ? 'flex' : 'none';
+            bulkActionsContainer.toggleClass('sf-hidden', selectedNotesPaths.length <= 1);
 
             // Handle visibility/disabled state of "Advance Selected" button
             const advanceSelectedBtn = bulkActionsContainer.querySelector('.review-bulk-advance') as HTMLButtonElement | null;
@@ -667,9 +684,9 @@ export class ListViewRenderer {
                         return schedule && DateUtils.startOfDay(new Date(schedule.nextReviewDate)) > todayStart;
                     });
                     advanceSelectedBtn.disabled = !hasEligibleFutureNote;
-                    advanceSelectedBtn.style.display = ''; // Always show if bulk actions are visible, rely on disabled state
+                    advanceSelectedBtn.toggleClass('sf-hidden', false); // Always show if bulk actions are visible, rely on disabled state
                 } else {
-                    advanceSelectedBtn.disabled = true; 
+                    advanceSelectedBtn.disabled = true;
                     // advanceSelectedBtn.style.display = 'none'; // Or hide if no selection
                 }
             }
@@ -694,7 +711,7 @@ export class ListViewRenderer {
 
         const reviewButtonsContainer = container.querySelector('.review-buttons-container');
         if (reviewButtonsContainer) {
-            (reviewButtonsContainer as HTMLElement).style.display = dueNotesForStats.length > 0 ? '' : 'none';
+            (reviewButtonsContainer as HTMLElement).toggleClass('sf-hidden', dueNotesForStats.length === 0);
         }
         this.updateBulkActionButtonsVisibility(container);
 
@@ -703,15 +720,15 @@ export class ListViewRenderer {
         const notesInCurrentContext = this.plugin.reviewController.getTodayNotes();
 
         if (allCaughtUpEl) {
-            (allCaughtUpEl as HTMLElement).style.display = notesInCurrentContext.length === 0 ? '' : 'none';
+            (allCaughtUpEl as HTMLElement).toggleClass('sf-hidden', notesInCurrentContext.length !== 0);
             if (notesInCurrentContext.length === 0) {
-                 allCaughtUpEl.setText(this.getActiveListBaseDate() ? "No notes for selected date." : "All caught up! No notes due for review.");
+                allCaughtUpEl.setText(this.getActiveListBaseDate() ? "No notes for selected date." : "All caught up! No notes due for review.");
             }
         } else if (notesInCurrentContext.length === 0) {
             const buttonsContainer = container.querySelector('.review-buttons-container');
             const newCaughtUpEl = container.createDiv("review-all-caught-up");
             newCaughtUpEl.setText(this.getActiveListBaseDate() ? "No notes for selected date." : "All caught up! No notes due for review.");
-            
+
             // Insert after stats or buttons if they exist
             // const statsEl = container.querySelector(".review-stats-list-view"); // Stats section is removed
             const anchor = buttonsContainer; // || statsEl; // Stats section removed
@@ -720,7 +737,7 @@ export class ListViewRenderer {
             } else if (anchor) {
                 container.appendChild(newCaughtUpEl);
             } else {
-                 container.prepend(newCaughtUpEl); // Fallback
+                container.prepend(newCaughtUpEl); // Fallback
             }
         }
     }
@@ -770,11 +787,11 @@ export class ListViewRenderer {
 
                 let overdueBadge = headerTextEl.querySelector(".review-overdue-badge") as HTMLElement | null;
                 if (dateStr === "Due notes") {
-                    const daysDiff = await Promise.all(notesInSection.map(async noteEl => {
+                    const daysDiff = notesInSection.map(noteEl => {
                         const path = (noteEl as HTMLElement).dataset.notePath;
                         const noteSchedule = path ? this.plugin.reviewScheduleService.schedules[path] : null;
                         return noteSchedule ? Math.abs(Math.floor((noteSchedule.nextReviewDate - DateUtils.startOfDay()) / (24 * 60 * 60 * 1000))) : 0;
-                    }));
+                    });
                     const maxDays = Math.max(0, ...daysDiff.filter(d => !isNaN(d)));
                     if (maxDays > 0) {
                         const badgeText = ` (${maxDays} ${maxDays === 1 ? 'day' : 'days'} overdue)`;
@@ -807,7 +824,7 @@ export class ListViewRenderer {
     /**
      * Group notes by their review date, considering activeListBaseDate.
      */
-    async groupNotesByDate(notes: ReviewSchedule[], includeFuture: boolean = false): Promise<Record<string, ReviewSchedule[]>> {
+    groupNotesByDate(notes: ReviewSchedule[], _includeFuture = false): Record<string, ReviewSchedule[]> {
         const grouped: Record<string, ReviewSchedule[]> = {};
         const actualTodayStart = DateUtils.startOfDay(new Date());
         const activeListBaseDate = this.getActiveListBaseDate();
@@ -831,7 +848,7 @@ export class ListViewRenderer {
             // Determine the group string.
             // If activeListBaseDate is set, format relative to that date.
             // If activeListBaseDate is null (default view), format relative to actual current time.
-            let dateStr = DateUtils.formatDate(note.nextReviewDate, 'relative', activeListBaseDate);
+            const dateStr = DateUtils.formatDate(note.nextReviewDate, 'relative', activeListBaseDate);
 
             // Overdue notes will now naturally be grouped under "Due notes" (or similar key from DateUtils)
             // by the dateStr determined above, rather than being merged into "Today".

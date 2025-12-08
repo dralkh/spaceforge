@@ -1,9 +1,7 @@
 import { Notice } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { IReviewBatchController } from './interfaces';
-import { ReviewSchedule } from '../models/review-schedule';
 import { BatchReviewModal } from '../ui/batch-review-modal';
-import { ConsolidatedMCQModal } from '../ui/consolidated-mcq-modal';
 
 /**
  * Controller for batch reviewing multiple notes
@@ -31,7 +29,7 @@ export class ReviewBatchController implements IReviewBatchController {
         if (!reviewController) return;
 
         // Update notes while preserving existing order
-        await reviewController.updateTodayNotes(true);
+        void reviewController.updateTodayNotes(true);
 
         const todayNotes = reviewController.getTodayNotes();
         if (todayNotes.length === 0) {
@@ -44,8 +42,8 @@ export class ReviewBatchController implements IReviewBatchController {
         // We need to update the core controller's state
         if (reviewController) {
             // Force update to ensure we start at the first note
-            await reviewController.updateTodayNotes(false);
-            
+            void reviewController.updateTodayNotes(false);
+
             const note = todayNotes[0];
 
             // Start the review with the selected note
@@ -61,7 +59,7 @@ export class ReviewBatchController implements IReviewBatchController {
      * @param paths Array of note paths to review
      * @param useMCQ Whether to use MCQs for testing (default: false)
      */
-    async reviewNotes(paths: string[], useMCQ: boolean = false): Promise<void> {
+    reviewNotes(paths: string[], useMCQ = false): void {
         if (paths.length === 0) {
             new Notice("No notes selected for review.");
             return;
@@ -76,7 +74,7 @@ export class ReviewBatchController implements IReviewBatchController {
         }
 
         if (useMCQ) {
-            new Notice(`Preparing MCQs for ${notesToReview.length} selected notes. This may take a moment...`);
+            new Notice(`Preparing MCQs for ${notesToReview.length} selected notes.This may take a moment...`);
         } else {
             new Notice(`Starting review of ${notesToReview.length} selected notes.`);
         }
@@ -91,13 +89,13 @@ export class ReviewBatchController implements IReviewBatchController {
      *
      * @param useMCQ Whether to use MCQs for testing
      */
-    async reviewAllNotesWithMCQ(useMCQ: boolean = true): Promise<void> {
+    reviewAllNotesWithMCQ(useMCQ = true): void {
         const reviewController = this.plugin.reviewController;
         if (!reviewController) return;
 
         // Update today's notes first, preserving custom order if it exists
         const hasCustomOrder = this.plugin.reviewScheduleService.customNoteOrder.length > 0;
-        await reviewController.updateTodayNotes(hasCustomOrder);
+        void reviewController.updateTodayNotes(hasCustomOrder);
 
         const todayNotes = reviewController.getTodayNotes();
         if (todayNotes.length === 0) {
@@ -127,7 +125,7 @@ export class ReviewBatchController implements IReviewBatchController {
 
         // Update notes respecting custom order if it exists
         const hasCustomOrder = this.plugin.reviewScheduleService.customNoteOrder.length > 0;
-        await reviewController.updateTodayNotes(hasCustomOrder);
+        void reviewController.updateTodayNotes(hasCustomOrder);
 
         const todayNotes = reviewController.getTodayNotes();
         if (todayNotes.length === 0) {
@@ -136,7 +134,8 @@ export class ReviewBatchController implements IReviewBatchController {
         }
 
         if (!this.plugin.mcqController) {
-            new Notice("MCQ controller not initialized. Please check MCQ settings.");
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice("MCQ controller not initialized, please check MCQ settings");
             return;
         }
 
@@ -162,7 +161,7 @@ export class ReviewBatchController implements IReviewBatchController {
      * @param paths Array of note paths to postpone
      * @param days Number of days to postpone (default: 1)
      */
-    async postponeNotes(paths: string[], days: number = 1): Promise<void> {
+    async postponeNotes(paths: string[], days = 1): Promise<void> {
         const reviewController = this.plugin.reviewController;
         if (!reviewController) return;
 
@@ -180,10 +179,10 @@ export class ReviewBatchController implements IReviewBatchController {
         await this.plugin.savePluginData(); // Add save call after loop
 
         // Refresh the sidebar view if available
-        this.plugin.getSidebarView()?.refresh();
+        void this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after postponing
-        await reviewController.updateTodayNotes(true);
+        void reviewController.updateTodayNotes(true);
 
         new Notice(`Postponed ${paths.length} notes by ${days} day(s).`);
     }
@@ -216,9 +215,9 @@ export class ReviewBatchController implements IReviewBatchController {
             await this.plugin.savePluginData(); // Save once after all operations
 
             // Refresh the sidebar view if available
-            this.plugin.getSidebarView()?.refresh();
+            void this.plugin.getSidebarView()?.refresh();
             // Update today's notes after advancing
-            await reviewController.updateTodayNotes(true);
+            void reviewController.updateTodayNotes(true);
             new Notice(`Advanced ${advancedCount} note(s).`);
         } else {
             new Notice("No eligible notes were advanced.");
@@ -248,10 +247,10 @@ export class ReviewBatchController implements IReviewBatchController {
         await this.plugin.savePluginData(); // Add save call after loop
 
         // Refresh the sidebar view if available
-        this.plugin.getSidebarView()?.refresh();
+        void this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after removing
-        await reviewController.updateTodayNotes(true);
+        void reviewController.updateTodayNotes(true);
 
         new Notice(`Removed ${paths.length} notes from review schedule.`);
     }

@@ -1,9 +1,8 @@
-import { Modal, Notice, TFile } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, ReviewSchedule, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
 import { IReviewController } from './interfaces';
 import { ReviewModal } from '../ui/review-modal';
-import { getNextFileInSession, isSessionComplete } from '../models/review-session';
 
 /**
  * Core controller that handles the review process
@@ -22,7 +21,7 @@ export class ReviewControllerCore implements IReviewController {
     /**
      * Current index in today's notes
      */
-    private currentNoteIndex: number = 0;
+    private currentNoteIndex = 0;
 
     /**
      * Cache of linked notes to improve performance
@@ -61,9 +60,9 @@ export class ReviewControllerCore implements IReviewController {
      * Sets an override for the current review date.
      * @param date Timestamp of the date to simulate, or null to use actual Date.now().
      */
-    public async setReviewDateOverride(date: number | null): Promise<void> {
+    public setReviewDateOverride(date: number | null): void {
         this.currentReviewDateOverride = date;
-        await this.updateTodayNotes(); // Ensure notes are updated when the override changes
+        this.updateTodayNotes(); // Ensure notes are updated when the override changes
     }
 
     /**
@@ -116,7 +115,7 @@ export class ReviewControllerCore implements IReviewController {
      *
      * @param preserveCurrentIndex Whether to try to preserve the current note index
      */
-    async updateTodayNotes(preserveCurrentIndex: boolean = false): Promise<void> {
+    updateTodayNotes(preserveCurrentIndex = false): void {
         // Store current note path if we want to preserve the index
         let currentNotePath: string | null = null;
         if (preserveCurrentIndex && this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length) {
@@ -127,10 +126,6 @@ export class ReviewControllerCore implements IReviewController {
         this.linkedNoteCache.clear();
         this.traversalOrder = [];
         this.traversalPositions.clear();
-
-        // Save the existing traversal order and positions
-        const originalTraversalOrder = [...this.traversalOrder];
-        const originalPositions = new Map(this.traversalPositions);
 
         // Get the latest due notes from storage, already sorted by custom order (if available)
         // by getDueNotesWithCustomOrder, using the effective review date.
@@ -205,7 +200,7 @@ export class ReviewControllerCore implements IReviewController {
      */
     async reviewCurrentNote(): Promise<void> {
         if (this.todayNotes.length === 0) {
-            await this.updateTodayNotes();
+            this.updateTodayNotes();
             if (this.todayNotes.length === 0) {
                 new Notice("No notes due for review today!");
                 return;
@@ -241,20 +236,16 @@ export class ReviewControllerCore implements IReviewController {
      * @param path Path to the note file
      * @param days Number of days to postpone (default: 1)
      */
-    async postponeNote(path: string, days: number = 1): Promise<void> {
+    async postponeNote(path: string, days = 1): Promise<void> {
         // Store the current note path to potentially adjust currentNoteIndex later
-        // const currentPath = this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length // Not strictly needed here as handleNotePostponed re-evaluates
-        //     ? this.todayNotes[this.currentNoteIndex].path
-        //     : null;
-
-        await this.plugin.dataStorage.reviewScheduleService.postponeNote(path, days); // Corrected to call service via dataStorage
-        await this.plugin.savePluginData(); 
+        this.plugin.dataStorage.reviewScheduleService.postponeNote(path, days); // Corrected to call service via dataStorage
+        await this.plugin.savePluginData();
 
         // Explicitly update navigation state in controller to ensure UI consistency
         await this.handleNotePostponed(path);
 
         // Refresh the sidebar view if available
-        this.plugin.getSidebarView()?.refresh();
+        void this.plugin.getSidebarView()?.refresh();
         // Notice is handled by the service for postponeNote
     }
 
@@ -264,13 +255,13 @@ export class ReviewControllerCore implements IReviewController {
      * @param path Path to the note file
      */
     async advanceNote(path: string): Promise<void> {
-        const advanced = await this.plugin.dataStorage.reviewScheduleService.advanceNote(path);
+        const advanced = this.plugin.dataStorage.reviewScheduleService.advanceNote(path);
 
         if (advanced) {
             await this.plugin.savePluginData();
             await this.handleNoteAdvanced(path); // New handler for advancing
 
-            this.plugin.getSidebarView()?.refresh();
+            void this.plugin.getSidebarView()?.refresh();
             new Notice(`Note advanced.`); // Controller handles notice for advance
         } else {
             new Notice(`Note is not eligible to be advanced.`);
@@ -283,14 +274,14 @@ export class ReviewControllerCore implements IReviewController {
      *
      * @param path Path to the advanced note
      */
-    async handleNoteAdvanced(path: string): Promise<void> {
+    handleNoteAdvanced(_path: string): void {
         // Re-fetch and re-sort today's notes, preserving current selection if possible.
         // updateTodayNotes(true) should correctly place the advanced note
         // if it's now due, or remove it if it was advanced from future to still future.
         // It also updates traversalOrder and currentNoteIndex.
-        await this.updateTodayNotes(true);
+        this.updateTodayNotes(true);
     }
-    
+
     /**
      * Handle a note being postponed, updating navigation state
      *
@@ -370,17 +361,17 @@ export class ReviewControllerCore implements IReviewController {
      */
     async skipReview(path: string): Promise<void> {
         const effectiveDate = this.getEffectiveReviewDate();
-        await this.plugin.dataStorage.reviewScheduleService.skipNote(path, ReviewResponse.CorrectWithDifficulty, effectiveDate); // Pass effectiveDate
+        this.plugin.dataStorage.reviewScheduleService.skipNote(path, ReviewResponse.CorrectWithDifficulty, effectiveDate); // Pass effectiveDate
         await this.plugin.savePluginData(); // Add save call
 
         // Show notification with more informative message
         new Notice("Review postponed to tomorrow. Note will be easier to recover with a small penalty applied.");
 
         // Refresh the sidebar view if available
-        this.plugin.getSidebarView()?.refresh();
+        void this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after skipping the review
-        await this.updateTodayNotes(true);
+        this.updateTodayNotes(true);
 
         // Continue to the next note and show review modal
         if (this.todayNotes.length > 0) {
@@ -419,15 +410,15 @@ export class ReviewControllerCore implements IReviewController {
     async processReviewResponse(path: string, response: ReviewResponse | FsrsRating): Promise<void> {
         const effectiveDate = this.getEffectiveReviewDate();
         // Record a normal review (not skipped) with the user's quality rating
-        const wasRecorded = await this.plugin.dataStorage.reviewScheduleService.recordReview(path, response, false, effectiveDate);
-        
+        const wasRecorded = this.plugin.dataStorage.reviewScheduleService.recordReview(path, response, false, effectiveDate);
+
         if (!wasRecorded) {
             // Note was not due, this is just a preview
             new Notice("Note previewed, not recorded");
             return;
         }
 
-        // await this.plugin.savePluginData(); // Moved save call to the end of the method
+
 
         // Check for MCQ regeneration based on rating
         const schedule = this.plugin.dataStorage.reviewScheduleService.schedules[path];
@@ -454,11 +445,10 @@ export class ReviewControllerCore implements IReviewController {
 
         // Show notification based on response
         let responseText: string;
-        // const schedule = this.plugin.dataStorage.reviewScheduleService.schedules[path]; // Already defined above
 
         if (schedule && schedule.schedulingAlgorithm === 'fsrs') {
             // FSRS response text
-            switch(response as FsrsRating) { // Cast because we are in FSRS block
+            switch (response as FsrsRating) { // Cast because we are in FSRS block
                 case FsrsRating.Again: responseText = "Again (1)"; break;
                 case FsrsRating.Hard: responseText = "Hard (2)"; break;
                 case FsrsRating.Good: responseText = "Good (3)"; break;
@@ -467,7 +457,7 @@ export class ReviewControllerCore implements IReviewController {
             }
         } else {
             // SM-2 response text
-            switch(response as ReviewResponse) { // Cast because we are in SM-2 block
+            switch (response as ReviewResponse) { // Cast because we are in SM-2 block
                 case ReviewResponse.CompleteBlackout: responseText = "Complete Blackout (0)"; break;
                 case ReviewResponse.IncorrectResponse: responseText = "Incorrect Response (1)"; break;
                 case ReviewResponse.IncorrectButFamiliar: responseText = "Incorrect but Familiar (2)"; break;
@@ -480,10 +470,10 @@ export class ReviewControllerCore implements IReviewController {
         new Notice(`Note review recorded: ${responseText}`);
 
         // Refresh the sidebar view if available
-        this.plugin.getSidebarView()?.refresh();
+        void this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after recording the review (preserve the index since we're in the middle of navigation)
-        await this.updateTodayNotes(true);
+        this.updateTodayNotes(true);
 
         // Check if we're in a hierarchical review session
         const activeSession = this.plugin.dataStorage.getActiveSession();
@@ -491,7 +481,6 @@ export class ReviewControllerCore implements IReviewController {
         if (activeSession) {
             // Advance to the next file in the session
             await this.plugin.dataStorage.advanceActiveSession();
-            // await this.plugin.savePluginData(); // Moved save call to the end of the method
 
             // Get the next file to review
             const nextFilePath = this.plugin.dataStorage.getNextSessionFile();
@@ -506,19 +495,12 @@ export class ReviewControllerCore implements IReviewController {
         }
         // If not in a session, automatically go to the next note and show review modal
         else if (this.todayNotes.length > 0) {
-            // Log the current state for debugging
-
-            // Simply move to the next note in today's notes list (which maintains user's custom order)
-            this.currentNoteIndex = (this.currentNoteIndex + 1) % this.todayNotes.length;
-
             // Check if we've reviewed all notes (in case we've come full circle)
             const currentPath = this.todayNotes[this.currentNoteIndex].path;
             if (currentPath === path) {
                 new Notice("All caught up! No more notes due for review.");
                 return;
             }
-
-            // Log the new state after determining next note
 
             // After finding the next note, show the review modal
             if (this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length) {
@@ -535,7 +517,7 @@ export class ReviewControllerCore implements IReviewController {
         } else {
             new Notice("All caught up! No more notes due for review.");
         }
-        
+
         // Save all accumulated plugin data once at the end
         await this.plugin.savePluginData();
     }

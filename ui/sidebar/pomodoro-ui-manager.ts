@@ -7,8 +7,7 @@ export class PomodoroUIManager {
     private attachedContainer: HTMLElement | null = null; // The container provided by ListViewRenderer
 
     // References to Pomodoro UI elements
-    private pomodoroVisibilityToggleBtnContainer: HTMLElement | null = null;
-    private pomodoroVisibilityToggleBtn: HTMLButtonElement | null = null;
+    // private pomodoroVisibilityToggleBtnContainer & Btn removed as unused
     public pomodoroRootEl: HTMLElement | null = null; // Container for the actual timer content
     private pomodoroTimerDisplayEl: HTMLElement | null = null;
     private pomodoroStartBtn: HTMLButtonElement | null = null;
@@ -21,24 +20,24 @@ export class PomodoroUIManager {
     private pomodoroQuickLongInput: HTMLInputElement | null = null;
     private pomodoroQuickSessionsInput: HTMLInputElement | null = null;
     private pomodoroCalculationResultEl: HTMLElement | null = null;
-    
+
     // New estimation and cycle tracking elements (moved to calculation panel)
     private pomodoroCycleProgressEl: HTMLElement | null = null;
-    
+
     // User override input elements
     private pomodoroUserOverrideHoursInput: HTMLInputElement | null = null;
     private pomodoroUserOverrideMinutesInput: HTMLInputElement | null = null;
     private pomodoroUserAddToEstimationCheckbox: HTMLInputElement | null = null;
 
     // private isPomodoroSectionOpen: boolean = false; // No longer needed, section is always "open"
-    private areButtonsVisible: boolean = true; // For Play/Pause/Skip buttons
-    private isTimerTextVisible: boolean = true; // For the timer countdown text
+    private areButtonsVisible = true; // For Play/Pause/Skip buttons
+    private isTimerTextVisible = true; // For the timer countdown text
     private longPressTimer: number | null = null;
     private veryLongPressTimer: number | null = null;
     private readonly LONG_PRESS_DURATION = 500; // ms
     private readonly VERY_LONG_PRESS_DURATION = 1500; // ms
-    private didLongPress: boolean = false;
-    private didVeryLongPress: boolean = false;
+    private didLongPress = false;
+    private didVeryLongPress = false;
 
 
     /**
@@ -56,12 +55,12 @@ export class PomodoroUIManager {
             // new Notice("Pomodoro durations updated."); // Removed notification
             return true;
         } else {
-            new Notice("Invalid Pomodoro durations. Settings not saved. Please enter positive numbers.");
+            new Notice("Invalid Pomodoro durations. Settings not saved. Please enter positive numbers."); // eslint-disable-line obsidianmd/ui/sentence-case
             // Re-populate with current valid settings to prevent saving invalid on next close if not corrected
-            if(this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
-            if(this.pomodoroQuickShortInput) this.pomodoroQuickShortInput.value = String(this.plugin.settings.pomodoroShortBreakDuration);
-            if(this.pomodoroQuickLongInput) this.pomodoroQuickLongInput.value = String(this.plugin.settings.pomodoroLongBreakDuration);
-            if(this.pomodoroQuickSessionsInput) this.pomodoroQuickSessionsInput.value = String(this.plugin.settings.pomodoroSessionsUntilLongBreak);
+            if (this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
+            if (this.pomodoroQuickShortInput) this.pomodoroQuickShortInput.value = String(this.plugin.settings.pomodoroShortBreakDuration);
+            if (this.pomodoroQuickLongInput) this.pomodoroQuickLongInput.value = String(this.plugin.settings.pomodoroLongBreakDuration);
+            if (this.pomodoroQuickSessionsInput) this.pomodoroQuickSessionsInput.value = String(this.plugin.settings.pomodoroSessionsUntilLongBreak);
             return false;
         }
     }
@@ -78,7 +77,7 @@ export class PomodoroUIManager {
      */
     public attachAndRender(container: HTMLElement): void {
         this.attachedContainer = container;
-        
+
         // Ensure pomodoroRootEl exists and is parented correctly
         // The old pomodoroVisibilityToggleBtnContainer is now hidden by CSS and its logic removed.
         let rootElWasCreated = false;
@@ -98,9 +97,9 @@ export class PomodoroUIManager {
         if (rootElWasCreated || (this.pomodoroRootEl && this.pomodoroRootEl.children.length === 0)) {
             this.renderPomodoroTimer(this.pomodoroRootEl);
         }
-        
+
         // Always update UI details as the section is considered always open
-        this.updatePomodoroUI(); 
+        this.updatePomodoroUI();
     }
 
     // getIsPomodoroSectionOpen, setIsPomodoroSectionOpen, setupPomodoroVisibilityToggleButton, updatePomodoroVisibility are no longer needed
@@ -154,15 +153,14 @@ export class PomodoroUIManager {
         // Timer Display
         if (!this.pomodoroTimerDisplayEl || this.pomodoroTimerDisplayEl.parentElement !== mainControlsRow) {
             this.pomodoroTimerDisplayEl?.remove();
-            this.pomodoroTimerDisplayEl = mainControlsRow.createDiv("pomodoro-timer-display");
-            this.pomodoroTimerDisplayEl.addClass("pomodoro-timer-fade");
+            this.pomodoroTimerDisplayEl = mainControlsRow.createDiv({ cls: "pomodoro-timer-display pomodoro-timer-fade" });
         }
         this.pomodoroTimerDisplayEl.setText(this.plugin.pomodoroService.getFormattedTimeLeft());
         // Add event listeners for long-press and click on timer display
         if (this.pomodoroTimerDisplayEl) {
             this.pomodoroTimerDisplayEl.addEventListener("mousedown", (e) => {
                 // Prevent text selection during long press
-                e.preventDefault(); 
+                e.preventDefault();
                 this.didLongPress = false;
                 this.didVeryLongPress = false;
 
@@ -173,11 +171,11 @@ export class PomodoroUIManager {
                 }, this.LONG_PRESS_DURATION);
 
                 this.veryLongPressTimer = window.setTimeout(() => {
-                    this.didVeryLongPress = true; 
+                    this.didVeryLongPress = true;
                     this.isTimerTextVisible = !this.isTimerTextVisible; // Toggle timer text
                     // If timer text is now hidden, also hide buttons. If shown, show buttons.
-                    this.areButtonsVisible = this.isTimerTextVisible; 
-                    this.updateTimerTextDisplay(); 
+                    this.areButtonsVisible = this.isTimerTextVisible;
+                    this.updateTimerTextDisplay();
                     this.updateButtonVisibility();
                 }, this.VERY_LONG_PRESS_DURATION);
             });
@@ -210,7 +208,7 @@ export class PomodoroUIManager {
 
             this.pomodoroTimerDisplayEl.addEventListener("mouseup", handlePressEnd);
             this.pomodoroTimerDisplayEl.addEventListener("touchend", handlePressEnd);
-            
+
             const cancelPress = () => {
                 if (this.veryLongPressTimer) window.clearTimeout(this.veryLongPressTimer);
                 if (this.longPressTimer) window.clearTimeout(this.longPressTimer);
@@ -222,10 +220,10 @@ export class PomodoroUIManager {
 
             this.pomodoroTimerDisplayEl.addEventListener("mouseleave", cancelPress);
             this.pomodoroTimerDisplayEl.addEventListener("touchmove", cancelPress);
-            
+
             // Touchstart needs to mirror mousedown logic for setting up timers
-             this.pomodoroTimerDisplayEl.addEventListener("touchstart", (e) => {
-                e.preventDefault(); 
+            this.pomodoroTimerDisplayEl.addEventListener("touchstart", (e) => {
+                e.preventDefault();
                 this.didLongPress = false;
                 this.didVeryLongPress = false;
 
@@ -257,7 +255,7 @@ export class PomodoroUIManager {
             this.pomodoroCycleProgressEl?.remove();
             this.pomodoroCycleProgressEl = container.createDiv("pomodoro-cycle-progress");
         }
-        
+
         // Quick Settings Toggle Button - REMOVED
         // if (!this.pomodoroQuickSettingsToggleBtn || this.pomodoroQuickSettingsToggleBtn.parentElement !== mainControlsRow) {
         //     this.pomodoroQuickSettingsToggleBtn?.remove();
@@ -267,8 +265,14 @@ export class PomodoroUIManager {
         //     this.pomodoroQuickSettingsToggleBtn.addEventListener("click", () => {
         //         const panel = this.pomodoroQuickSettingsPanelEl;
         //         if (!panel) return;
-        //         const isCurrentlyHidden = panel.style.display === 'none' || !panel.style.display;
-        //         panel.style.display = isCurrentlyHidden ? 'flex' : 'none';
+        //         const isCurrentlyHidden = panel.classList.contains('sf-hidden');
+        //         if (isCurrentlyHidden) {
+        //             panel.classList.remove('sf-hidden');
+        //             panel.classList.add('sf-visible');
+        //         } else {
+        //             panel.classList.remove('sf-visible');
+        //             panel.classList.add('sf-hidden');
+        //         }
 
         //         if (isCurrentlyHidden) { // Populate inputs when opening
         //             if(this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
@@ -278,22 +282,23 @@ export class PomodoroUIManager {
         //         }
         //     });
         // }
-        
+
         // Quick Settings Panel
         // The panel is now created directly under the mainControlsRow for better layout control with dropdown
         let settingsPanelContainer = container.querySelector(".pomodoro-settings-panel-container") as HTMLElement;
         if (!settingsPanelContainer) {
             settingsPanelContainer = container.createDiv("pomodoro-settings-panel-container");
         }
-        
+
         if (!this.pomodoroQuickSettingsPanelEl || this.pomodoroQuickSettingsPanelEl.parentElement !== settingsPanelContainer) {
             this.pomodoroQuickSettingsPanelEl?.remove();
             this.pomodoroQuickSettingsPanelEl = settingsPanelContainer.createDiv("pomodoro-quick-settings-panel");
             this.pomodoroQuickSettingsPanelEl.classList.add('sf-hidden'); // Initial state
 
             // Recreate inputs and buttons if panel is new
-            const createQuickSetting = (labelText: string, inputType: string = 'number'): HTMLInputElement => {
-                const settingDiv = this.pomodoroQuickSettingsPanelEl!.createDiv("pomodoro-quick-setting");
+            const panel = this.pomodoroQuickSettingsPanelEl;
+            const createQuickSetting = (labelText: string, inputType = 'number'): HTMLInputElement => {
+                const settingDiv = panel.createDiv("pomodoro-quick-setting");
                 settingDiv.createEl("label", { text: labelText });
                 const input = settingDiv.createEl("input", { type: inputType });
                 input.setAttr("min", "1");
@@ -324,46 +329,46 @@ export class PomodoroUIManager {
             // });
 
             // User override time inputs
-            const overrideContainer = this.pomodoroQuickSettingsPanelEl.createDiv("pomodoro-override-container");
-            const overrideLabel = overrideContainer.createEl("label", { text: "Override time (optional):", cls: "pomodoro-override-label" });
-            
+            const overrideContainer = this.pomodoroQuickSettingsPanelEl.createDiv({ cls: "pomodoro-override-container" });
+            overrideContainer.createEl("label", { text: "Override time (optional):", cls: "pomodoro-override-label" });
+
             const overrideInputsContainer = overrideContainer.createDiv("pomodoro-override-inputs");
             this.pomodoroUserOverrideHoursInput = overrideInputsContainer.createEl("input", { type: "number", cls: "pomodoro-override-hours" });
             this.pomodoroUserOverrideHoursInput.setAttr("min", "0");
             this.pomodoroUserOverrideHoursInput.setAttr("placeholder", "H");
             this.pomodoroUserOverrideHoursInput.value = String(this.plugin.pluginState.pomodoroUserOverrideHours);
-            
+
             const hoursLabel = overrideInputsContainer.createSpan("pomodoro-override-label-small");
-            hoursLabel.setText("h");
-            
+            hoursLabel.setText("h"); // eslint-disable-line obsidianmd/ui/sentence-case
+
             this.pomodoroUserOverrideMinutesInput = overrideInputsContainer.createEl("input", { type: "number", cls: "pomodoro-override-minutes" });
             this.pomodoroUserOverrideMinutesInput.setAttr("min", "0");
             this.pomodoroUserOverrideMinutesInput.setAttr("placeholder", "M");
             this.pomodoroUserOverrideMinutesInput.value = String(this.plugin.pluginState.pomodoroUserOverrideMinutes);
-            
+
             const minutesLabel = overrideInputsContainer.createSpan("pomodoro-override-label-small");
-            minutesLabel.setText("m");
-            
+            minutesLabel.setText("m"); // eslint-disable-line obsidianmd/ui/sentence-case
+
             // Add to estimation toggle
             const toggleContainer = overrideContainer.createDiv("pomodoro-override-toggle-container");
             this.pomodoroUserAddToEstimationCheckbox = toggleContainer.createEl("input", { type: "checkbox", cls: "pomodoro-add-to-estimation" });
             this.pomodoroUserAddToEstimationCheckbox.checked = this.plugin.pluginState.pomodoroUserAddToEstimation;
-            
+
             const toggleLabel = toggleContainer.createEl("label", { text: "Add to estimated time", cls: "pomodoro-toggle-label" });
             toggleLabel.setAttribute("for", "pomodoro-add-to-estimation");
 
-            const calculateBtn = buttonsContainer.createEl("button", { text: "Calculate Reading Time", cls: "pomodoro-quick-calculate-btn" });
-            calculateBtn.addEventListener("click", async () => {
+            const calculateBtn = buttonsContainer.createEl("button", { text: "Calculate reading time", cls: "pomodoro-quick-calculate-btn" });
+            calculateBtn.addEventListener("click", () => {
                 const settingsSaved = this._savePomodoroSettings();
                 if (settingsSaved) {
-                    await this.calculateAndDisplayPomodoroEstimate();
+                    void this.calculateAndDisplayPomodoroEstimate();
                 }
             });
 
             this.pomodoroCalculationResultEl = this.pomodoroQuickSettingsPanelEl.createDiv({ cls: "pomodoro-calculation-result" });
             this.pomodoroCalculationResultEl.classList.add('sf-hidden');
         }
-        
+
         this.updatePomodoroUI(); // Ensure UI reflects current state after potential recreation
     }
 
@@ -377,16 +382,16 @@ export class PomodoroUIManager {
         this.saveUserOverrideSettings();
 
         // Use notes from the review controller, which are context-aware (selected date or actual today)
-        const notesForEstimate = this.plugin.reviewController.getTodayNotes(); 
-        
+        const notesForEstimate = this.plugin.reviewController.getTodayNotes();
+
         // Check if we have either notes or user override
         const userOverrideHours = this.plugin.pluginState.pomodoroUserOverrideHours || 0;
         const userOverrideMinutes = this.plugin.pluginState.pomodoroUserOverrideMinutes || 0;
         const userOverrideTimeInMinutes = (userOverrideHours * 60) + userOverrideMinutes;
-        
+
         if (notesForEstimate.length === 0 && userOverrideTimeInMinutes === 0) {
             const activeDate = this.plugin.reviewController.getCurrentReviewDateOverride();
-            const message = activeDate 
+            const message = activeDate
                 ? `No notes scheduled for ${new Date(activeDate).toLocaleDateString()} to calculate.`
                 : "No notes currently due to calculate.";
             this.pomodoroCalculationResultEl.setText(message);
@@ -397,23 +402,22 @@ export class PomodoroUIManager {
 
         // Use the PomodoroService to calculate estimation (this also resets and updates cycle tracking)
         const result = await this.plugin.pomodoroService.calculateEstimationFromNotes(notesForEstimate);
-        
+
         if (!result) {
             this.pomodoroCalculationResultEl.setText("Unable to calculate estimation.");
-            this.pomodoroCalculationResultEl.style.display = 'block';
+            this.pomodoroCalculationResultEl.removeClass('sf-hidden');
             return;
         }
 
-        const { totalReadingTimeInSeconds, totalReadingTimeInMinutes, pomodorosNeeded, totalTimeWithBreaksMinutes } = result;
+        const { totalReadingTimeInSeconds, pomodorosNeeded, totalTimeWithBreaksMinutes } = result;
 
         // Get user override values for display (already declared above)
         const addToEstimation = this.plugin.pluginState.pomodoroUserAddToEstimation || false;
 
-        const formattedTotalReadingTime = EstimationUtils.formatTime(totalReadingTimeInSeconds);
         const formattedTotalTimeWithBreaks = EstimationUtils.formatTime(Math.ceil(totalTimeWithBreaksMinutes * 60));
 
         this.pomodoroCalculationResultEl.empty();
-        
+
         // Show base reading time if we have notes and it wasn't completely overridden
         if (notesForEstimate.length > 0 && totalReadingTimeInSeconds > 0 && (!userOverrideTimeInMinutes || addToEstimation)) {
             // Calculate base reading time without overrides for display
@@ -427,19 +431,19 @@ export class PomodoroUIManager {
             // Show message when using only override time
             this.pomodoroCalculationResultEl.createEl("p", { text: `Using override time only (no notes).` });
         }
-        
+
         // Show user override information if applicable
         if (userOverrideTimeInMinutes > 0) {
-            const overrideText = addToEstimation 
+            const overrideText = addToEstimation
                 ? `Added ${userOverrideHours}h ${userOverrideMinutes}m override time.`
                 : `Using ${userOverrideHours}h ${userOverrideMinutes}m override time (replacing estimate).`;
             this.pomodoroCalculationResultEl.createEl("p", { text: overrideText, cls: "pomodoro-override-info" });
         }
-        
+
         this.pomodoroCalculationResultEl.createEl("p", { text: `Requires ~${pomodorosNeeded} Pomodoro work session(s).` });
         this.pomodoroCalculationResultEl.createEl("p", { text: `Total time with breaks: ~${formattedTotalTimeWithBreaks}.` });
-        this.pomodoroCalculationResultEl.style.display = 'block';
-        
+        this.pomodoroCalculationResultEl.removeClass('sf-hidden');
+
         // Update the cycle progress display to show the new estimation
         this.updateCycleProgressDisplay();
     }
@@ -455,8 +459,8 @@ export class PomodoroUIManager {
         this.plugin.pluginState.pomodoroUserOverrideHours = hours;
         this.plugin.pluginState.pomodoroUserOverrideMinutes = minutes;
         this.plugin.pluginState.pomodoroUserAddToEstimation = addToEstimation;
-        
-        this.plugin.savePluginData();
+
+        void this.plugin.savePluginData();
     }
 
     /**
@@ -475,10 +479,10 @@ export class PomodoroUIManager {
         }
 
         if (isCurrentlyHidden) { // Populate inputs when opening
-            if(this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
-            if(this.pomodoroQuickShortInput) this.pomodoroQuickShortInput.value = String(this.plugin.settings.pomodoroShortBreakDuration);
-            if(this.pomodoroQuickLongInput) this.pomodoroQuickLongInput.value = String(this.plugin.settings.pomodoroLongBreakDuration);
-            if(this.pomodoroQuickSessionsInput) this.pomodoroQuickSessionsInput.value = String(this.plugin.settings.pomodoroSessionsUntilLongBreak);
+            if (this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
+            if (this.pomodoroQuickShortInput) this.pomodoroQuickShortInput.value = String(this.plugin.settings.pomodoroShortBreakDuration);
+            if (this.pomodoroQuickLongInput) this.pomodoroQuickLongInput.value = String(this.plugin.settings.pomodoroLongBreakDuration);
+            if (this.pomodoroQuickSessionsInput) this.pomodoroQuickSessionsInput.value = String(this.plugin.settings.pomodoroSessionsUntilLongBreak);
         } else {
             // Panel is being closed, so save the settings
             this._savePomodoroSettings();
@@ -494,14 +498,14 @@ export class PomodoroUIManager {
             // Using opacity is generally smoother and preserves layout/border.
         }
     }
-    
+
     private updateButtonVisibility(): void {
-        const buttonsVisibility = this.areButtonsVisible ? '' : 'none';
+
         const isRunning = this.plugin.pluginState.pomodoroIsRunning;
 
-        if (this.pomodoroStartBtn) this.pomodoroStartBtn.style.display = isRunning ? 'none' : buttonsVisibility;
-        if (this.pomodoroStopBtn) this.pomodoroStopBtn.style.display = isRunning ? buttonsVisibility : 'none';
-        if (this.pomodoroSkipBtn) this.pomodoroSkipBtn.style.display = buttonsVisibility;
+        if (this.pomodoroStartBtn) this.pomodoroStartBtn.toggleClass('sf-hidden', isRunning);
+        if (this.pomodoroStopBtn) this.pomodoroStopBtn.toggleClass('sf-hidden', !isRunning);
+        if (this.pomodoroSkipBtn) this.pomodoroSkipBtn.toggleClass('sf-hidden', !this.areButtonsVisible);
     }
 
 
@@ -509,13 +513,13 @@ export class PomodoroUIManager {
      * Updates the Pomodoro UI based on the current state from PomodoroService.
      */
     public updatePomodoroUI(): void {
-         // Don't update if the UI hasn't been attached yet or pomodoroRootEl is not created
+        // Don't update if the UI hasn't been attached yet or pomodoroRootEl is not created
         if (!this.attachedContainer || !this.pomodoroRootEl) {
-            return; 
+            return;
         }
-        
+
         // Ensure the root container is visible (it should always be, managed by attachAndRender)
-        this.pomodoroRootEl.style.display = '';
+        this.pomodoroRootEl.removeClass('sf-hidden');
 
         const state = this.plugin.pluginState;
         const service = this.plugin.pomodoroService;
@@ -526,45 +530,45 @@ export class PomodoroUIManager {
             if (state.pomodoroCurrentMode !== 'idle') {
                 this.pomodoroTimerDisplayEl.addClass(`mode-${state.pomodoroCurrentMode}`);
             } else {
-                 this.pomodoroTimerDisplayEl.addClass('mode-idle');
+                this.pomodoroTimerDisplayEl.addClass('mode-idle');
             }
             if (state.pomodoroIsRunning) {
                 this.pomodoroTimerDisplayEl.addClass('timer-visible');
             } else {
-                 this.pomodoroTimerDisplayEl.removeClass('timer-visible');
+                this.pomodoroTimerDisplayEl.removeClass('timer-visible');
             }
         }
 
         // This function now primarily updates timer text, mode classes, and calls helper visibility functions.
-        
+
         if (this.pomodoroTimerDisplayEl) {
             this.pomodoroTimerDisplayEl.setText(service.getFormattedTimeLeft()); // Always set text for screen readers / state
             this.updateTimerTextDisplay(); // Then apply visual visibility for the text
-            
+
             this.pomodoroTimerDisplayEl.className = 'pomodoro-timer-display pomodoro-timer-fade'; // Reset classes
             if (state.pomodoroCurrentMode !== 'idle') {
                 this.pomodoroTimerDisplayEl.addClass(`mode-${state.pomodoroCurrentMode}`);
             } else {
-                 this.pomodoroTimerDisplayEl.addClass('mode-idle');
+                this.pomodoroTimerDisplayEl.addClass('mode-idle');
             }
             // 'timer-visible' class might be redundant if opacity is used, but keep for now if it affects other styles.
             if (state.pomodoroIsRunning) {
                 this.pomodoroTimerDisplayEl.addClass('timer-visible');
             } else {
-                 this.pomodoroTimerDisplayEl.removeClass('timer-visible');
+                this.pomodoroTimerDisplayEl.removeClass('timer-visible');
             }
         }
-        
+
         this.updateButtonVisibility(); // Update button visibility based on their state
 
         // Update classes on the root element itself for styling paused/idle states
         this.pomodoroRootEl.toggleClass('is-running', state.pomodoroIsRunning);
         this.pomodoroRootEl.toggleClass('is-paused', !state.pomodoroIsRunning && state.pomodoroCurrentMode !== 'idle');
         this.pomodoroRootEl.toggleClass('is-idle', state.pomodoroCurrentMode === 'idle');
-        
+
         // Hide calculation result if quick settings panel is closed
         if (this.pomodoroCalculationResultEl && this.pomodoroQuickSettingsPanelEl?.style.display === 'none') {
-            this.pomodoroCalculationResultEl.style.display = 'none';
+            this.pomodoroCalculationResultEl.addClass('sf-hidden');
         }
 
         // Update cycle progress display
@@ -580,23 +584,23 @@ export class PomodoroUIManager {
         if (!this.pomodoroCycleProgressEl) return;
 
         const cycleProgress = this.plugin.pomodoroService.getCycleProgress();
-        
+
         if (cycleProgress) {
             const { current, total, workSessionsRemaining, totalWorkSessions, totalTimeMinutes } = cycleProgress;
-            
+
             // Calculate completed sessions
             const completedSessions = totalWorkSessions - workSessionsRemaining;
-            
+
             // Format total time
             const totalHours = Math.floor(totalTimeMinutes / 60);
             const totalMinutes = Math.round(totalTimeMinutes % 60);
             const timeString = totalHours > 0 ? `${totalHours}H/${totalMinutes}M` : `${totalMinutes}M`;
-            
+
             this.pomodoroCycleProgressEl.setText(`Cycles ${current}/${total} - Sessions ${completedSessions}/${totalWorkSessions} - ${timeString}`);
-            this.pomodoroCycleProgressEl.style.display = '';
+            this.pomodoroCycleProgressEl.removeClass('sf-hidden');
             this.pomodoroCycleProgressEl.addClass('cycle-active');
         } else {
-            this.pomodoroCycleProgressEl.style.display = 'none';
+            this.pomodoroCycleProgressEl.addClass('sf-hidden');
         }
     }
 
@@ -606,7 +610,7 @@ export class PomodoroUIManager {
     private formatTime(totalSeconds: number): string {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
-        
+
         if (hours > 0) {
             return `${hours}h ${minutes}m`;
         } else {

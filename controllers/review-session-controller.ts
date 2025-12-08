@@ -1,4 +1,3 @@
-import { Notice } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { IReviewSessionController } from './interfaces';
 import { LinkAnalyzer } from '../utils/link-analyzer';
@@ -42,7 +41,7 @@ export class ReviewSessionController implements IReviewSessionController {
 
         // If we don't have links cached, try to analyze them
         if (links.length === 0) {
-            (async () => {
+            void (async () => {
                 const newLinks = await this.analyzeNoteLinks(notePath);
                 if (newLinks.length > 0) {
                     this.linkedNoteCache.set(notePath, newLinks);
@@ -74,9 +73,9 @@ export class ReviewSessionController implements IReviewSessionController {
 
             // Store in cache for future use
             this.linkedNoteCache.set(notePath, links);
-            
+
             return links;
-        } catch (error) {
+        } catch {
             return [];
         }
     }

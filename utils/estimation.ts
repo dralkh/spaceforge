@@ -15,22 +15,22 @@ export class EstimationUtils {
         fiction: 250,    // Fiction/prose
         simple: 300      // Simple content
     };
-    
+
     /**
      * Average English word length in characters (including spaces)
      */
     private static readonly AVG_WORD_LENGTH = 5.5;
-    
+
     /**
      * Minimum review time in seconds
      */
     private static readonly MIN_REVIEW_TIME = 30;
-    
+
     /**
      * Reference to the plugin (for access to settings)
      */
     private static plugin: SpaceforgePlugin;
-    
+
     /**
      * Set the plugin reference
      * 
@@ -39,7 +39,7 @@ export class EstimationUtils {
     static setPlugin(plugin: SpaceforgePlugin): void {
         this.plugin = plugin;
     }
-    
+
     /**
      * Get the user's reading speed from settings
      * 
@@ -49,17 +49,17 @@ export class EstimationUtils {
     static getReadingSpeed(contentType?: keyof typeof EstimationUtils.READING_SPEEDS): number {
         // Get base reading speed from settings
         const baseSpeed = this.plugin?.settings.readingSpeed || 200;
-        
+
         // Apply content-specific adjustment if specified
         if (contentType) {
             const baseContentSpeed = this.READING_SPEEDS.notes;
             const contentSpeed = this.READING_SPEEDS[contentType];
             return baseSpeed * (contentSpeed / baseContentSpeed);
         }
-        
+
         return baseSpeed;
     }
-    
+
     /**
      * Estimate review time for a file based on its content
      * 
@@ -68,35 +68,35 @@ export class EstimationUtils {
      * @param contentType Type of content for reading speed adjustment
      * @returns Estimated review time in seconds
      */
-    static async estimateReviewTime(
-        file: TFile, 
-        fileContent?: string, 
+    static estimateReviewTime(
+        file: TFile,
+        fileContent?: string,
         contentType: keyof typeof EstimationUtils.READING_SPEEDS = 'notes'
-    ): Promise<number> {
+    ): number {
         if (!file) {
             return this.MIN_REVIEW_TIME;
         }
-        
+
         // Use file size as a rough proxy if content is not available
         if (!fileContent) {
             const sizeEstimate = Math.ceil(file.stat.size / (this.AVG_WORD_LENGTH * 7)) * 60;
             return Math.max(this.MIN_REVIEW_TIME, sizeEstimate);
         }
-        
+
         // Count words in content
         const wordCount = this.countWords(fileContent);
-        
+
         // Calculate reading time based on words and reading speed
         const readingSpeed = this.getReadingSpeed(contentType);
         const readingTimeMinutes = wordCount / readingSpeed;
-        
+
         // Add some buffer time for actual review (thinking, interacting)
         const reviewTimeSeconds = Math.ceil(readingTimeMinutes * 60);
-        
+
         // Return at least minimum review time
         return Math.max(this.MIN_REVIEW_TIME, reviewTimeSeconds);
     }
-    
+
     /**
      * Calculate aggregate review time for multiple notes
      * 
@@ -107,15 +107,15 @@ export class EstimationUtils {
         if (!this.plugin) {
             return paths.length * this.MIN_REVIEW_TIME;
         }
-        
+
         let totalTime = 0;
         for (const path of paths) {
             totalTime += await this.plugin.dataStorage.estimateReviewTime(path);
         }
-        
+
         return totalTime;
     }
-    
+
     /**
      * Count words in text
      * 
@@ -131,12 +131,12 @@ export class EstimationUtils {
             .replace(/\*\*.*?\*\*/g, '$1') // Bold to plain text
             .replace(/\*.*?\*/g, '$1') // Italic to plain text
             .replace(/~~.*?~~/g, '$1'); // Strikethrough to plain text
-            
+
         // Count words (sequences of non-whitespace characters)
         const words = cleanText.match(/\S+/g) || [];
         return words.length;
     }
-    
+
     /**
      * Format seconds as a readable time string
      * 
@@ -145,13 +145,13 @@ export class EstimationUtils {
      */
     static formatTime(seconds: number): string {
         const minutes = Math.floor(seconds / 60);
-        
+
         if (minutes < 60) {
             return `${minutes} min`;
         } else {
             const hours = Math.floor(minutes / 60);
             const remainingMinutes = minutes % 60;
-            
+
             if (remainingMinutes === 0) {
                 return `${hours} hr`;
             } else {
@@ -159,7 +159,7 @@ export class EstimationUtils {
             }
         }
     }
-    
+
     /**
      * Format a time estimate with color coding based on duration
      * 
@@ -170,7 +170,7 @@ export class EstimationUtils {
     static formatTimeWithColor(seconds: number, element: HTMLElement): void {
         const formattedTime = this.formatTime(seconds);
         element.setText(formattedTime);
-        
+
         // Color code based on duration
         if (seconds < 5 * 60) { // Less than 5 minutes
             element.addClass("review-time-short");

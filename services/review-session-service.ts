@@ -78,7 +78,7 @@ export class ReviewSessionService {
             }
 
             return session;
-        } catch (error) {
+        } catch {
             new Notice("Failed to create review session");
             return null;
         }
@@ -90,7 +90,7 @@ export class ReviewSessionService {
      * @param sessionId ID of the session to activate
      * @returns Whether the session was activated
      */
-    async setActiveSession(sessionId: string | null): Promise<boolean> {
+    setActiveSession(sessionId: string | null): boolean {
         if (sessionId === null) {
             this.reviewSessions.activeSessionId = null;
             // Data saving is now handled by main.ts after this method returns
@@ -156,7 +156,7 @@ export class ReviewSessionService {
      *
      * @returns Whether there are more files to review
      */
-    async advanceActiveSession(): Promise<boolean> {
+    advanceActiveSession(): boolean {
         const session = this.getActiveSession();
         if (!session) {
             return false;
@@ -191,7 +191,7 @@ export class ReviewSessionService {
      * @param sessionId ID of the session
      * @returns Number of files scheduled
      */
-    async scheduleSessionForReview(sessionId: string): Promise<number> {
+    scheduleSessionForReview(sessionId: string): number {
         const session = this.reviewSessions.sessions[sessionId];
         if (!session) {
             return 0;
@@ -199,10 +199,10 @@ export class ReviewSessionService {
 
         // Access ReviewScheduleService via plugin reference
         if (!this.plugin.reviewScheduleService) {
-             return 0;
+            return 0;
         }
 
         // Call the method on the ReviewScheduleService instance
-        return await this.plugin.reviewScheduleService.scheduleNotesInOrder(session.hierarchy.traversalOrder);
+        return this.plugin.reviewScheduleService.scheduleNotesInOrder(session.hierarchy.traversalOrder);
     }
 }

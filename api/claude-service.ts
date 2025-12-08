@@ -2,7 +2,7 @@ import { Notice, requestUrl } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
 
 export class ClaudeService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -13,15 +13,18 @@ export class ClaudeService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.claudeApiKey) {
-            new Notice('Claude API key is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Claude API key is not set, please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.claudeModel) {
-            new Notice('Claude Model is not set. Please add it in the Spaceforge settings.');
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Claude model is not set, please add it in the Spaceforge settings');
             return null;
         }
 
         try {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using Claude...');
 
             // Determine the number of questions to generate
@@ -38,7 +41,8 @@ export class ClaudeService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Claude. Please try again.');
+                // eslint-disable-next-line obsidianmd/ui/sentence-case
+                new Notice('Failed to generate valid MCQs from Claude, please try again');
                 return null;
             }
 
@@ -47,8 +51,9 @@ export class ClaudeService implements IMCQGenerationService {
                 questions,
                 generatedAt: Date.now()
             };
-        } catch (error) {
-            new Notice('Failed to generate MCQs with Claude. Please check console for details.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Failed to generate MCQs with Claude, please check console for details');
             return null;
         }
     }
@@ -66,7 +71,7 @@ export class ClaudeService implements IMCQGenerationService {
             basePrompt = `Generate ${questionCount} multiple-choice questions that test understanding of key concepts in the following note. Each question should have ${choiceCount} choices, with only one correct answer. Format the output as a numbered list of questions with lettered choices (A, B, C, etc.). Mark the correct answer by putting [CORRECT] at the end of the line.\n\nFor example:\n1. What is the capital of France?\n   A) London\n   B) Berlin\n   C) Paris [CORRECT]\n   D) Madrid\n   E) Rome`;
         }
 
-        if (difficulty === 'basic') {
+        if (difficulty === MCQDifficulty.Basic) {
             basePrompt += `\n\nCreate straightforward questions that focus on key facts and basic concepts. Make the questions clear and direct, suitable for beginners or initial review.`;
         } else {
             basePrompt += `\n\nCreate challenging questions that test deeper understanding and application of concepts. Make the incorrect choices plausible to encourage critical thinking.`;
@@ -78,9 +83,9 @@ export class ClaudeService implements IMCQGenerationService {
         const apiKey = settings.claudeApiKey;
         const model = settings.claudeModel;
         const difficulty = settings.mcqDifficulty;
-        
-        const systemPrompt = difficulty === 'basic' 
-            ? settings.mcqBasicSystemPrompt 
+
+        const systemPrompt = difficulty === MCQDifficulty.Basic
+            ? settings.mcqBasicSystemPrompt
             : settings.mcqAdvancedSystemPrompt;
 
         try {
@@ -124,12 +129,12 @@ export class ClaudeService implements IMCQGenerationService {
             // Claude might not start with "1. ", so we adjust the split logic if needed.
             // The current logic tries to split by number then newline, which might be robust enough.
             let questionBlocks: string[] = response.split(/\n\d+\.\s+/).filter(block => block.trim().length > 0);
-            
+
             // If the first block doesn't start with a number, prepend "1. " to it if it's not empty
             if (questionBlocks.length > 0 && !/^\d+\.\s+/.test(response.trimStart())) {
-                 // If the original response starts with a question directly (no "1. ")
+                // If the original response starts with a question directly (no "1. ")
                 if (!/^\d+\.\s+/.test(questionBlocks[0])) {
-                     // Check if the first block is the start of the first question
+                    // Check if the first block is the start of the first question
                     if (response.trimStart().length > 0 && questionBlocks.length === 1 && !response.includes("\n1.")) {
                         // This means the entire response is treated as a single block without "1."
                         // We might need a different splitting strategy or assume the first block is the first question
@@ -149,7 +154,7 @@ export class ClaudeService implements IMCQGenerationService {
                     }
                 }
             }
-             // If initial split by "\n\d+." fails or gives few blocks, try splitting by "\d+." then handling newlines
+            // If initial split by "\n\d+." fails or gives few blocks, try splitting by "\d+." then handling newlines
             if (questionBlocks.length === 0 || (questionBlocks.length < settings.mcqQuestionsPerNote / 2 && response.includes("1."))) {
                 const lines = response.split('\n');
                 let currentQuestionBlock = '';
@@ -162,7 +167,7 @@ export class ClaudeService implements IMCQGenerationService {
                         currentQuestionBlock = line + '\n';
                     } else if (currentQuestionBlock.length > 0) { // only add to current block if it has started
                         currentQuestionBlock += line + '\n';
-                    } else if (tempBlocks.length === 0 && line.trim().length > 0) { 
+                    } else if (tempBlocks.length === 0 && line.trim().length > 0) {
                         // Handle case where the first question doesn't start with "1." but is the first content
                         currentQuestionBlock = line + '\n';
                     }
@@ -191,8 +196,8 @@ export class ClaudeService implements IMCQGenerationService {
                     const isCorrect = line.includes('[CORRECT]');
                     // More robustly remove common choice markers (A., A), 1., 1), -, *)
                     const cleanedLine = line.replace(/\[CORRECT\]/gi, '') // Case-insensitive removal
-                                           .replace(/^([A-Z]\.|[A-Z]\)|\d+\.|\d+\)|-\s*|\*\s*)/, '')
-                                           .trim();
+                        .replace(/^([A-Z]\.|[A-Z]\)|\d+\.|\d+\)|-\s*|\*\s*)/, '')
+                        .trim();
                     if (cleanedLine.length > 0) { // Only add non-empty choices
                         choices.push(cleanedLine);
                         if (isCorrect) correctAnswerIndex = choices.length - 1;
@@ -209,20 +214,21 @@ export class ClaudeService implements IMCQGenerationService {
                             break;
                         }
                     }
-                     // If still not found, default to the first choice as per original logic
+                    // If still not found, default to the first choice as per original logic
                     if (correctAnswerIndex === -1) correctAnswerIndex = 0;
                 }
 
 
-                if (questionText && choices.length >= settings.mcqChoicesPerQuestion -1 && choices.length > 0) { // Allow slightly fewer choices if parsing is tricky
+                if (questionText && choices.length >= settings.mcqChoicesPerQuestion - 1 && choices.length > 0) { // Allow slightly fewer choices if parsing is tricky
                     questions.push({ question: questionText, choices, correctAnswerIndex });
                 } else if (questionText && choices.length >= 2) { // Absolute minimum of 2 choices
-                     questions.push({ question: questionText, choices, correctAnswerIndex });
+                    questions.push({ question: questionText, choices, correctAnswerIndex });
                 }
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
-        } catch (error) {
-            new Notice('Error parsing MCQ response from Claude. Please try again.');
+        } catch {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            new Notice('Error parsing MCQ response from Claude, please try again');
             return [];
         }
     }

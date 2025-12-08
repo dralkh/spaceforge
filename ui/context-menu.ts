@@ -58,27 +58,27 @@ export class ContextMenuHandler {
 
         menu.addItem((item) => {
             item.setTitle(isScheduled ? "Update review schedule" : "Add to review schedule")
-               .setIcon("calendar-plus")
-               .onClick(async () => {
-                   await this.plugin.reviewScheduleService.scheduleNoteForReview(file.path);
-                   await this.plugin.savePluginData();
-               });
+                .setIcon("calendar-plus")
+                .onClick(async () => {
+                    this.plugin.reviewScheduleService.scheduleNoteForReview(file.path);
+                    await this.plugin.savePluginData();
+                });
         });
 
         if (isScheduled) {
             menu.addItem((item) => {
                 item.setTitle("Review now")
-                   .setIcon("eye")
-                   .onClick(() => this.plugin.reviewController.reviewNote(file.path));
+                    .setIcon("eye")
+                    .onClick(() => this.plugin.reviewController.reviewNote(file.path));
             });
 
             menu.addItem((item) => {
                 item.setTitle("Remove from review")
-                   .setIcon("calendar-minus")
-                   .onClick(async () => {
-                       await this.plugin.reviewScheduleService.removeFromReview(file.path);
-                       await this.plugin.savePluginData();
-                   });
+                    .setIcon("calendar-minus")
+                    .onClick(async () => {
+                        this.plugin.reviewScheduleService.removeFromReview(file.path);
+                        await this.plugin.savePluginData();
+                    });
             });
         }
 
@@ -86,18 +86,18 @@ export class ContextMenuHandler {
         if (file.parent) { // Ensure there is a parent folder
             menu.addItem((item) => {
                 item.setTitle("Add note's folder to review schedule")
-                   .setIcon("folder-plus") // Using a folder icon
-                   .onClick(async () => {
-                       if (file.parent) { // Parent already confirmed, but good for safety
-                           new Notice(`Adding folder "${file.parent.name}" to review schedule...`);
-                           // Ensure file.parent is indeed a TFolder before calling addFolderToReview
-                           if (file.parent instanceof TFolder) {
-                               await this.addFolderToReview(file.parent); // Call the existing folder logic
-                           } else {
-                               new Notice("Error: Parent is not a folder.");
-                           }
-                       }
-                   });
+                    .setIcon("folder-plus") // Using a folder icon
+                    .onClick(async () => {
+                        if (file.parent) { // Parent already confirmed, but good for safety
+                            new Notice(`Adding folder "${file.parent.name}" to review schedule...`);
+                            // Ensure file.parent is indeed a TFolder before calling addFolderToReview
+                            if (file.parent instanceof TFolder) {
+                                await this.addFolderToReview(file.parent); // Call the existing folder logic
+                            } else {
+                                new Notice("Error: parent is not a folder.");
+                            }
+                        }
+                    });
             });
         }
     }
@@ -112,12 +112,13 @@ export class ContextMenuHandler {
         try {
             menu.addItem((item) => {
                 item.setTitle("Add folder to review")
-                   .setIcon("calendar-plus")
-                   .onClick(() => {
-                       this.addFolderToReview(folder);
-                   });
+                    .setIcon("calendar-plus")
+                    .onClick(() => {
+                        void this.addFolderToReview(folder);
+                    });
             });
-        } catch (error) {
+        } catch {
+            // no-op
         }
     }
 
@@ -146,12 +147,12 @@ export class ContextMenuHandler {
             });
 
             if (allFiles.length === 0) {
-                new Notice("No markdown files found in folder.");
+                new Notice("No Markdown files found in folder.");
                 return;
             }
 
             // Use the LinkAnalyzer to build a hierarchical structure with consistent main file selection
-            const includeSubfolders = this.plugin.settings.includeSubfolders;
+            // Use the LinkAnalyzer to build a hierarchical structure with consistent main file selection
 
             // First, identify a potential main file that should be used as the starting point
             let mainFilePath: string | null = null;
@@ -197,7 +198,7 @@ export class ContextMenuHandler {
                 }
             }
 
-            let traversalOrder: string[] = [];
+            const traversalOrder: string[] = [];
             const visited = new Set<string>(); // Global visited set
 
             const processLinksRecursively = async (path: string) => {
@@ -210,13 +211,13 @@ export class ContextMenuHandler {
                 const links = await LinkAnalyzer.analyzeNoteLinks(
                     this.plugin.app.vault,
                     path,
-                    false 
+                    false
                 );
 
                 for (const link of links) {
                     const linkFile = this.plugin.app.vault.getAbstractFileByPath(link);
                     if (!(linkFile instanceof TFile) || linkFile.extension !== 'md') {
-                        continue; 
+                        continue;
                     }
 
                     if (allFiles.some(f => f.path === linkFile.path)) { // Is internal to the overall operation
@@ -238,16 +239,16 @@ export class ContextMenuHandler {
             // Then, iterate through all files (sorted for consistency) to catch other branches or unlinked files.
             // This ensures that if mainFilePath didn't cover everything, or if there wasn't one,
             // all top-level items and their linked children within allFiles are processed.
-            const sortedAllFiles = [...allFiles].sort((a,b) => a.path.localeCompare(b.path));
+            const sortedAllFiles = [...allFiles].sort((a, b) => a.path.localeCompare(b.path));
             for (const file of sortedAllFiles) {
                 if (!visited.has(file.path)) {
                     await processLinksRecursively(file.path);
                 }
             }
-            
+
 
             // Schedule notes in the traversal order using the service
-            const count = await this.plugin.reviewScheduleService.scheduleNotesInOrder(traversalOrder);
+            const count = this.plugin.reviewScheduleService.scheduleNotesInOrder(traversalOrder);
             if (count > 0) {
                 await this.plugin.savePluginData(); // Add save call
             }
@@ -259,9 +260,9 @@ export class ContextMenuHandler {
             new Notice(`Added ${count} notes from "${folder.name}" to review schedule, starting with ${startingFileName}`);
 
             // Update today's notes in the review controller using our same methodology
-            await this.plugin.reviewController.updateTodayNotes();
+            this.plugin.reviewController.updateTodayNotes();
 
-        } catch (error) {
+        } catch {
             new Notice("Error adding folder to review schedule");
         }
     }
@@ -281,7 +282,7 @@ export class ContextMenuHandler {
         );
         // Save after session creation
         if (session) {
-             await this.plugin.savePluginData(); // Add save call
+            await this.plugin.savePluginData(); // Add save call
         }
 
         if (!session) {
@@ -305,7 +306,7 @@ export class ContextMenuHandler {
             // We'll add the save call here after scheduleSessionForReview returns.
             const scheduledCount = await this.plugin.reviewSessionService.scheduleSessionForReview(session.id);
             if (scheduledCount > 0) {
-                 await this.plugin.savePluginData(); // Add save call
+                await this.plugin.savePluginData(); // Add save call
             }
 
             // Show success message
@@ -314,7 +315,7 @@ export class ContextMenuHandler {
             // Open the first file for review
             const file = this.plugin.app.vault.getAbstractFileByPath(firstFilePath);
             if (file instanceof TFile) {
-                this.plugin.reviewController.reviewNote(firstFilePath);
+                void this.plugin.reviewController.reviewNote(firstFilePath);
             }
         } else {
             new Notice("No files found for review in this folder.");

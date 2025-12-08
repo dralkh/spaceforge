@@ -66,7 +66,7 @@ export interface ReviewSessionStore {
  * @param prefix Prefix for the ID
  * @returns Unique ID
  */
-export function generateSessionId(prefix: string = 'session'): string {
+export function generateSessionId(prefix = 'session'): string {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 

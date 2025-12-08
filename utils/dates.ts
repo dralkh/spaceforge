@@ -13,7 +13,7 @@ export class DateUtils {
         newDate.setHours(0, 0, 0, 0);
         return newDate.getTime();
     }
-    
+
     /**
      * Add days to a timestamp
      * 
@@ -24,7 +24,7 @@ export class DateUtils {
     static addDays(timestamp: number, days: number): number {
         return timestamp + (days * 24 * 60 * 60 * 1000);
     }
-    
+
     /**
      * Format a timestamp as a readable date string
      * 
@@ -38,11 +38,9 @@ export class DateUtils {
 
         if (format === 'relative') {
             // Determine the reference date for relative calculations
-            const referenceDateForCalc = baseDateParam ? new Date(baseDateParam) : new Date();
 
             // Normalize dates to their start of day for accurate day-based comparison
             const normalizedNoteEventDate = this.startOfDay(noteEventDate);
-            const normalizedReferenceDate = this.startOfDay(referenceDateForCalc);
             const normalizedActualCurrentDate = this.startOfDay(new Date()); // Actual current day, for "Due notes"
 
             // "Due notes" are always relative to the *actual* current day, regardless of baseDateParam
@@ -83,22 +81,22 @@ export class DateUtils {
         } else if (format === 'short') {
             return noteEventDate.toLocaleDateString();
         } else if (format === 'long') {
-            return noteEventDate.toLocaleDateString(undefined, { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            return noteEventDate.toLocaleDateString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             });
         } else {
             // Medium format (default)
-            return noteEventDate.toLocaleDateString(undefined, { 
-                weekday: 'short', 
-                month: 'short', 
+            return noteEventDate.toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
                 day: 'numeric'
             });
         }
     }
-    
+
     /**
      * Get the day difference between two timestamps
      * 
@@ -109,15 +107,15 @@ export class DateUtils {
     static dayDifference(timestamp1: number, timestamp2: number): number {
         const date1 = new Date(timestamp1);
         const date2 = new Date(timestamp2);
-        
+
         // Reset to midnight
         date1.setHours(0, 0, 0, 0);
         date2.setHours(0, 0, 0, 0);
-        
+
         // Calculate difference in days
         const diffTime = Math.abs(date2.getTime() - date1.getTime());
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
+
         return diffDays;
     }
 
@@ -155,11 +153,11 @@ export class DateUtils {
     static dayDifferenceUTC(timestamp1: number, timestamp2: number): number {
         const date1UTCMidnight = this.startOfUTCDay(new Date(timestamp1));
         const date2UTCMidnight = this.startOfUTCDay(new Date(timestamp2));
-        
+
         // Calculate difference in days
         const diffTime = Math.abs(date2UTCMidnight - date1UTCMidnight);
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
+
         return diffDays;
     }
 
@@ -171,7 +169,7 @@ export class DateUtils {
      */
     static isSameDay(date1: Date, date2: Date): boolean {
         return date1.getFullYear() === date2.getFullYear() &&
-               date1.getMonth() === date2.getMonth() &&
-               date1.getDate() === date2.getDate();
+            date1.getMonth() === date2.getMonth() &&
+            date1.getDate() === date2.getDate();
     }
 }
