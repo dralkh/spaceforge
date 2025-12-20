@@ -148,7 +148,7 @@ export class PomodoroUIManager {
             setIcon(this.pomodoroStopBtn, "pause");
             this.pomodoroStopBtn.addEventListener("click", () => this.plugin.pomodoroService.stop());
         }
-        this.pomodoroStopBtn.hide(); // Initial state, updatePomodoroUI will manage visibility
+        // this.pomodoroStopBtn.hide(); // Initial state, updatePomodoroUI will manage visibility
 
         // Timer Display
         if (!this.pomodoroTimerDisplayEl || this.pomodoroTimerDisplayEl.parentElement !== mainControlsRow) {
@@ -293,7 +293,7 @@ export class PomodoroUIManager {
         if (!this.pomodoroQuickSettingsPanelEl || this.pomodoroQuickSettingsPanelEl.parentElement !== settingsPanelContainer) {
             this.pomodoroQuickSettingsPanelEl?.remove();
             this.pomodoroQuickSettingsPanelEl = settingsPanelContainer.createDiv("pomodoro-quick-settings-panel");
-            this.pomodoroQuickSettingsPanelEl.classList.add('sf-hidden'); // Initial state
+            // this.pomodoroQuickSettingsPanelEl.classList.add('sf-hidden'); // Initial state
 
             // Recreate inputs and buttons if panel is new
             const panel = this.pomodoroQuickSettingsPanelEl;
@@ -469,16 +469,14 @@ export class PomodoroUIManager {
     private toggleSettingsPanel(): void {
         const panel = this.pomodoroQuickSettingsPanelEl;
         if (!panel) return;
-        const isCurrentlyHidden = panel.classList.contains('sf-hidden') || !panel.classList.contains('sf-visible');
-        if (isCurrentlyHidden) {
-            panel.classList.remove('sf-hidden');
-            panel.classList.add('sf-visible');
+        const isCurrentlyOpen = panel.classList.contains('is-open');
+        if (!isCurrentlyOpen) {
+            panel.classList.add('is-open');
         } else {
-            panel.classList.remove('sf-visible');
-            panel.classList.add('sf-hidden');
+            panel.classList.remove('is-open');
         }
 
-        if (isCurrentlyHidden) { // Populate inputs when opening
+        if (!isCurrentlyOpen) { // Populate inputs when opening
             if (this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
             if (this.pomodoroQuickShortInput) this.pomodoroQuickShortInput.value = String(this.plugin.settings.pomodoroShortBreakDuration);
             if (this.pomodoroQuickLongInput) this.pomodoroQuickLongInput.value = String(this.plugin.settings.pomodoroLongBreakDuration);
@@ -567,7 +565,7 @@ export class PomodoroUIManager {
         this.pomodoroRootEl.toggleClass('is-idle', state.pomodoroCurrentMode === 'idle');
 
         // Hide calculation result if quick settings panel is closed
-        if (this.pomodoroCalculationResultEl && this.pomodoroQuickSettingsPanelEl?.style.display === 'none') {
+        if (this.pomodoroCalculationResultEl && this.pomodoroQuickSettingsPanelEl && !this.pomodoroQuickSettingsPanelEl.classList.contains('is-open')) {
             this.pomodoroCalculationResultEl.addClass('sf-hidden');
         }
 

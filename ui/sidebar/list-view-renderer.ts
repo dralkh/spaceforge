@@ -130,25 +130,33 @@ export class ListViewRenderer {
         let pomodoroContainer = container.querySelector(".sidebar-pomodoro-section") as HTMLElement;
         if (!pomodoroContainer) {
             pomodoroContainer = container.createDiv("sidebar-pomodoro-section");
-            pomodoroContainer.createDiv("pomodoro-section-container");
+        }
+
+        let pomodoroSectionContainerEl = pomodoroContainer.querySelector(".sidebar-pomodoro-section-container") as HTMLElement;
+        if (!pomodoroSectionContainerEl) {
+            // Check for legacy class names and migrate if found
+            const legacyEl = pomodoroContainer.querySelector(".pomodoro-section-container, .sidebar-pomodoro-button-container") as HTMLElement;
+            if (legacyEl) {
+                legacyEl.className = "sidebar-pomodoro-section-container";
+                pomodoroSectionContainerEl = legacyEl;
+            } else {
+                pomodoroSectionContainerEl = pomodoroContainer.createDiv("sidebar-pomodoro-section-container");
+            }
         }
 
         // Update Pomodoro section visibility and content
-        if (this.pomodoroUIManager && pomodoroContainer) {
-            const pomodoroSectionContainerEl = pomodoroContainer.querySelector(".sidebar-pomodoro-button-container") as HTMLElement;
-            if (pomodoroSectionContainerEl) {
-                this.pomodoroUIManager.attachAndRender(pomodoroSectionContainerEl);
-                if (this.plugin.settings.pomodoroEnabled) {
-                    pomodoroContainer.classList.remove('sf-hidden');
-                    this.pomodoroUIManager.showPomodoroSection(true);
-                    this.pomodoroUIManager.updatePomodoroUI();
+        if (this.pomodoroUIManager && pomodoroContainer && pomodoroSectionContainerEl) {
+            this.pomodoroUIManager.attachAndRender(pomodoroSectionContainerEl);
+            if (this.plugin.settings.pomodoroEnabled) {
+                pomodoroContainer.classList.remove('sf-hidden');
+                this.pomodoroUIManager.showPomodoroSection(true);
+                this.pomodoroUIManager.updatePomodoroUI();
 
-                    // Automatically calculate estimation for current notes
-                    void this.pomodoroUIManager.calculateAndDisplayEstimation();
-                } else {
-                    pomodoroContainer.classList.add('sf-hidden');
-                    this.pomodoroUIManager.showPomodoroSection(false);
-                }
+                // Automatically calculate estimation for current notes
+                void this.pomodoroUIManager.calculateAndDisplayEstimation();
+            } else {
+                pomodoroContainer.classList.add('sf-hidden');
+                this.pomodoroUIManager.showPomodoroSection(false);
             }
         }
 

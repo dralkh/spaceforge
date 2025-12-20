@@ -144,7 +144,7 @@
   border-radius: 0 0 var(--radius-m) var(--radius-m); /* Rounded bottom corners */
   box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Modern shadow */
   padding: 0; /* Initial padding for transition */
-  /* display: flex; is handled by JS */
+  display: flex; /* Always flex to allow transition of other properties */
   flex-direction: column;
   gap: 8px; /* Increased gap for better spacing */
   overflow: hidden; /* Crucial for max-height transition */
@@ -154,14 +154,16 @@
               opacity 0.3s ease-out,
               padding 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
   /* margin-top: 0; /* Removed original margin-top */
+  pointer-events: none; /* Prevent interaction when closed */
 }
 
-/* Styles when the panel is open (display: flex is set by JS) */
-.pomodoro-quick-settings-panel[style*="display: flex"] {
+/* Styles when the panel is open */
+.pomodoro-quick-settings-panel.is-open {
   padding: 12px; /* Restored padding */
-  max-height: 500px; /* Large enough to fit content */
+  max-height: 800px; /* Large enough to fit content */
   opacity: 1;
   border-top: 1px solid var(--background-modifier-border); /* Add a separator line when open */
+  pointer-events: auto; /* Allow interaction when open */
 }
 
 .pomodoro-quick-setting { /* Added for individual setting item styling */
