@@ -1,4 +1,5 @@
 import { Notice, requestUrl } from 'obsidian';
+import { OPENAI, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -13,16 +14,16 @@ export class OpenAIService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.openaiApiKey) {
-            new Notice('OpenAI API key is not set. Please add it in the Spaceforge settings');
+            new Notice(`${OPENAI} ${API} key not set in settings.`);
             return null;
         }
         if (!settings.openaiModel) {
-            new Notice('OpenAI model is not set. Please add it in the Spaceforge settings');
+            new Notice(`${OPENAI} model not set in settings.`);
             return null;
         }
 
         try {
-            new Notice('Generating MCQs using OpenAI...');
+            new Notice(`Generating questions using ${OPENAI}...`);
 
             // Determine the number of questions to generate
             let numQuestionsToGenerate: number;
@@ -38,7 +39,7 @@ export class OpenAIService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from OpenAI, please try again');
+                new Notice(`Failed to generate valid questions from ${OPENAI}. Try again.`);
                 return null;
             }
 
@@ -48,7 +49,7 @@ export class OpenAIService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            new Notice('Failed to generate MCQs with OpenAI, please check console for details');
+            new Notice(`Failed to generate questions with ${OPENAI}. Check console for details.`);
             return null;
         }
     }
@@ -170,7 +171,7 @@ export class OpenAIService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            new Notice('Error parsing MCQ response from OpenAI. Please try again');
+            new Notice(`Error parsing response from ${OPENAI}. Try again.`);
             return [];
         }
     }

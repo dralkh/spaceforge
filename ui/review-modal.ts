@@ -1,4 +1,5 @@
 import { App, Modal, Notice, TFile, setIcon, Setting } from 'obsidian';
+import { SM2, FSRS } from './constants';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
 import { State as FsrsState } from 'ts-fsrs'; // For displaying FSRS state name
@@ -100,7 +101,7 @@ export class ReviewModal extends Modal {
                         void initializedMcqController.startMCQReview(this.path);
                         this.close();
                     } else {
-                        new Notice("MCQ feature could not be initialized. Please check settings.");
+                        new Notice("Feature could not be initialized. Please check settings.");
                     }
                 }
             });
@@ -150,13 +151,13 @@ export class ReviewModal extends Modal {
             if (schedule.lastReviewDate) infoText.createEl("p", { text: `Last reviewed: ${new Date(schedule.lastReviewDate).toLocaleDateString()}` });
 
             if (schedule.schedulingAlgorithm === 'fsrs' && schedule.fsrsData) {
-                infoText.createEl("p", { text: `Algorithm: FSRS`, cls: "review-phase-fsrs" });
-                infoText.createEl("p", { text: `Stability: ${schedule.fsrsData.stability.toFixed(2)}` });
-                infoText.createEl("p", { text: `Difficulty: ${schedule.fsrsData.difficulty.toFixed(2)}` });
-                infoText.createEl("p", { text: `State: ${FsrsState[schedule.fsrsData.state]}` }); // Display FSRS state name
+                infoText.createEl("p", { text: `Algorithm: ${FSRS}`, cls: "review-phase-fsrs" });
+                infoText.createEl("p", { text: `${'Stability'}: ${schedule.fsrsData.stability.toFixed(2)}` });
+                infoText.createEl("p", { text: `${'Difficulty'}: ${schedule.fsrsData.difficulty.toFixed(2)}` });
+                infoText.createEl("p", { text: `${'State'}: ${FsrsState[schedule.fsrsData.state]}` }); // Display FSRS state name
                 infoText.createEl("p", { text: `Interval: ${schedule.fsrsData.scheduled_days} days` });
             } else { // SM-2 or fallback
-                infoText.createEl("p", { text: `Algorithm: SM-2`, cls: "review-phase-sm2" });
+                infoText.createEl("p", { text: `Algorithm: ${SM2}`, cls: "review-phase-sm2" });
                 let phaseText: string; let phaseClass: string;
                 if (schedule.scheduleCategory === 'initial') {
                     const totalInitialSteps = this.plugin.settings.initialScheduleCustomIntervals.length;

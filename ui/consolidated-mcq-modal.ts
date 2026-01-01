@@ -213,7 +213,7 @@ export class ConsolidatedMCQModal extends Modal {
 
         // Verify we have a valid question
         if (!question || !question.choices || question.choices.length < 2) {
-            new Notice('Error: Invalid question data. Moving to next question.');
+            new Notice('Invalid question data. Moving to next question.');
 
             // Skip to next question
             this.currentQuestionIndex++;
@@ -522,7 +522,7 @@ export class ConsolidatedMCQModal extends Modal {
         contentEl.empty();
 
         // Display results header with stylized heading
-        new Setting(contentEl).setName('MCQ review complete').setHeading().setClass('mcq-review-complete-header');
+        new Setting(contentEl).setName('Review complete').setHeading().setClass('mcq-review-complete-header');
 
         // Display overall score with enhanced styling
         const totalCorrectOverall = this.answers.filter(a => a.correct && a.attempts <= 1).length;
@@ -538,16 +538,16 @@ export class ConsolidatedMCQModal extends Modal {
         const performanceIndicator = scoreEl.createDiv('mcq-performance-indicator');
 
         if (scorePercentOverall >= 90) {
-            performanceIndicator.setText('🎓 Excellent performance!');
+            performanceIndicator.setText('Excellent performance');
             performanceIndicator.addClass('excellent');
         } else if (scorePercentOverall >= 70) {
-            performanceIndicator.setText('👍 Good work!');
+            performanceIndicator.setText('Good work');
             performanceIndicator.addClass('good');
         } else if (scorePercentOverall >= 50) {
-            performanceIndicator.setText('🔄 Keep practicing');
+            performanceIndicator.setText('Keep practicing');
             performanceIndicator.addClass('needs-improvement');
         } else {
-            performanceIndicator.setText('📚 More review recommended');
+            performanceIndicator.setText('More review recommended');
             performanceIndicator.addClass('review-recommended');
         }
 

@@ -76,7 +76,7 @@ export class ReviewScheduleService {
         // Check if file exists and is a markdown file
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
         if (!file || !(file instanceof TFile) || file.extension !== "md") {
-            new Notice("Only markdown files can be added to the review schedule.");
+            new Notice("Only Markdown files can be added to review.");
             return;
         }
 
@@ -143,7 +143,7 @@ export class ReviewScheduleService {
             this.plugin.events.emit('sidebar-update');
         }
 
-        new Notice(`Note added to review schedule.`);
+        new Notice(`Note added to review.`);
     }
 
     /**
@@ -708,7 +708,7 @@ export class ReviewScheduleService {
             this.customNoteOrder = this.customNoteOrder.filter(p => p !== path);
 
             // Data saving is now handled by main.ts after this method returns
-            new Notice("Note removed from review schedule.");
+            new Notice("Note removed from review.");
 
             // Note: The controller will be notified separately to update its state
             // This prevents immediate reordering based on link analysis after removal.
@@ -726,7 +726,7 @@ export class ReviewScheduleService {
         this.schedules = {};
         this.customNoteOrder = []; // Also clear custom order
         // Data saving is now handled by main.ts after this method returns
-        new Notice("All review schedules have been cleared.");
+        new Notice("All review schedules cleared.");
 
         // Notify any listeners (for UI updates)
         if (this.plugin.events) {

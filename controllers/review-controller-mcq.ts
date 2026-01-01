@@ -68,12 +68,12 @@ export class MCQController {
         externalOnCompleteCallback?: (path: string, success: boolean) => void
     ): Promise<void> {
         if (!this.plugin.settings.enableMCQ) {
-            new Notice('MCQ feature is disabled in settings.');
+            new Notice('Feature is disabled in settings.');
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
             return;
         }
         if (!this.mcqGenerationService) {
-            new Notice('MCQ generation service is not available. Check API provider settings.');
+            new Notice('Generation service is not available. Check API provider settings.');
             return;
         }
 
@@ -81,23 +81,23 @@ export class MCQController {
             let mcqSet = this.mcqService.getMCQSetForNote(notePath);
 
             if (mcqSet && mcqSet.needsQuestionRegeneration) {
-                new Notice('Questions for this note are flagged for regeneration. Generating new set...');
+                new Notice('Questions flagged for regeneration. Generating new set...');
                 mcqSet = await this.generateMCQs(notePath, true);
                 if (mcqSet) {
                     mcqSet.needsQuestionRegeneration = false;
                     this.mcqService.saveMCQSet(mcqSet);
                     await this.plugin.savePluginData();
                 } else {
-                    new Notice('Failed to regenerate MCQs. Using existing set if available.');
+                    new Notice('Failed to regenerate. Using existing set if available.');
                     mcqSet = this.mcqService.getMCQSetForNote(notePath);
                 }
             }
 
             if (!mcqSet || mcqSet.questions.length === 0) {
-                new Notice('No MCQs found for this note. Generating new set...');
+                new Notice('No questions found. Generating new set...');
                 mcqSet = await this.generateMCQs(notePath);
                 if (!mcqSet) {
-                    new Notice('Failed to generate MCQs for this note.');
+                    new Notice('Failed to generate questions.');
                     return;
                 }
             }
@@ -135,7 +135,7 @@ export class MCQController {
             // Pass the new internal callback to the modal constructor
             new MCQModal(this.plugin, notePath, mcqSet, internalOnComplete).open();
         } catch {
-            new Notice('Error starting MCQ review. Please check console for details.');
+            new Notice('Error starting review. Please check console for details.');
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
         }
     }
@@ -149,7 +149,7 @@ export class MCQController {
      */
     async generateMCQs(notePath: string, forceRegeneration = false): Promise<MCQSet | null> {
         if (!this.plugin.settings.enableMCQ || !this.mcqGenerationService) {
-            new Notice('MCQ feature is disabled or the generation service is not available. Check API provider settings.');
+            new Notice('Feature is disabled or the generation service is not available. Check API provider settings.');
             return null;
         }
 
@@ -202,11 +202,11 @@ export class MCQController {
      */
     async startConsolidatedMCQReviewForSelectedDate(): Promise<void> {
         if (!this.plugin.settings.enableMCQ) {
-            new Notice('MCQ feature is disabled in settings.');
+            new Notice('Feature is disabled in settings.');
             return;
         }
         if (!this.mcqGenerationService) {
-            new Notice('MCQ generation service is not available. Check API provider settings.');
+            new Notice('Generation service is not available. Check API provider settings.');
             return;
         }
 
@@ -220,7 +220,7 @@ export class MCQController {
         const mcqSetsForReview: { path: string; mcqSet: MCQSet; fileName: string }[] = [];
         let notesWithMCQsCount = 0;
 
-        new Notice(`Fetching MCQs for ${dueNotes.length} due note(s)...`);
+        new Notice(`Fetching questions for ${dueNotes.length} due note(s)...`);
 
         for (const noteSchedule of dueNotes) {
             const notePath = noteSchedule.path;
@@ -228,7 +228,7 @@ export class MCQController {
 
             // If MCQ set needs regeneration, attempt to regenerate it.
             if (mcqSet && mcqSet.needsQuestionRegeneration) {
-                new Notice(`Regenerating flagged MCQs for ${notePath}...`);
+                new Notice(`Regenerating flagged questions for ${notePath}...`);
                 const regeneratedMcqSet = await this.generateMCQs(notePath, true); // forceRegeneration = true
                 if (regeneratedMcqSet) {
                     mcqSet = regeneratedMcqSet; // Use the new set
@@ -236,19 +236,19 @@ export class MCQController {
                     this.mcqService.saveMCQSet(mcqSet);
                     // Overall plugin data save will happen once after the loop
                 } else {
-                    new Notice(`Failed to regenerate MCQs for ${notePath}.Using existing set if available(might be outdated or empty).`);
+                    new Notice(`Failed to regenerate questions for ${notePath}. Using existing set if available (might be outdated or empty).`);
                     // mcqSet remains the old one, or null if it didn't exist.
                 }
             }
 
             // If no MCQ set exists after potential regeneration, or if it's empty, try to generate one.
             if (!mcqSet || mcqSet.questions.length === 0) {
-                new Notice(`No MCQs found or set is empty for ${notePath}.Attempting to generate new set...`);
+                new Notice(`No questions found or set is empty for ${notePath}. Attempting to generate new set...`);
                 const newMcqSet = await this.generateMCQs(notePath, false); // forceRegeneration = false (respects cache if fresh)
                 if (newMcqSet) {
                     mcqSet = newMcqSet;
                 } else {
-                    new Notice(`Failed to generate MCQs for ${notePath}.This note will be skipped in MCQ review.`);
+                    new Notice(`Failed to generate questions for ${notePath}. This note will be skipped.`);
                 }
             }
 
@@ -264,13 +264,13 @@ export class MCQController {
         }
 
         if (mcqSetsForReview.length === 0) {
-            new Notice('No MCQs available or generated for the due notes.');
+            new Notice('No questions available for the due notes.');
             return;
         }
 
         await this.plugin.savePluginData(); // Save any changes from MCQ generation
 
-        new Notice(`Starting consolidated MCQ review for ${notesWithMCQsCount} note(s) with ${mcqSetsForReview.reduce((sum, s) => sum + s.mcqSet.questions.length, 0)} questions.`);
+        new Notice(`Starting consolidated review for ${notesWithMCQsCount} note(s) with ${mcqSetsForReview.reduce((sum, s) => sum + s.mcqSet.questions.length, 0)} questions.`);
 
         const onConsolidatedComplete = (
             results: Array<{ path: string; success: boolean; response: ReviewResponse; score?: number }>
@@ -295,7 +295,7 @@ export class MCQController {
                 if (reviewsProcessed > 0) {
                     new Notice(`${reviewsProcessed} note review(s) updated based on consolidated MCQ session.`);
                 } else {
-                    new Notice("No note reviews were updated from the MCQ session");
+                    new Notice("No reviews updated.");
                 }
             })();
         };

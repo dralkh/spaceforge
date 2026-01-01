@@ -1,4 +1,5 @@
 import { Notice, requestUrl } from 'obsidian';
+import { OLLAMA, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -13,16 +14,16 @@ export class OllamaService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.ollamaApiUrl) {
-            new Notice('Ollama API URL is not set. Please add it in the Spaceforge settings');
+            new Notice(`${OLLAMA} ${API} ${URL} not set in settings.`);
             return null;
         }
         if (!settings.ollamaModel) {
-            new Notice('Ollama model is not set. Please add it in the Spaceforge settings');
+            new Notice(`${OLLAMA} model not set in settings.`);
             return null;
         }
 
         try {
-            new Notice('Generating MCQs using Ollama...');
+            new Notice(`Generating questions using ${OLLAMA}...`);
 
             // Determine the number of questions to generate
             let numQuestionsToGenerate: number;
@@ -38,7 +39,7 @@ export class OllamaService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Ollama. Please try again');
+                new Notice(`Failed to generate valid questions from ${OLLAMA}. Try again.`);
                 return null;
             }
 
@@ -48,7 +49,7 @@ export class OllamaService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            new Notice('Failed to generate MCQs with Ollama. Please check console for details');
+            new Notice(`Failed to generate questions with ${OLLAMA}. Check console for details.`);
             return null;
         }
     }
@@ -171,7 +172,7 @@ export class OllamaService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            new Notice('Error parsing MCQ response from Ollama. Please try again');
+            new Notice(`Error parsing response from ${OLLAMA}. Try again.`);
             return [];
         }
     }

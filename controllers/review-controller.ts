@@ -139,8 +139,8 @@ export class ReviewController implements IReviewController {
      *
      * @param path Path to the postponed note
      */
-    async handleNotePostponed(path: string): Promise<void> {
-        await this.coreController.handleNotePostponed(path);
+    handleNotePostponed(path: string): void {
+        this.coreController.handleNotePostponed(path);
     }
 
     /**

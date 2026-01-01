@@ -1,4 +1,5 @@
 import { Notice, requestUrl } from 'obsidian';
+import { OPENROUTER, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -33,13 +34,13 @@ export class OpenRouterService implements IMCQGenerationService {
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         // Check if API key is set
         if (!settings.openRouterApiKey) {
-            new Notice('OpenRouter API key is not set. Please add it in the settings');
+            new Notice(`${OPENROUTER} ${API} key not set in settings.`);
             return null;
         }
 
         try {
             // Show loading notice
-            new Notice('Generating MCQs using OpenRouter...');
+            new Notice(`Generating questions using ${OPENROUTER}...`);
 
             // Determine the number of questions to generate
             let numQuestionsToGenerate: number;
@@ -63,7 +64,7 @@ export class OpenRouterService implements IMCQGenerationService {
 
             // Ensure we have at least one question if requested
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from OpenRouter. Please try again');
+                new Notice('Failed to generate valid questions. Try again.');
                 return null;
             }
 
@@ -76,7 +77,7 @@ export class OpenRouterService implements IMCQGenerationService {
 
             return mcqSet;
         } catch {
-            new Notice('Failed to generate MCQs with OpenRouter. Please check console for details');
+            new Notice('Failed to generate questions. Check console for details.');
             return null;
         }
     }
@@ -294,7 +295,7 @@ For example:
             // Use numQuestionsToGenerate instead of settings.mcqQuestionsPerNote
             return questions.slice(0, numQuestionsToGenerate);
         } catch {
-            new Notice('Error parsing MCQ response from OpenRouter. Please try again');
+            new Notice(`Error parsing response from ${OPENROUTER}. Try again.`);
             return [];
         }
     }

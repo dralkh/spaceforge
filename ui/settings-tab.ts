@@ -1,9 +1,9 @@
 import { App, Notice, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import { ConfirmationModal } from './confirmation-modal';
 import SpaceforgePlugin from '../main';
-// Import ApiProvider, DEFAULT_SETTINGS, SpaceforgeSettings, and MCQQuestionAmountMode
 import { ApiProvider, DEFAULT_SETTINGS, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
-import { SpaceforgePluginData, DEFAULT_PLUGIN_STATE_DATA } from '../models/plugin-data'; // Import data structures
+import { SpaceforgePluginData, DEFAULT_PLUGIN_STATE_DATA } from '../models/plugin-data';
+import { SM2, FSRS, POMODORO, MCQS, API, SPACEFORGE, CLAUDE, GEMINI, OLLAMA, TOGETHER_AI, WPM } from './constants';
 
 /**
  * Settings tab for the plugin
@@ -128,7 +128,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 a.click();
                 document.body.removeChild(a);
 
-                new Notice('All plugin data exported successfully');
+                new Notice('All data exported successfully');
             });
 
             // Import all data button
@@ -176,7 +176,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
                             this.display(); // Refresh settings display
 
-                            new Notice('All plugin data imported successfully. Plugin may require a reload for all changes to take effect.');
+                            new Notice('All data imported successfully. Plugin may require a reload for all changes to take effect.');
                         } catch (error) {
                             new Notice(`Failed to import data: ${error.message} `);
                         }
@@ -217,7 +217,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
                         this.display(); // Refresh settings display
 
-                        new Notice('All plugin data reset to defaults.');
+                        new Notice('All data reset to defaults.');
                     }
                 ).open();
             });
@@ -354,7 +354,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             // Save the cleared data
                             await this.plugin.savePluginData();
 
-                            new Notice('All plugin data cleared successfully.');
+                            new Notice('All data cleared successfully.');
 
                             // Then refresh UI elements
                             this.display(); // Refresh settings UI
@@ -383,8 +383,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             .setName('Default scheduling algorithm')
             .setDesc('Choose the default algorithm for newly created notes.')
             .addDropdown(dropdown => dropdown
-                .addOption('sm2', 'SM-2')
-                .addOption('fsrs', 'FSRS')
+                .addOption('sm2', SM2)
+                .addOption('fsrs', FSRS)
                 .setValue(this.plugin.settings.defaultSchedulingAlgorithm)
                 .onChange(async (value: 'sm2' | 'fsrs') => {
                     this.plugin.settings.defaultSchedulingAlgorithm = value;
@@ -400,13 +400,13 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const sm2ParamsContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const sm2Summary = sm2ParamsContainer.createEl('summary');
         // Changed to h3
-        sm2Summary.setText('SM-2 parameters');
+        sm2Summary.setText(`${SM2} parameters`);
         sm2ParamsContainer.open = false; // Initially closed
 
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: base ease factor')
-            .setDesc('Initial ease factor for new SM-2 notes (2.5 is SM-2 default). Higher ease increases interval growth. Value shown is internal format (250 = 2.5).')
+            .setName(`Base ease factor (${SM2})`)
+            .setDesc(`Initial ease factor for new ${SM2} notes (2.5 is ${SM2} default). Higher ease increases interval growth. Value shown is internal format (250 = 2.5).`)
             .addSlider(slider => slider
                 .setLimits(130, 500, 10)
                 .setValue(this.plugin.settings.baseEase)
@@ -417,8 +417,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: use initial learning schedule')
-            .setDesc('For new SM-2 notes, use a fixed set of initial intervals before applying the full algorithm.')
+            .setName(`Use initial learning schedule (${SM2})`)
+            .setDesc(`For new ${SM2} notes, use a fixed set of initial intervals before applying the full algorithm.`)
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.useInitialSchedule)
                 .onChange(async (value: boolean) => {
@@ -429,8 +429,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.useInitialSchedule) {
             new Setting(sm2ParamsContainer)
-                .setName('SM-2: custom initial intervals (days)')
-                .setDesc('Comma-separated list for initial SM-2 reviews (e.g., 0,1,3,7). Must start with 0.')
+                .setName(`Custom initial intervals (${SM2})`)
+                .setDesc(`Comma-separated list for initial ${SM2} reviews (e.g., 0,1,3,7). Must start with 0.`)
                 .addText(text => text
                     .setValue(this.plugin.settings.initialScheduleCustomIntervals.join(', '))
                     .onChange(async (value: string) => {
@@ -439,15 +439,15 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             this.plugin.settings.initialScheduleCustomIntervals = intervals;
                             await this.plugin.savePluginData();
                         } else {
-                            new Notice("Custom initial SM-2 intervals must start with 0 and be valid numbers.", 5000);
+                            new Notice(`Custom initial ${SM2} intervals must start with 0 and be valid numbers.`, 5000);
                             text.setValue(this.plugin.settings.initialScheduleCustomIntervals.join(', '));
                         }
                     }));
         }
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: maximum interval (days)')
-            .setDesc('Longest possible interval between SM-2 reviews.')
+            .setName(`Maximum interval (${SM2})`)
+            .setDesc(`Longest possible interval between ${SM2} reviews.`)
             .addText(text => text
                 .setValue(this.plugin.settings.maximumInterval.toString())
                 .onChange(async (value: string) => {
@@ -459,8 +459,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: load balancing')
-            .setDesc('Add slight randomness to SM-2 intervals to prevent reviews clumping on the same day.')
+            .setName(`Load balancing (${SM2})`)
+            .setDesc(`Add slight randomness to ${SM2} intervals to prevent reviews clumping on the same day.`)
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.loadBalance)
                 .onChange(async (value: boolean) => {
@@ -472,7 +472,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const fsrsParamsContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const fsrsSummary = fsrsParamsContainer.createEl('summary');
         // Changed to h3
-        fsrsSummary.setText('FSRS parameters');
+        fsrsSummary.setText(`${FSRS} parameters`);
         fsrsParamsContainer.open = false; // Initially closed
 
         new Setting(fsrsParamsContainer)
@@ -487,13 +487,13 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                     } else {
-                        new Notice("FSRS request retention must be between 0.7 and 0.99.");
+                        new Notice(`${FSRS} request retention must be between 0.7 and 0.99.`);
                     }
                 }));
 
         new Setting(fsrsParamsContainer)
             .setName('Maximum interval (days)')
-            .setDesc('Longest possible interval FSRS will schedule.')
+            .setDesc(`Longest possible interval ${FSRS} will schedule.`)
             .addText(text => text
                 .setValue(this.plugin.settings.fsrsParameters?.maximum_interval?.toString() ?? DEFAULT_SETTINGS.fsrsParameters.maximum_interval?.toString() ?? '36500')
                 .onChange(async (value) => {
@@ -503,7 +503,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                     } else {
-                        new Notice("FSRS maximum interval must be a positive number.");
+                        new Notice(`${FSRS} maximum interval must be a positive number.`);
                     }
                 }));
 
@@ -523,12 +523,12 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                     } else {
-                        new Notice("FSRS learning steps must be valid comma-separated numbers > 0, or empty.");
+                        new Notice(`${FSRS} learning steps must be valid comma-separated numbers > 0, or empty.`);
                     }
                 }));
         new Setting(fsrsParamsContainer)
             .setName('Enable fuzz')
-            .setDesc('Add slight randomness to FSRS intervals (recommended).')
+            .setDesc(`Add slight randomness to ${FSRS} intervals (recommended).`)
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.fsrsParameters?.enable_fuzz ?? DEFAULT_SETTINGS.fsrsParameters.enable_fuzz ?? false)
                 .onChange(async (value) => {
@@ -537,8 +537,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                 }));
         new Setting(fsrsParamsContainer)
-            .setName('Enable short term scheduling')
-            .setDesc('Use FSRS short-term memory model (affects initial learning steps).')
+            .setName('Enable short-term scheduling')
+            .setDesc(`Use ${FSRS} short-term memory model (affects initial learning steps).`)
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.fsrsParameters?.enable_short_term ?? DEFAULT_SETTINGS.fsrsParameters.enable_short_term ?? false)
                 .onChange(async (value) => {
@@ -548,7 +548,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
         new Setting(fsrsParamsContainer)
             .setName('Weights (w)')
-            .setDesc('FSRS algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.')
+            .setDesc(`${FSRS} algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.`)
             .addTextArea(text => {
                 text.inputEl.rows = 3;
                 text.inputEl.addClass('sf-full-width-textarea');
@@ -560,7 +560,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                             this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                         } else {
-                            new Notice("FSRS weights must be a comma-separated list of 17 valid numbers.");
+                            new Notice(`${FSRS} weights must be a comma-separated list of 17 valid numbers.`);
                         }
                     });
             });
@@ -573,42 +573,42 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         conversionContainer.open = false; // Initially closed
 
         new Setting(conversionContainer)
-            .setName('Convert all SM-2 cards to FSRS')
-            .setDesc('Migrate all existing SM-2 cards to use the FSRS algorithm. This will reset their learning state for FSRS.')
+            .setName(`Convert all ${SM2} cards to ${FSRS}`)
+            .setDesc(`Migrate all existing ${SM2} cards to use the ${FSRS} algorithm. This will reset their learning state for ${FSRS}.`)
             .addButton(button => button
-                .setButtonText('Convert SM-2 to FSRS')
+                .setButtonText(`Convert ${SM2} to ${FSRS}`)
                 .setCta() // Call to action style
                 .onClick(() => {
                     new ConfirmationModal(
                         this.app,
-                        'Convert SM-2 to FSRS',
-                        'Are you sure you want to convert ALL SM-2 cards to FSRS? Their FSRS learning state will be reset. This action cannot be easily undone.',
+                        `Convert ${SM2} to ${FSRS}`,
+                        `Are you sure you want to convert ALL ${SM2} cards to ${FSRS}? Their ${FSRS} learning state will be reset. This action cannot be easily undone.`,
                         async () => {
-                            new Notice('Converting SM-2 cards to FSRS... This may take a moment.');
+                            new Notice(`Converting ${SM2} cards to ${FSRS}... This may take a moment.`);
                             this.plugin.reviewScheduleService.convertAllSm2ToFsrs();
                             await this.plugin.savePluginData();
-                            new Notice('All SM-2 cards have been converted to FSRS.');
+                            new Notice(`All ${SM2} cards have been converted to ${FSRS}.`);
                             this.display(); // Refresh settings tab
                         }
                     ).open();
                 }));
 
         new Setting(conversionContainer)
-            .setName('Convert all FSRS cards to SM-2')
-            .setDesc('Migrate all existing FSRS cards to use the SM-2 algorithm. Their SM-2 learning state will be initialized with defaults.')
+            .setName(`Convert all ${FSRS} cards to ${SM2}`)
+            .setDesc(`Migrate all existing ${FSRS} cards to use the ${SM2} algorithm. Their ${SM2} learning state will be initialized with defaults.`)
             .addButton(button => button
-                .setButtonText('Convert FSRS to SM-2')
+                .setButtonText(`Convert ${FSRS} to ${SM2}`)
                 .setCta()
                 .onClick(() => {
                     new ConfirmationModal(
                         this.app,
-                        'Convert FSRS to SM-2',
-                        'Are you sure you want to convert ALL FSRS cards to SM-2? Their SM-2 learning state will be reset to defaults. This action cannot be easily undone.',
+                        `Convert ${FSRS} to ${SM2}`,
+                        `Are you sure you want to convert ALL ${FSRS} cards to ${SM2}? Their ${SM2} learning state will be reset to defaults. This action cannot be easily undone.`,
                         async () => {
-                            new Notice('Converting FSRS cards to SM-2... This may take a moment.');
+                            new Notice(`Converting ${FSRS} cards to ${SM2}... This may take a moment.`);
                             this.plugin.reviewScheduleService.convertAllFsrsToSm2();
                             await this.plugin.savePluginData();
-                            new Notice('All FSRS cards have been converted to SM-2.');
+                            new Notice(`All ${FSRS} cards have been converted to ${SM2}.`);
                             this.display(); // Refresh settings tab
                         }
                     ).open();
@@ -674,7 +674,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(interfaceSection)
-            .setName('Reading speed (WPM)')
+            .setName(`Reading speed (${WPM})`)
             .setDesc('Words per minute for estimating review time')
             .addSlider(slider => slider
                 .setLimits(100, 500, 10)
@@ -687,7 +687,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         interfaceSection.createEl('div', {
             cls: 'sf-setting-explain',
-            text: 'Average adults read 200-250 WPM for regular content, 100-150 WPM for technical content'
+            text: `Average adults read 200-250 ${WPM} for regular content, 100-150 ${WPM} for technical content`
         });
 
         new Setting(interfaceSection)
@@ -756,7 +756,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const mcqSection = createCollapsible('Multiple choice questions', 'newspaper', false); // Closed by default
 
         new Setting(mcqSection)
-            .setName('Enable MCQ feature')
+            .setName('Enable multiple choice feature')
             .setDesc('Use AI-generated multiple-choice questions to test your knowledge')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableMCQ)
@@ -821,7 +821,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setClass("sf-settings-subsection-provider-header");
                 const apiKeyContainer = mcqSection.createEl('div', { cls: 'sf-setting-highlight' });
                 new Setting(apiKeyContainer)
-                    .setName('OpenRouter API key')
+                    .setName('API key')
                     .setDesc('Required for generating MCQs via OpenRouter.')
                     .addText(text => text
                         .setPlaceholder('Enter your OpenRouter API key')
@@ -834,7 +834,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 apiKeyContainer.createEl('div').setText('Get your API key at https://openrouter.ai/keys');
 
                 new Setting(mcqSection)
-                    .setName('OpenRouter model')
+                    .setName('Model')
                     .setDesc('Model identifier from OpenRouter (e.g., openai/gpt-4.1-mini)')
                     .addText(text => text
                         .setPlaceholder('Enter OpenRouter model identifier')
@@ -850,7 +850,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('OpenAI API key')
+                    .setName('API key')
                     .setDesc('Your OpenAI API key.')
                     .addText(text => text
                         .setPlaceholder('Enter your OpenAI API key (sk-...)')
@@ -860,7 +860,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('OpenAI model')
+                    .setName('Model')
                     .setDesc('Model name (e.g., gpt-3.5-turbo, gpt-4)')
                     .addText(text => text
                         .setPlaceholder('Enter OpenAI model name')
@@ -875,20 +875,20 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('Ollama API URL')
+                    .setName('API URL')
                     .setDesc('URL of your running Ollama instance (e.g., http://localhost:11434)')
                     .addText(text => text
-                        .setPlaceholder('http://localhost:11434')
+                        .setPlaceholder(`http:${'//'}localhost:11434`)
                         .setValue(this.plugin.settings.ollamaApiUrl)
                         .onChange(async (value: string) => {
                             this.plugin.settings.ollamaApiUrl = value;
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Ollama model')
-                    .setDesc('Name of the Ollama model to use (e.g., llama3, mistral)')
+                    .setName('Model')
+                    .setDesc(`Name of the ${OLLAMA} model to use (e.g., llama3, mistral)`)
                     .addText(text => text
-                        .setPlaceholder('Enter Ollama model name')
+                        .setPlaceholder(`Enter ${OLLAMA} model name`)
                         .setValue(this.plugin.settings.ollamaModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.ollamaModel = value;
@@ -900,20 +900,20 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('Gemini API key')
-                    .setDesc('Your Google AI Gemini API key.')
+                    .setName('API key')
+                    .setDesc(`Your Google AI ${GEMINI} ${API} key.`)
                     .addText(text => text
-                        .setPlaceholder('Enter your Gemini API key')
+                        .setPlaceholder(`Enter your ${GEMINI} ${API} key`)
                         .setValue(this.plugin.settings.geminiApiKey)
                         .onChange(async (value: string) => {
                             this.plugin.settings.geminiApiKey = value;
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Gemini model')
+                    .setName('Model')
                     .setDesc('Model name (e.g., gemini-pro)')
                     .addText(text => text
-                        .setPlaceholder('Enter Gemini model name')
+                        .setPlaceholder(`Enter ${GEMINI} model name`)
                         .setValue(this.plugin.settings.geminiModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.geminiModel = value;
@@ -925,20 +925,20 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('Claude API key')
-                    .setDesc('Your Anthropic Claude API key.')
+                    .setName('API key')
+                    .setDesc(`Your Anthropic ${CLAUDE} ${API} key.`)
                     .addText(text => text
-                        .setPlaceholder('Enter your Claude API key')
+                        .setPlaceholder(`Enter your ${CLAUDE} ${API} key`)
                         .setValue(this.plugin.settings.claudeApiKey)
                         .onChange(async (value: string) => {
                             this.plugin.settings.claudeApiKey = value;
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Claude model')
+                    .setName('Model')
                     .setDesc('Model name (e.g., claude-3-opus-20240229, claude-3-sonnet-20240229)')
                     .addText(text => text
-                        .setPlaceholder('Enter Claude model name')
+                        .setPlaceholder(`Enter ${CLAUDE} model name`)
                         .setValue(this.plugin.settings.claudeModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.claudeModel = value;
@@ -950,20 +950,20 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
-                    .setName('Together AI API key')
-                    .setDesc('Your Together AI API key.')
+                    .setName('API key')
+                    .setDesc(`Your ${TOGETHER_AI} ${API} key.`)
                     .addText(text => text
-                        .setPlaceholder('Enter your Together AI API key')
+                        .setPlaceholder(`Enter your ${TOGETHER_AI} ${API} key`)
                         .setValue(this.plugin.settings.togetherApiKey)
                         .onChange(async (value: string) => {
                             this.plugin.settings.togetherApiKey = value;
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Together AI model')
+                    .setName('Model')
                     .setDesc('Model identifier from Together AI (e.g., meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)')
                     .addText(text => text
-                        .setPlaceholder('Enter Together AI model identifier')
+                        .setPlaceholder(`Enter ${TOGETHER_AI} model identifier`)
                         .setValue(this.plugin.settings.togetherModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.togetherModel = value;
@@ -1056,7 +1056,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             const promptTypeContainer = mcqFormattingGrid.createEl('div');
             new Setting(promptTypeContainer)
                 .setName('Prompt type')
-                .setDesc('Format for MCQ generation')
+                .setDesc('Format for question generation')
                 .addDropdown(dropdown => dropdown
                     .addOption('basic', 'Basic')
                     .addOption('detailed', 'Detailed')
@@ -1069,7 +1069,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // Second item in grid
             const difficultyContainer = mcqFormattingGrid.createEl('div');
             new Setting(difficultyContainer)
-                .setName('MCQ difficulty')
+                .setName('Difficulty')
                 .setDesc('Complexity level')
                 .addDropdown(dropdown => dropdown
                     .addOption(MCQDifficulty.Basic, 'Basic recall')
@@ -1177,8 +1177,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             if (this.plugin.settings.enableQuestionRegenerationOnRating) {
                 new Setting(mcqSection)
-                    .setName('Min SM-2 rating for MCQ regeneration')
-                    .setDesc('For SM-2: Regenerate MCQs if review rating (0-5) is this value or higher. (0:Blackout, 5:Perfect)')
+                    .setName(`Minimum rating for regeneration (${SM2})`)
+                    .setDesc(`For ${SM2}: Regenerate ${MCQS} if review rating (0-5) is this value or higher. (0:Blackout, 5:Perfect)`)
                     .addSlider(slider => slider
                         .setLimits(0, 5, 1)
                         .setValue(this.plugin.settings.minSm2RatingForQuestionRegeneration)
@@ -1189,8 +1189,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
 
                 new Setting(mcqSection)
-                    .setName('Min FSRS rating for MCQ regeneration')
-                    .setDesc('For FSRS: Regenerate MCQs if review rating (1-4) is this value or higher. (1:Again, 4:Easy)')
+                    .setName(`Minimum rating for regeneration (${FSRS})`)
+                    .setDesc(`For ${FSRS}: Regenerate ${MCQS} if review rating (1-4) is this value or higher. (1:Again, 4:Easy)`)
                     .addSlider(slider => slider
                         .setLimits(1, 4, 1) // FSRS ratings are 1-4
                         .setValue(this.plugin.settings.minFsrsRatingForQuestionRegeneration)
@@ -1205,16 +1205,16 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // If MCQ is disabled, show a message about enabling it
             const mcqDisabledMessage = mcqSection.createEl('div', { cls: 'sf-info-box' });
             mcqDisabledMessage.createEl('p', {
-                text: 'Multiple choice questions are currently disabled. Enable it to configure durations and notifications.'
+                text: `${MCQS} are currently disabled. Enable it to configure durations and notifications.`
             });
         }
 
         // ========= POMODORO TIMER SECTION =========
-        const pomodoroSection = createCollapsible('Pomodoro timer', 'timer', false); // Added timer icon
+        const pomodoroSection = createCollapsible(`${POMODORO} timer`, 'timer', false); // Added timer icon
 
         new Setting(pomodoroSection)
-            .setName('Enable pomodoro timer')
-            .setDesc('Show the Pomodoro timer in the sidebar.')
+            .setName(`Enable ${POMODORO} timer`)
+            .setDesc(`Show the ${POMODORO} timer in the sidebar.`)
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.pomodoroEnabled)
                 .onChange(async (value: boolean) => {
@@ -1310,7 +1310,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         } else {
             const pomodoroDisabledMessage = pomodoroSection.createEl('div', { cls: 'sf-info-box' });
             pomodoroDisabledMessage.createEl('p', {
-                text: 'Pomodoro timer is currently disabled. Enable it to configure durations and notifications.'
+                text: `${POMODORO} timer is currently disabled. Enable it to configure durations and notifications.`
             });
         }
 
@@ -1331,7 +1331,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             .setDesc(locationDesc)
             .addExtraButton(button => button
                 .setIcon('info')
-                .setTooltip('Current location of your Spaceforge data')
+                .setTooltip(`Current location of your ${SPACEFORGE} data`)
                 .onClick(() => {
                     const message = this.plugin.settings.useCustomDataPath && this.plugin.settings.customDataPath
                         ? `Your data is stored at: ${this.plugin.settings.customDataPath.endsWith('/data.json') ? this.plugin.settings.customDataPath : `${this.plugin.settings.customDataPath}/data.json`}`
@@ -1385,17 +1385,17 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         container.empty(); // Clear previous content
 
         if (algorithm === 'sm2') {
-            new Setting(container).setName('About the modified SM-2 algorithm').setHeading();
+            new Setting(container).setName(`About modified ${SM2} algorithm`).setHeading();
             container.createEl('p', {
-                text: 'Spaceforge uses a modified version of the SuperMemo SM-2 algorithm (1991) which schedules reviews based on how well you recall information. ' +
+                text: `Spaceforge uses a modified version of the SuperMemo ${SM2} algorithm (1991) which schedules reviews based on how well you recall information. ` +
                     'When you rate your recall quality from 0-5, the algorithm adjusts the interval and difficulty (ease factor) accordingly.'
             });
             container.createEl('p', {
                 text: 'Our implementation includes specific handling for overdue or skipped items to prevent them from accumulating in a backlog:'
             });
             const sm2List = container.createEl('ul');
-            sm2List.createEl('li', { text: 'Overdue items: Automatically set to review tomorrow with a quality rating of 0.' });
-            sm2List.createEl('li', { text: 'Postponed items: Explicitly moved to tomorrow with a one-step quality penalty.' });
+            sm2List.createEl('li', { text: `${'Overdue'} items: Automatically set to review tomorrow with a quality rating of 0.` });
+            sm2List.createEl('li', { text: `${'Postponed'} items: Explicitly moved to tomorrow with a one-step quality penalty.` });
             sm2List.createEl('li', { text: 'Both cases reset the repetition count to 1 and update the ease factor.' });
 
             const ratingsTable = container.createEl('table', { cls: 'sf-ratings-table' }); // Added a class for potential styling
@@ -1426,19 +1426,19 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             row4.createEl('td', { text: 'Perfect recall' });
             row4.createEl('td', { text: 'Largest increase' });
         } else if (algorithm === 'fsrs') {
-            new Setting(container).setName('About the FSRS algorithm').setHeading();
+            new Setting(container).setName(`About ${FSRS} algorithm`).setHeading();
             container.createEl('p', {
-                text: 'FSRS (Free Spaced Repetition Scheduler) is a modern, evidence-based algorithm that models memory retention to optimize review schedules. ' +
-                    'It calculates card difficulty and stability dynamically based on your review history and aims for a target retention rate.'
+                text: `${FSRS} (Free Spaced Repetition Scheduler) is a modern, evidence-based algorithm that models memory retention to optimize review schedules. ` +
+                    `It calculates card difficulty and stability dynamically based on your review history and aims for a target retention rate.`
             });
             container.createEl('p', {
-                text: 'Key concepts in FSRS:'
+                text: `Key concepts in ${FSRS}:`
             });
             const fsrsList = container.createEl('ul');
-            fsrsList.createEl('li', { text: 'Difficulty: How hard a card is to remember.' });
-            fsrsList.createEl('li', { text: 'Stability: How long a card is likely to be remembered.' });
-            fsrsList.createEl('li', { text: 'Retention: The probability of recalling a card at the time of review.' });
-            fsrsList.createEl('li', { text: 'Learning steps: Initial short intervals for new cards (configurable).' });
+            fsrsList.createEl('li', { text: `${'Difficulty'}: How hard a card is to remember.` });
+            fsrsList.createEl('li', { text: `${'Stability'}: How long a card is likely to be remembered.` });
+            fsrsList.createEl('li', { text: `${'Retention'}: The probability of recalling a card at the time of review.` });
+            fsrsList.createEl('li', { text: `${'Learning'} steps: Initial short intervals for new cards (configurable).` });
 
             const ratingsTable = container.createEl('table', { cls: 'sf-ratings-table' });
             const thead = ratingsTable.createTHead();
@@ -1449,22 +1449,22 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             headerRow.createEl('th', { text: 'Effect on stability/difficulty' });
 
             const row1 = tbody.insertRow();
-            row1.createEl('td', { text: '1 (Again)' });
+            row1.createEl('td', { text: `${'1 (Again)'}` });
             row1.createEl('td', { text: 'Forgot the card' });
             row1.createEl('td', { text: 'Decreases stability, may increase difficulty' });
 
             const row2 = tbody.insertRow();
-            row2.createEl('td', { text: '2 (Hard)' });
+            row2.createEl('td', { text: `${'2 (Hard)'}` });
             row2.createEl('td', { text: 'Recalled with significant difficulty' });
             row2.createEl('td', { text: 'Smaller increase in stability' });
 
             const row3 = tbody.insertRow();
-            row3.createEl('td', { text: '3 (Good)' });
+            row3.createEl('td', { text: `${'3 (Good)'}` });
             row3.createEl('td', { text: 'Recalled correctly' });
             row3.createEl('td', { text: 'Standard increase in stability' });
 
             const row4 = tbody.insertRow();
-            row4.createEl('td', { text: '4 (Easy)' });
+            row4.createEl('td', { text: `${'4 (Easy)'}` });
             row4.createEl('td', { text: 'Recalled easily' });
             row4.createEl('td', { text: 'Largest increase in stability' });
         }

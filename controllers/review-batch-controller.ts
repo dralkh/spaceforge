@@ -33,7 +33,7 @@ export class ReviewBatchController implements IReviewBatchController {
 
         const todayNotes = reviewController.getTodayNotes();
         if (todayNotes.length === 0) {
-            new Notice("No notes due for review today!");
+            new Notice("No notes due for review today.");
             return;
         }
 
@@ -134,7 +134,7 @@ export class ReviewBatchController implements IReviewBatchController {
         }
 
         if (!this.plugin.mcqController) {
-            new Notice("MCQ controller not initialized. Please check MCQ settings");
+            new Notice("Questions feature not initialized. Check settings.");
             return;
         }
 

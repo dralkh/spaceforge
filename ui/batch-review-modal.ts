@@ -170,12 +170,12 @@ export class BatchReviewModal extends Modal {
                 );
                 consolidatedModal.open();
             } catch {
-                new Notice("Error showing MCQ review. Falling back to manual review.");
+                new Notice("Error showing review. Falling back to manual review.");
                 this.open();
                 void this.processNextManual();
             }
         } else {
-            new Notice("MCQ controller not available. Falling back to manual review.");
+            new Notice("Controller not available. Falling back to manual review.");
             this.open();
             void this.processNextManual();
         }
@@ -196,7 +196,7 @@ export class BatchReviewModal extends Modal {
         const note = this.notes[this.currentIndex];
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("MCQ review in progress").setHeading();
+        new Setting(contentEl).setName("Review in progress").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Processing note ${this.currentIndex + 1}/${this.notes.length}` });
         const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -252,7 +252,7 @@ export class BatchReviewModal extends Modal {
                 void this.processNextManual();
             }
         } else {
-            new Notice("MCQ controller not available, falling back to manual review.");
+            new Notice("Controller not available, falling back to manual review.");
             this.open();
             void this.processNextManual();
         }
@@ -283,17 +283,17 @@ export class BatchReviewModal extends Modal {
         }
 
         const buttonsContainer = contentEl.createDiv("batch-review-buttons");
-        const blackoutButton = buttonsContainer.createEl("button", { text: "0: Complete blackout", cls: "review-button review-button-complete-blackout" });
+        const blackoutButton = buttonsContainer.createEl("button", { text: "0: complete blackout", cls: "review-button review-button-complete-blackout" });
         blackoutButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CompleteBlackout));
-        const incorrectButton = buttonsContainer.createEl("button", { text: "1: Incorrect response", cls: "review-button review-button-incorrect" });
+        const incorrectButton = buttonsContainer.createEl("button", { text: "1: incorrect response", cls: "review-button review-button-incorrect" });
         incorrectButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.IncorrectResponse));
-        const incorrectFamiliarButton = buttonsContainer.createEl("button", { text: "2: Incorrect but familiar", cls: "review-button review-button-incorrect-familiar" });
+        const incorrectFamiliarButton = buttonsContainer.createEl("button", { text: "2: incorrect but familiar", cls: "review-button review-button-incorrect-familiar" });
         incorrectFamiliarButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.IncorrectButFamiliar));
-        const correctDifficultyButton = buttonsContainer.createEl("button", { text: "3: Correct with difficulty", cls: "review-button review-button-correct-difficulty" });
+        const correctDifficultyButton = buttonsContainer.createEl("button", { text: "3: correct with difficulty", cls: "review-button review-button-correct-difficulty" });
         correctDifficultyButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CorrectWithDifficulty));
-        const correctHesitationButton = buttonsContainer.createEl("button", { text: "4: Correct with hesitation", cls: "review-button review-button-correct-hesitation" });
+        const correctHesitationButton = buttonsContainer.createEl("button", { text: "4: correct with hesitation", cls: "review-button review-button-correct-hesitation" });
         correctHesitationButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CorrectWithHesitation));
-        const perfectRecallButton = buttonsContainer.createEl("button", { text: "5: Perfect recall", cls: "review-button review-button-perfect-recall" });
+        const perfectRecallButton = buttonsContainer.createEl("button", { text: "5: perfect recall", cls: "review-button review-button-perfect-recall" });
         perfectRecallButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.PerfectRecall));
         const skipButton = buttonsContainer.createEl("button", { text: "Skip", cls: "review-button review-button-skip" });
         skipButton.addEventListener("click", () => {
@@ -320,7 +320,7 @@ export class BatchReviewModal extends Modal {
     showSummary(): void {
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName('MCQ review complete').setHeading().setClass('mcq-review-complete-header');
+        new Setting(contentEl).setName('Review complete').setHeading().setClass('mcq-review-complete-header');
         const statsEl = contentEl.createDiv("batch-review-summary-stats");
         const totalNotes = this.results.length;
         const successfulNotes = this.results.filter(r => r.success).length;

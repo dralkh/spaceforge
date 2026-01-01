@@ -1,4 +1,5 @@
 import { Notice, requestUrl } from 'obsidian';
+import { TOGETHER_AI, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -13,16 +14,16 @@ export class TogetherService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.togetherApiKey) {
-            new Notice('Together AI API key is not set. Please add it in the Spaceforge settings');
+            new Notice(`${TOGETHER_AI} ${API} key not set in settings.`);
             return null;
         }
         if (!settings.togetherModel) {
-            new Notice('Together AI model is not set. Please add it in the Spaceforge settings');
+            new Notice(`${TOGETHER_AI} model not set in settings.`);
             return null;
         }
 
         try {
-            new Notice('Generating MCQs using Together AI...');
+            new Notice(`Generating questions using ${TOGETHER_AI}...`);
 
             // Determine the number of questions to generate
             let numQuestionsToGenerate: number;
@@ -38,7 +39,7 @@ export class TogetherService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Together AI. Please try again');
+                new Notice('Failed to generate valid questions. Try again.');
                 return null;
             }
 
@@ -48,7 +49,7 @@ export class TogetherService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            new Notice('Failed to generate MCQs with Together AI. Please check console for details');
+            new Notice('Failed to generate questions. Check console for details.');
             return null;
         }
     }
@@ -200,7 +201,7 @@ export class TogetherService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            new Notice('Error parsing MCQ response from Together AI. Please try again');
+            new Notice(`Error parsing response from ${TOGETHER_AI}. Try again.`);
             return [];
         }
     }

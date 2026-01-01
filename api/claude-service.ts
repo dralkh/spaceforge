@@ -1,4 +1,5 @@
 import { Notice, requestUrl } from 'obsidian';
+import { CLAUDE, MCQS, MCQ, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -13,16 +14,16 @@ export class ClaudeService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.claudeApiKey) {
-            new Notice('Claude API key is not set. Please add it in the Spaceforge settings');
+            new Notice(`${CLAUDE} ${API} key is not set. Please add it in the settings`);
             return null;
         }
         if (!settings.claudeModel) {
-            new Notice('Claude model is not set. Please add it in the Spaceforge settings');
+            new Notice(`${CLAUDE} model is not set. Please add it in the settings`);
             return null;
         }
 
         try {
-            new Notice('Generating MCQs using Claude...');
+            new Notice(`Generating ${MCQS} using ${CLAUDE}...`);
 
             // Determine the number of questions to generate
             let numQuestionsToGenerate: number;
@@ -38,7 +39,7 @@ export class ClaudeService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Claude. Please try again');
+                new Notice(`Failed to generate valid ${MCQS} from ${CLAUDE}. Please try again`);
                 return null;
             }
 
@@ -47,8 +48,9 @@ export class ClaudeService implements IMCQGenerationService {
                 questions,
                 generatedAt: Date.now()
             };
-        } catch {
-            new Notice('Failed to generate MCQs with Claude. Please check console for details');
+        } catch (error) {
+            console.error(`Error generating ${MCQS} with ${CLAUDE}:`, error);
+            new Notice(`Failed to generate ${MCQS} with ${CLAUDE}. Please check console for details`);
             return null;
         }
     }
@@ -222,7 +224,7 @@ export class ClaudeService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            new Notice('Error parsing MCQ response from Claude. Please try again');
+            new Notice(`Error parsing ${MCQ} response from ${CLAUDE}. Please try again`);
             return [];
         }
     }

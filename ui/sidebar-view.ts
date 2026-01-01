@@ -248,7 +248,7 @@ export class ReviewSidebarView extends ItemView {
         if (this.listViewRenderer) { // Check if renderer is initialized
             await this.listViewRenderer.render(container);
         } else {
-            container.setText("Error: Could not render list view. Renderer not ready.");
+            container.setText("Error: could not render list view. Renderer not ready.");
         }
     }
 
@@ -267,7 +267,7 @@ export class ReviewSidebarView extends ItemView {
         if (this.calendarView) { // Should always exist due to ensureBaseStructure
             await this.calendarView.render();
         } else {
-            container.setText("Error: Could not render calendar view. CalendarView not ready.");
+            container.setText("Error: could not render calendar view. CalendarView not ready.");
             return; // Avoid further errors if calendarView is somehow null
         }
 

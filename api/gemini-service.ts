@@ -1,4 +1,5 @@
 import { Notice, requestUrl } from 'obsidian';
+import { GEMINI, MCQS, MCQ, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
@@ -15,16 +16,16 @@ export class GeminiService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.geminiApiKey) {
-            new Notice('Gemini API key is not set. Please add it in the Spaceforge settings');
+            new Notice(`${GEMINI} ${API} key is not set. Please add it in the settings`);
             return null;
         }
         if (!settings.geminiModel) {
-            new Notice('Gemini model is not set. Please add it in the Spaceforge settings');
+            new Notice(`${GEMINI} model is not set. Please add it in the settings`);
             return null;
         }
 
         try {
-            new Notice('Generating MCQs using Gemini...');
+            new Notice(`Generating ${MCQS} using ${GEMINI}...`);
 
             // Determine the number of questions to generate
             let numQuestionsToGenerate: number;
@@ -40,7 +41,7 @@ export class GeminiService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                new Notice('Failed to generate valid MCQs from Gemini. Please try again');
+                new Notice(`Failed to generate valid ${MCQS} from ${GEMINI}. Please try again`);
                 return null;
             }
 
@@ -50,7 +51,7 @@ export class GeminiService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            new Notice('Failed to generate MCQs with Gemini. Please check console for details');
+            new Notice(`Failed to generate ${MCQS} with ${GEMINI}. Please check console for details`);
             return null;
         }
     }
@@ -174,7 +175,7 @@ export class GeminiService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            new Notice('Error parsing MCQ response from Gemini. Please try again');
+            new Notice(`Error parsing ${MCQ} response from ${GEMINI}. Please try again`);
             return [];
         }
     }

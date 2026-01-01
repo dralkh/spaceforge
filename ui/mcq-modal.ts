@@ -75,7 +75,7 @@ export class MCQModal extends Modal {
                             new Notice('Could not find note file to regenerate MCQs.');
                         }
                     } else {
-                        new Notice('MCQ generation service not available.');
+                        new Notice('Generation service not available.');
                     }
                 })();
             });
@@ -205,7 +205,7 @@ export class MCQModal extends Modal {
         }
         const question = this.mcqSet.questions[questionIndex];
         if (!question || !question.choices || question.choices.length < 2) {
-            new Notice('Error: Invalid question data. Moving to next question.');
+            new Notice('Invalid question data. Moving to next question.');
             this.session.currentQuestionIndex++;
             if (this.session.currentQuestionIndex < this.mcqSet.questions.length) {
                 this.displayCurrentQuestion(containerEl);
@@ -443,7 +443,7 @@ export class MCQModal extends Modal {
             });
         } catch {
             new Setting(contentEl).setName('Error completing session').setHeading();
-            contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' });
+            contentEl.createEl('p', { text: 'There was an error completing the session. Please try again.' });
             const errorCloseBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
             errorCloseBtn.addEventListener('click', () => this.close());
         }
