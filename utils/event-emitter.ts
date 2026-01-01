@@ -1,11 +1,13 @@
 /**
  * Simple event emitter implementation
  */
-export class EventEmitter {
+export type EventMap = Record<string, any[]>;
+
+export class EventEmitter<Events extends { [K in keyof Events]: any[] } = Record<string, any[]>> {
     /**
      * Event listeners by event name
      */
-    private listeners: Record<string, ((...args: any[]) => void)[]> = {};
+    private listeners: { [K in keyof Events]?: ((...args: Events[K]) => void)[] } = {};
 
     /**
      * Register a listener for an event
@@ -13,12 +15,13 @@ export class EventEmitter {
      * @param event Event name
      * @param callback Function to call when event is emitted
      */
-    on(event: string, callback: (...args: any[]) => void): void {
-        if (!this.listeners[event]) {
-            this.listeners[event] = [];
+    on<K extends keyof Events>(event: K, callback: (...args: Events[K]) => void): void {
+        const key = event as string;
+        if (!this.listeners[key as keyof Events]) {
+            this.listeners[key as keyof Events] = [];
         }
 
-        this.listeners[event].push(callback);
+        this.listeners[key as keyof Events]!.push(callback);
     }
 
     /**
@@ -27,12 +30,13 @@ export class EventEmitter {
      * @param event Event name
      * @param args Arguments to pass to listeners
      */
-    emit(event: string, ...args: unknown[]): void {
-        if (!this.listeners[event]) {
+    emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
+        const key = event as string;
+        if (!this.listeners[key as keyof Events]) {
             return;
         }
 
-        for (const callback of this.listeners[event]) {
+        for (const callback of this.listeners[key as keyof Events]!) {
             callback(...args);
         }
     }
@@ -43,12 +47,13 @@ export class EventEmitter {
      * @param event Event name
      * @param callback Function to remove
      */
-    off(event: string, callback: (...args: any[]) => void): void {
-        if (!this.listeners[event]) {
+    off<K extends keyof Events>(event: K, callback: (...args: Events[K]) => void): void {
+        const key = event as string;
+        if (!this.listeners[key as keyof Events]) {
             return;
         }
 
-        this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+        this.listeners[key as keyof Events] = this.listeners[key as keyof Events]!.filter(cb => cb !== callback);
     }
 
     /**
@@ -56,9 +61,9 @@ export class EventEmitter {
      * 
      * @param event Event name
      */
-    removeAllListeners(event?: string): void {
+    removeAllListeners<K extends keyof Events>(event?: K): void {
         if (event) {
-            delete this.listeners[event];
+            delete this.listeners[event as keyof Events];
         } else {
             this.listeners = {};
         }

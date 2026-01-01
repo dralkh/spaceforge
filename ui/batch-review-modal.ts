@@ -113,7 +113,7 @@ export class BatchReviewModal extends Modal {
     async collectAllMCQs(): Promise<void> {
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("Collecting MCQs").setHeading(); // eslint-disable-line obsidianmd/ui/sentence-case
+        new Setting(contentEl).setName("Collecting MCQs").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Preparing MCQs for ${this.notes.length} notes...` });
         const progressBar = contentEl.createDiv("mcq-collection-progress sf-progress-bar-container-batch");
@@ -172,12 +172,12 @@ export class BatchReviewModal extends Modal {
                 );
                 consolidatedModal.open();
             } catch (_error) {
-                new Notice("Error showing MCQ review. Falling back to manual review."); // eslint-disable-line obsidianmd/ui/sentence-case
+                new Notice("Error showing MCQ review. Falling back to manual review.");
                 this.open();
                 void this.processNextManual();
             }
         } else {
-            new Notice("MCQ controller not available. Falling back to manual review."); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice("MCQ controller not available. Falling back to manual review.");
             this.open();
             void this.processNextManual();
         }
@@ -198,7 +198,7 @@ export class BatchReviewModal extends Modal {
         const note = this.notes[this.currentIndex];
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName("MCQ review in progress").setHeading(); // eslint-disable-line obsidianmd/ui/sentence-case
+        new Setting(contentEl).setName("MCQ review in progress").setHeading();
         const progressEl = contentEl.createDiv("batch-review-progress");
         progressEl.createEl("p", { text: `Processing note ${this.currentIndex + 1}/${this.notes.length}` });
         const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
@@ -254,7 +254,7 @@ export class BatchReviewModal extends Modal {
                 void this.processNextManual();
             }
         } else {
-            new Notice("MCQ controller not available, falling back to manual review."); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice("MCQ controller not available, falling back to manual review.");
             this.open();
             void this.processNextManual();
         }
@@ -285,17 +285,17 @@ export class BatchReviewModal extends Modal {
         }
 
         const buttonsContainer = contentEl.createDiv("batch-review-buttons");
-        const blackoutButton = buttonsContainer.createEl("button", { text: "0: Complete blackout", cls: "review-button review-button-complete-blackout" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        const blackoutButton = buttonsContainer.createEl("button", { text: "0: Complete blackout", cls: "review-button review-button-complete-blackout" });
         blackoutButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CompleteBlackout));
-        const incorrectButton = buttonsContainer.createEl("button", { text: "1: Incorrect response", cls: "review-button review-button-incorrect" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        const incorrectButton = buttonsContainer.createEl("button", { text: "1: Incorrect response", cls: "review-button review-button-incorrect" });
         incorrectButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.IncorrectResponse));
-        const incorrectFamiliarButton = buttonsContainer.createEl("button", { text: "2: Incorrect but familiar", cls: "review-button review-button-incorrect-familiar" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        const incorrectFamiliarButton = buttonsContainer.createEl("button", { text: "2: Incorrect but familiar", cls: "review-button review-button-incorrect-familiar" });
         incorrectFamiliarButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.IncorrectButFamiliar));
-        const correctDifficultyButton = buttonsContainer.createEl("button", { text: "3: Correct with difficulty", cls: "review-button review-button-correct-difficulty" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        const correctDifficultyButton = buttonsContainer.createEl("button", { text: "3: Correct with difficulty", cls: "review-button review-button-correct-difficulty" });
         correctDifficultyButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CorrectWithDifficulty));
-        const correctHesitationButton = buttonsContainer.createEl("button", { text: "4: Correct with hesitation", cls: "review-button review-button-correct-hesitation" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        const correctHesitationButton = buttonsContainer.createEl("button", { text: "4: Correct with hesitation", cls: "review-button review-button-correct-hesitation" });
         correctHesitationButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.CorrectWithHesitation));
-        const perfectRecallButton = buttonsContainer.createEl("button", { text: "5: Perfect recall", cls: "review-button review-button-perfect-recall" }); // eslint-disable-line obsidianmd/ui/sentence-case
+        const perfectRecallButton = buttonsContainer.createEl("button", { text: "5: Perfect recall", cls: "review-button review-button-perfect-recall" });
         perfectRecallButton.addEventListener("click", () => void this.recordManualResult(note.path, ReviewResponse.PerfectRecall));
         const skipButton = buttonsContainer.createEl("button", { text: "Skip", cls: "review-button review-button-skip" });
         skipButton.addEventListener("click", () => {
@@ -322,7 +322,7 @@ export class BatchReviewModal extends Modal {
     showSummary(): void {
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName('MCQ review complete').setHeading().setClass('mcq-review-complete-header'); // eslint-disable-line obsidianmd/ui/sentence-case
+        new Setting(contentEl).setName('MCQ review complete').setHeading().setClass('mcq-review-complete-header');
         const statsEl = contentEl.createDiv("batch-review-summary-stats");
         const totalNotes = this.results.length;
         const successfulNotes = this.results.filter(r => r.success).length;

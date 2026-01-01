@@ -33,14 +33,12 @@ export class OpenRouterService implements IMCQGenerationService {
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         // Check if API key is set
         if (!settings.openRouterApiKey) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('OpenRouter API key is not set, please add it in the settings');
+            new Notice('OpenRouter API key is not set. Please add it in the settings');
             return null;
         }
 
         try {
             // Show loading notice
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using OpenRouter...');
 
             // Determine the number of questions to generate
@@ -65,8 +63,7 @@ export class OpenRouterService implements IMCQGenerationService {
 
             // Ensure we have at least one question if requested
             if (questions.length === 0) {
-                // eslint-disable-next-line obsidianmd/ui/sentence-case
-                new Notice('Failed to generate valid MCQs from OpenRouter, please try again');
+                new Notice('Failed to generate valid MCQs from OpenRouter. Please try again');
                 return null;
             }
 
@@ -79,8 +76,7 @@ export class OpenRouterService implements IMCQGenerationService {
 
             return mcqSet;
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Failed to generate MCQs with OpenRouter, please check console for details');
+            new Notice('Failed to generate MCQs with OpenRouter. Please check console for details');
             return null;
         }
     }
@@ -298,8 +294,7 @@ For example:
             // Use numQuestionsToGenerate instead of settings.mcqQuestionsPerNote
             return questions.slice(0, numQuestionsToGenerate);
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Error parsing MCQ response from OpenRouter, please try again');
+            new Notice('Error parsing MCQ response from OpenRouter. Please try again');
             return [];
         }
     }

@@ -68,12 +68,12 @@ export class MCQController {
         externalOnCompleteCallback?: (path: string, success: boolean) => void
     ): Promise<void> {
         if (!this.plugin.settings.enableMCQ) {
-            new Notice('MCQ feature is disabled in settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('MCQ feature is disabled in settings.');
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
             return;
         }
         if (!this.mcqGenerationService) {
-            new Notice('MCQ generation service is not available. Check API provider settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('MCQ generation service is not available. Check API provider settings.');
             return;
         }
 
@@ -135,7 +135,7 @@ export class MCQController {
             // Pass the new internal callback to the modal constructor
             new MCQModal(this.plugin, notePath, mcqSet, internalOnComplete).open();
         } catch {
-            new Notice('Error starting MCQ review. Please check console for details.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('Error starting MCQ review. Please check console for details.');
             if (externalOnCompleteCallback) externalOnCompleteCallback(notePath, false);
         }
     }
@@ -149,7 +149,7 @@ export class MCQController {
      */
     async generateMCQs(notePath: string, forceRegeneration = false): Promise<MCQSet | null> {
         if (!this.plugin.settings.enableMCQ || !this.mcqGenerationService) {
-            new Notice('MCQ feature is disabled or the generation service is not available. Check API provider settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('MCQ feature is disabled or the generation service is not available. Check API provider settings.');
             return null;
         }
 
@@ -202,11 +202,11 @@ export class MCQController {
      */
     async startConsolidatedMCQReviewForSelectedDate(): Promise<void> {
         if (!this.plugin.settings.enableMCQ) {
-            new Notice('MCQ feature is disabled in settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('MCQ feature is disabled in settings.');
             return;
         }
         if (!this.mcqGenerationService) {
-            new Notice('MCQ generation service is not available. Check API provider settings.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('MCQ generation service is not available. Check API provider settings.');
             return;
         }
 
@@ -295,7 +295,6 @@ export class MCQController {
                 if (reviewsProcessed > 0) {
                     new Notice(`${reviewsProcessed} note review(s) updated based on consolidated MCQ session.`);
                 } else {
-                    // eslint-disable-next-line obsidianmd/ui/sentence-case
                     new Notice("No note reviews were updated from the MCQ session");
                 }
             })();

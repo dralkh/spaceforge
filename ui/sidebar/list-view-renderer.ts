@@ -127,15 +127,15 @@ export class ListViewRenderer {
 
     private _ensureAndUpdateReviewButtonsSection(container: HTMLElement, notesForDisplay: ReviewSchedule[], _selectedNotes: string[]): void {
         // --- Pomodoro Section (Always visible when enabled, independent of notes) ---
-        let pomodoroContainer = container.querySelector(".sidebar-pomodoro-section") as HTMLElement;
+        let pomodoroContainer = container.querySelector<HTMLElement>(".sidebar-pomodoro-section");
         if (!pomodoroContainer) {
             pomodoroContainer = container.createDiv("sidebar-pomodoro-section");
         }
 
-        let pomodoroSectionContainerEl = pomodoroContainer.querySelector(".sidebar-pomodoro-section-container") as HTMLElement;
+        let pomodoroSectionContainerEl = pomodoroContainer.querySelector<HTMLElement>(".sidebar-pomodoro-section-container");
         if (!pomodoroSectionContainerEl) {
             // Check for legacy class names and migrate if found
-            const legacyEl = pomodoroContainer.querySelector(".pomodoro-section-container, .sidebar-pomodoro-button-container") as HTMLElement;
+            const legacyEl = pomodoroContainer.querySelector<HTMLElement>(".pomodoro-section-container, .sidebar-pomodoro-button-container");
             if (legacyEl) {
                 legacyEl.className = "sidebar-pomodoro-section-container";
                 pomodoroSectionContainerEl = legacyEl;
@@ -161,7 +161,7 @@ export class ListViewRenderer {
         }
 
         // --- Review Buttons Section (Only visible when there are notes) ---
-        let reviewButtonsContainer = container.querySelector(".review-buttons-container") as HTMLElement;
+        let reviewButtonsContainer = container.querySelector<HTMLElement>(".review-buttons-container");
 
         // Visibility of review buttons should depend on whether there are notes in the current context (notesForDisplay)
         if (notesForDisplay.length > 0) {
@@ -187,7 +187,7 @@ export class ListViewRenderer {
             reviewButtonsContainer.classList.remove('sf-hidden');
 
             // Bulk action buttons
-            let bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;
+            let bulkActionButtons = container.querySelector<HTMLElement>(".review-bulk-actions");
             if (!bulkActionButtons) {
                 bulkActionButtons = container.createDiv("review-bulk-actions");
                 const reviewSelectedBtn = bulkActionButtons.createEl("button", { text: "Review selected", cls: "review-bulk-button" });
@@ -253,13 +253,13 @@ export class ListViewRenderer {
 
         } else if (reviewButtonsContainer) {
             reviewButtonsContainer.classList.add('sf-hidden');
-            const bulkActionButtons = container.querySelector(".review-bulk-actions") as HTMLElement;
+            const bulkActionButtons = container.querySelector<HTMLElement>(".review-bulk-actions");
             if (bulkActionButtons) bulkActionButtons.toggleClass('sf-hidden', true);
         }
     }
 
     private _ensureAndUpdateAllCaughtUpMessage(container: HTMLElement, dueNotesForStats: ReviewSchedule[], activeListBaseDate: Date | null): void {
-        let caughtUpEl = container.querySelector(".review-all-caught-up") as HTMLElement;
+        let caughtUpEl = container.querySelector<HTMLElement>(".review-all-caught-up");
         if (dueNotesForStats.length === 0 && !activeListBaseDate) {
             if (!caughtUpEl) {
                 caughtUpEl = container.createDiv("review-all-caught-up");
@@ -283,7 +283,7 @@ export class ListViewRenderer {
     }
 
     private async _ensureAndUpdateDateSections(container: HTMLElement, sortedDateKeys: string[], groupedNotes: Record<string, ReviewSchedule[]>): Promise<void> {
-        const existingSectionElements = Array.from(container.querySelectorAll(".review-date-section")) as HTMLElement[];
+        const existingSectionElements = Array.from(container.querySelectorAll<HTMLElement>(".review-date-section"));
         const dataKeysFromData = new Set(sortedDateKeys);
         let notesDisplayed = false;
 
@@ -301,8 +301,8 @@ export class ListViewRenderer {
             if (!notesForSection || notesForSection.length === 0) continue;
             notesDisplayed = true;
 
-            let dateSectionEl = container.querySelector(`.review-date-section[data-date-key="${dateStr}"]`) as HTMLElement;
-            let notesContainerEl: HTMLElement;
+            let dateSectionEl = container.querySelector<HTMLElement>(`.review-date-section[data-date-key="${dateStr}"]`);
+            let notesContainerEl: HTMLElement | null;
 
             if (!dateSectionEl) {
                 dateSectionEl = container.createDiv("review-date-section");
@@ -355,7 +355,7 @@ export class ListViewRenderer {
                 headerRow.createSpan("review-date-time"); // Placeholder for time
                 notesContainerEl = dateSectionEl.createDiv("review-notes-container");
             } else {
-                notesContainerEl = dateSectionEl.querySelector(".review-notes-container") as HTMLElement;
+                notesContainerEl = dateSectionEl.querySelector<HTMLElement>(".review-notes-container");
                 if (!notesContainerEl) { // Should not happen if structure is consistent
                     notesContainerEl = dateSectionEl.createDiv("review-notes-container");
                 }
@@ -372,9 +372,11 @@ export class ListViewRenderer {
                 dateSectionEl.addClass("review-date-section-overdue");
             }
 
-            const headerContainer = dateSectionEl.querySelector(".review-date-header-container") as HTMLElement;
-            const dateHeading = headerContainer.querySelector("h3") as HTMLElement;
-            const reviewTimeEl = dateSectionEl.querySelector(".review-date-time") as HTMLElement;
+            const headerContainer = dateSectionEl.querySelector<HTMLElement>(".review-date-header-container");
+            const dateHeading = headerContainer?.querySelector<HTMLElement>("h3");
+            const reviewTimeEl = dateSectionEl.querySelector<HTMLElement>(".review-date-time");
+
+            if (!headerContainer || !dateHeading) continue;
 
             let displayHeader = dateStr;
             const noteCountText = `${notesForSection.length} ${notesForSection.length === 1 ? 'note' : 'notes'}`;
@@ -390,7 +392,7 @@ export class ListViewRenderer {
             }
             dateHeading.setText(displayHeader);
 
-            let overdueBadge = dateHeading.querySelector(".review-overdue-badge") as HTMLElement | null;
+            let overdueBadge = dateHeading.querySelector<HTMLElement>(".review-overdue-badge");
             const todayActualStart = DateUtils.startOfDay(); // Timestamp for actual today's midnight
 
             // Condition for showing overdue badge:
@@ -432,13 +434,13 @@ export class ListViewRenderer {
 
             let sectionTime = 0;
             for (const note of notesForSection) { sectionTime += await this.plugin.reviewScheduleService.estimateReviewTime(note.path); }
-            reviewTimeEl.setText(`(${EstimationUtils.formatTime(sectionTime)})`);
+            if (reviewTimeEl) reviewTimeEl.setText(`(${EstimationUtils.formatTime(sectionTime)})`);
 
             await this._updateOrRenderNoteList(notesContainerEl, notesForSection, dateStr, container);
         }
 
         // Message for activeListBaseDate with no notes
-        let noNotesForDateMsg = container.querySelector(".review-no-notes-for-date") as HTMLElement;
+        let noNotesForDateMsg = container.querySelector<HTMLElement>(".review-no-notes-for-date");
         const activeListBaseDate = this.getActiveListBaseDate();
         if (activeListBaseDate && !notesDisplayed) {
             if (!noNotesForDateMsg) {
@@ -453,7 +455,7 @@ export class ListViewRenderer {
 
     private _ensureAndUpdateActiveSessionSection(container: HTMLElement): void {
         const activeSession = this.plugin.reviewSessionService.getActiveSession();
-        let sessionSection = container.querySelector(".review-session-section") as HTMLElement;
+        let sessionSection = container.querySelector<HTMLElement>(".review-session-section");
 
         if (activeSession) {
             if (!sessionSection) {
@@ -473,11 +475,17 @@ export class ListViewRenderer {
                 });
             }
             sessionSection.toggleClass('sf-hidden', false);
-            (sessionSection.querySelector(".review-session-name") as HTMLElement).setText(activeSession.name);
-            (sessionSection.querySelector(".review-session-progress") as HTMLElement).setText(`Progress: ${activeSession.currentIndex}/${activeSession.hierarchy.traversalOrder.length}`);
-            const progressBar = sessionSection.querySelector(".review-session-progress-bar") as HTMLElement;
-            const progressPercent = Math.min(100, Math.round((activeSession.currentIndex / activeSession.hierarchy.traversalOrder.length) * 100));
-            progressBar.style.width = `${progressPercent}%`;
+            const nameEl = sessionSection.querySelector<HTMLElement>(".review-session-name");
+            if (nameEl) nameEl.setText(activeSession.name);
+
+            const progressEl = sessionSection.querySelector<HTMLElement>(".review-session-progress");
+            if (progressEl) progressEl.setText(`Progress: ${activeSession.currentIndex}/${activeSession.hierarchy.traversalOrder.length}`);
+
+            const progressBar = sessionSection.querySelector<HTMLElement>(".review-session-progress-bar");
+            if (progressBar) {
+                const progressPercent = Math.min(100, Math.round((activeSession.currentIndex / activeSession.hierarchy.traversalOrder.length) * 100));
+                progressBar.style.width = `${progressPercent}%`;
+            }
         } else if (sessionSection) {
             sessionSection.toggleClass('sf-hidden', true);
         }
@@ -495,7 +503,7 @@ export class ListViewRenderer {
                 return true;
             });
 
-        let upcomingSection = container.querySelector(".review-upcoming-section") as HTMLElement;
+        let upcomingSection = container.querySelector<HTMLElement>(".review-upcoming-section");
 
         if (upcomingKeys.length > 0) {
             if (!upcomingSection) {
@@ -504,10 +512,10 @@ export class ListViewRenderer {
                 upcomingSection.createDiv("review-upcoming-list"); // List container
             }
             upcomingSection.toggleClass('sf-hidden', false);
-            const upcomingListEl = upcomingSection.querySelector(".review-upcoming-list") as HTMLElement;
+            const upcomingListEl = upcomingSection.querySelector<HTMLElement>(".review-upcoming-list");
             if (!upcomingListEl) return; // Should not happen
 
-            const existingDayItemElements = Array.from(upcomingListEl.querySelectorAll(".review-upcoming-day")) as HTMLElement[];
+            const existingDayItemElements = Array.from(upcomingListEl.querySelectorAll<HTMLElement>(".review-upcoming-day"));
 
 
             // Remove stale day items
@@ -528,7 +536,7 @@ export class ListViewRenderer {
                     continue;
                 }
 
-                let dayItemEl = upcomingListEl.querySelector(`.review-upcoming-day[data-day-key="${dayKey}"]`) as HTMLElement;
+                let dayItemEl = upcomingListEl.querySelector<HTMLElement>(`.review-upcoming-day[data-day-key="${dayKey}"]`);
                 if (!dayItemEl) {
                     dayItemEl = upcomingListEl.createDiv("review-upcoming-day");
                     dayItemEl.addClass("clickable");
@@ -536,8 +544,8 @@ export class ListViewRenderer {
                     const daySummary = dayItemEl.createDiv("review-upcoming-day-summary");
                     daySummary.createEl("span", { cls: "review-upcoming-day-name" }); // Placeholder for name
 
-                    dayItemEl.addEventListener("click", () => { // Attach listener once
-                        const currentDayKey = dayItemEl.dataset.dayKey;
+                    dayItemEl.addEventListener("click", (e) => { // Attach listener once
+                        const currentDayKey = (e.currentTarget as HTMLElement).dataset.dayKey;
                         if (!currentDayKey) return;
                         const expandedUpcomingDayKey = this.getExpandedUpcomingDayKey();
                         const isCurrentlyExpanded = expandedUpcomingDayKey === currentDayKey;
@@ -548,7 +556,7 @@ export class ListViewRenderer {
                 }
 
                 // Update summary
-                const daySummaryNameEl = dayItemEl.querySelector(".review-upcoming-day-summary .review-upcoming-day-name") as HTMLElement;
+                const daySummaryNameEl = dayItemEl.querySelector<HTMLElement>(".review-upcoming-day-summary .review-upcoming-day-name");
                 let upcomingDisplayHeader = dayKey;
                 if (notesForDay.length > 0) { // Should always be true here
                     const sampleUpcomingDate = new Date(notesForDay[0].nextReviewDate);
@@ -564,7 +572,7 @@ export class ListViewRenderer {
                 // Handle expanded state
                 const isExpanded = this.getExpandedUpcomingDayKey() === dayKey;
                 dayItemEl.classList.toggle("is-expanded", isExpanded);
-                let notesContainerEl = dayItemEl.querySelector(".review-upcoming-notes-container") as HTMLElement;
+                let notesContainerEl = dayItemEl.querySelector<HTMLElement>(".review-upcoming-notes-container");
 
                 if (isExpanded) {
                     if (!notesContainerEl) {
@@ -591,7 +599,7 @@ export class ListViewRenderer {
         dateStr: string,
         parentContainerForBulkActions: HTMLElement
     ): Promise<void> {
-        const existingNoteElements = Array.from(notesContainer.querySelectorAll('.review-note-item[data-note-path]')) as HTMLElement[];
+        const existingNoteElements = Array.from(notesContainer.querySelectorAll<HTMLElement>('.review-note-item[data-note-path]'));
         const existingNotesMap = new Map(existingNoteElements.map(el => [el.dataset.notePath, el]));
         const notesInOrder: HTMLElement[] = [];
 
@@ -677,13 +685,13 @@ export class ListViewRenderer {
      */
     private updateBulkActionButtonsVisibility(container: HTMLElement): void {
         const selectedNotesPaths = this.getSelectedNotes();
-        const bulkActionsContainer = container.querySelector('.review-bulk-actions') as HTMLElement;
+        const bulkActionsContainer = container.querySelector<HTMLElement>('.review-bulk-actions');
 
         if (bulkActionsContainer) {
             bulkActionsContainer.toggleClass('sf-hidden', selectedNotesPaths.length <= 1);
 
             // Handle visibility/disabled state of "Advance Selected" button
-            const advanceSelectedBtn = bulkActionsContainer.querySelector('.review-bulk-advance') as HTMLButtonElement | null;
+            const advanceSelectedBtn = bulkActionsContainer.querySelector<HTMLButtonElement>('.review-bulk-advance');
             if (advanceSelectedBtn) {
                 if (selectedNotesPaths.length > 1) {
                     const todayStart = DateUtils.startOfDay(new Date()); // Returns timestamp

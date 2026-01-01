@@ -13,13 +13,11 @@ export class OpenAIService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.openaiApiKey) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('OpenAI API key is not set, please add it in the Spaceforge settings');
+            new Notice('OpenAI API key is not set. Please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.openaiModel) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('OpenAI model is not set, please add it in the Spaceforge settings');
+            new Notice('OpenAI model is not set. Please add it in the Spaceforge settings');
             return null;
         }
 
@@ -172,8 +170,7 @@ export class OpenAIService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Error parsing MCQ response from OpenAI, please try again');
+            new Notice('Error parsing MCQ response from OpenAI. Please try again');
             return [];
         }
     }

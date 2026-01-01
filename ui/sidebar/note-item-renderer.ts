@@ -38,7 +38,7 @@ export class NoteItemRenderer {
         }
 
         // Title
-        const titleEl = noteEl.querySelector(".review-note-title") as HTMLElement;
+        const titleEl = noteEl.querySelector<HTMLElement>(".review-note-title");
         if (titleEl) {
             const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
             titleEl.setText(file instanceof TFile ? file.basename : note.path);
@@ -48,8 +48,8 @@ export class NoteItemRenderer {
         const formattedTime = EstimationUtils.formatTime(estimatedTime);
 
         // Phase and Time
-        const phaseEl = noteEl.querySelector(".review-note-phase") as HTMLElement;
-        const timeElOld = noteEl.querySelector(".review-note-time") as HTMLElement; // For non-initial
+        const phaseEl = noteEl.querySelector<HTMLElement>(".review-note-phase");
+        const timeElOld = noteEl.querySelector<HTMLElement>(".review-note-time"); // For non-initial
         if (timeElOld) timeElOld.remove(); // Remove old time element if it exists from a previous state
 
         if (phaseEl) {
@@ -74,8 +74,8 @@ export class NoteItemRenderer {
         }
 
         // Drag handle visibility (buttons are static, drag handle might change)
-        const buttonsEl = noteEl.querySelector(".review-note-buttons") as HTMLElement;
-        const dragHandleEl = buttonsEl?.querySelector(".review-note-drag-handle") as HTMLElement;
+        const buttonsEl = noteEl.querySelector<HTMLElement>(".review-note-buttons");
+        const dragHandleEl = buttonsEl?.querySelector<HTMLElement>(".review-note-drag-handle");
         if (dragHandleEl) { // If it exists, update its state or recreate if logic is complex
             const isDraggable = (dateStr === 'Due notes' || dateStr === 'Today');
             dragHandleEl.classList.toggle("is-disabled", !isDraggable);
@@ -88,7 +88,7 @@ export class NoteItemRenderer {
         }
 
         // Advance button state
-        const advanceBtn = noteEl.querySelector(".review-note-advance") as HTMLButtonElement | null;
+        const advanceBtn = noteEl.querySelector<HTMLButtonElement>(".review-note-advance");
         if (advanceBtn) {
             const todayStartTs = DateUtils.startOfDay(new Date()); // Returns timestamp
             const noteReviewDayStartTs = DateUtils.startOfDay(new Date(note.nextReviewDate)); // Returns timestamp

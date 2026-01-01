@@ -13,18 +13,15 @@ export class TogetherService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.togetherApiKey) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Together AI API key is not set, please add it in the Spaceforge settings');
+            new Notice('Together AI API key is not set. Please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.togetherModel) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Together AI model is not set, please add it in the Spaceforge settings');
+            new Notice('Together AI model is not set. Please add it in the Spaceforge settings');
             return null;
         }
 
         try {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using Together AI...');
 
             // Determine the number of questions to generate
@@ -41,8 +38,7 @@ export class TogetherService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                // eslint-disable-next-line obsidianmd/ui/sentence-case
-                new Notice('Failed to generate valid MCQs from Together AI, please try again');
+                new Notice('Failed to generate valid MCQs from Together AI. Please try again');
                 return null;
             }
 
@@ -52,8 +48,7 @@ export class TogetherService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Failed to generate MCQs with Together AI, please check console for details');
+            new Notice('Failed to generate MCQs with Together AI. Please check console for details');
             return null;
         }
     }
@@ -205,8 +200,7 @@ export class TogetherService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Error parsing MCQ response from Together AI, please try again');
+            new Notice('Error parsing MCQ response from Together AI. Please try again');
             return [];
         }
     }

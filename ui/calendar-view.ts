@@ -101,7 +101,7 @@ export class CalendarView {
     private ensureCalendarBaseStructure(): void {
         if (!this.containerEl) return;
 
-        let calendarContainer = this.containerEl.querySelector(".calendar-container") as HTMLElement;
+        let calendarContainer = this.containerEl.children[1].querySelector<HTMLElement>(".calendar-container");
         if (!calendarContainer) {
             calendarContainer = this.containerEl.createDiv("calendar-container");
         }

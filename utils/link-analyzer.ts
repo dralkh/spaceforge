@@ -161,7 +161,7 @@ export class LinkAnalyzer {
                         }
                     }
                 }
-            } catch (_error) { /* handle error */ }
+            } catch { /* handle error */ }
         }
 
         // Find the node with the most outgoing links as the starting point
@@ -506,6 +506,6 @@ export class LinkAnalyzer {
 
 
             return resolvedLinks;
-        } catch (_error) { /* handle error */ return []; }
+        } catch { /* handle error */ return []; }
     }
 }

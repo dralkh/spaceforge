@@ -79,7 +79,7 @@ export class ReviewModal extends Modal {
 
             const mcqButton = buttonsContainer.createEl("button", { cls: "review-button review-button-mcq" });
             const mcqIconSpan = mcqButton.createSpan("mcq-button-icon"); setIcon(mcqIconSpan, "mcq-quiz");
-            const textSpan = mcqButton.createSpan("mcq-button-text"); textSpan.setText("Test with MCQs"); // eslint-disable-line obsidianmd/ui/sentence-case
+            const textSpan = mcqButton.createSpan("mcq-button-text"); textSpan.setText("Test with MCQs");
 
             mcqButton.addEventListener("click", () => {
                 const mcqController = this.plugin.mcqController;
@@ -100,7 +100,7 @@ export class ReviewModal extends Modal {
                         void initializedMcqController.startMCQReview(this.path);
                         this.close();
                     } else {
-                        new Notice("MCQ feature could not be initialized. Please check settings."); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice("MCQ feature could not be initialized. Please check settings.");
                     }
                 }
             });
@@ -110,7 +110,7 @@ export class ReviewModal extends Modal {
             if (mcqController && this.plugin.mcqService.getMCQSetForNote(this.path)) {
                 const refreshMcqButton = buttonsContainer.createEl("button", { cls: "review-button review-button-mcq-refresh" });
                 const refreshIconSpan = refreshMcqButton.createSpan("mcq-button-icon"); setIcon(refreshIconSpan, "refresh-cw");
-                const refreshTextSpan = refreshMcqButton.createSpan("mcq-button-text"); refreshTextSpan.setText("Generate new MCQs"); // eslint-disable-line obsidianmd/ui/sentence-case
+                const refreshTextSpan = refreshMcqButton.createSpan("mcq-button-text"); refreshTextSpan.setText("Generate new MCQs");
 
                 refreshMcqButton.addEventListener("click", () => {
                     if (mcqController) {
@@ -150,13 +150,13 @@ export class ReviewModal extends Modal {
             if (schedule.lastReviewDate) infoText.createEl("p", { text: `Last reviewed: ${new Date(schedule.lastReviewDate).toLocaleDateString()}` });
 
             if (schedule.schedulingAlgorithm === 'fsrs' && schedule.fsrsData) {
-                infoText.createEl("p", { text: `Algorithm: FSRS`, cls: "review-phase-fsrs" }); // eslint-disable-line obsidianmd/ui/sentence-case
+                infoText.createEl("p", { text: `Algorithm: FSRS`, cls: "review-phase-fsrs" });
                 infoText.createEl("p", { text: `Stability: ${schedule.fsrsData.stability.toFixed(2)}` });
                 infoText.createEl("p", { text: `Difficulty: ${schedule.fsrsData.difficulty.toFixed(2)}` });
                 infoText.createEl("p", { text: `State: ${FsrsState[schedule.fsrsData.state]}` }); // Display FSRS state name
                 infoText.createEl("p", { text: `Interval: ${schedule.fsrsData.scheduled_days} days` });
             } else { // SM-2 or fallback
-                infoText.createEl("p", { text: `Algorithm: SM-2`, cls: "review-phase-sm2" }); // eslint-disable-line obsidianmd/ui/sentence-case
+                infoText.createEl("p", { text: `Algorithm: SM-2`, cls: "review-phase-sm2" });
                 let phaseText: string; let phaseClass: string;
                 if (schedule.scheduleCategory === 'initial') {
                     const totalInitialSteps = this.plugin.settings.initialScheduleCustomIntervals.length;

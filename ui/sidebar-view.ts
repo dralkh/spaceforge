@@ -52,7 +52,7 @@ export class ReviewSidebarView extends ItemView {
     }
 
     getViewType(): string { return "spaceforge-review-schedule"; }
-    getDisplayText(): string { return "Spaceforge Review"; } // eslint-disable-line obsidianmd/ui/sentence-case
+    getDisplayText(): string { return "Spaceforge review"; }
     getIcon(): string { return "calendar-clock"; }
 
     async onOpen(): Promise<void> {
@@ -248,7 +248,7 @@ export class ReviewSidebarView extends ItemView {
         if (this.listViewRenderer) { // Check if renderer is initialized
             await this.listViewRenderer.render(container);
         } else {
-            container.setText("Error: Could not render list view. Renderer not ready."); // eslint-disable-line obsidianmd/ui/sentence-case
+            container.setText("Error: Could not render list view. Renderer not ready.");
         }
     }
 
@@ -267,7 +267,7 @@ export class ReviewSidebarView extends ItemView {
         if (this.calendarView) { // Should always exist due to ensureBaseStructure
             await this.calendarView.render();
         } else {
-            container.setText("Error: Could not render calendar view. CalendarView not ready."); // eslint-disable-line obsidianmd/ui/sentence-case
+            container.setText("Error: Could not render calendar view. CalendarView not ready.");
             return; // Avoid further errors if calendarView is somehow null
         }
 

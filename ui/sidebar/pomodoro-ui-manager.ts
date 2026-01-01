@@ -55,7 +55,7 @@ export class PomodoroUIManager {
             // new Notice("Pomodoro durations updated."); // Removed notification
             return true;
         } else {
-            new Notice("Invalid Pomodoro durations. Settings not saved. Please enter positive numbers."); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice("Invalid Pomodoro durations. Settings not saved. Please enter positive numbers.");
             // Re-populate with current valid settings to prevent saving invalid on next close if not corrected
             if (this.pomodoroQuickWorkInput) this.pomodoroQuickWorkInput.value = String(this.plugin.settings.pomodoroWorkDuration);
             if (this.pomodoroQuickShortInput) this.pomodoroQuickShortInput.value = String(this.plugin.settings.pomodoroShortBreakDuration);
@@ -339,7 +339,7 @@ export class PomodoroUIManager {
             this.pomodoroUserOverrideHoursInput.value = String(this.plugin.pluginState.pomodoroUserOverrideHours);
 
             const hoursLabel = overrideInputsContainer.createSpan("pomodoro-override-label-small");
-            hoursLabel.setText("h"); // eslint-disable-line obsidianmd/ui/sentence-case
+            hoursLabel.setText("h");
 
             this.pomodoroUserOverrideMinutesInput = overrideInputsContainer.createEl("input", { type: "number", cls: "pomodoro-override-minutes" });
             this.pomodoroUserOverrideMinutesInput.setAttr("min", "0");
@@ -347,7 +347,7 @@ export class PomodoroUIManager {
             this.pomodoroUserOverrideMinutesInput.value = String(this.plugin.pluginState.pomodoroUserOverrideMinutes);
 
             const minutesLabel = overrideInputsContainer.createSpan("pomodoro-override-label-small");
-            minutesLabel.setText("m"); // eslint-disable-line obsidianmd/ui/sentence-case
+            minutesLabel.setText("m");
 
             // Add to estimation toggle
             const toggleContainer = overrideContainer.createDiv("pomodoro-override-toggle-container");

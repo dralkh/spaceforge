@@ -63,7 +63,7 @@ export class FsrsScheduleService {
             case FsrsRating.Hard: return TsFsrsRating.Hard;
             case FsrsRating.Good: return TsFsrsRating.Good;
             case FsrsRating.Easy: return TsFsrsRating.Easy;
-            default: throw new Error(`Unknown FsrsRating: ${rating}`);
+            default: throw new Error(`Unknown FsrsRating: ${rating as any}`);
         }
     }
 

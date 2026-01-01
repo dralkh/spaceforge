@@ -29,6 +29,11 @@ import { CalendarEventService } from './services/calendar-event-service';
 /**
  * Spaceforge: Spaced Repetition Plugin for Obsidian
  */
+export interface SpaceforgeEvents {
+    'sidebar-update': [];
+    'pomodoro-update': [];
+}
+
 export default class SpaceforgePlugin extends Plugin {
     settings: SpaceforgeSettings;
     pluginState: PluginStateData;
@@ -56,10 +61,10 @@ export default class SpaceforgePlugin extends Plugin {
     contextMenuHandler: ContextMenuHandler;
     // sidebarView: ReviewSidebarView; // Avoid storing direct references to views
     public clickedDateFromCalendar: Date | null = null;
-    events: EventEmitter;
+    events: EventEmitter<SpaceforgeEvents>;
 
     async onload(): Promise<void> {
-        this.events = new EventEmitter();
+        this.events = new EventEmitter<SpaceforgeEvents>();
 
         // Initialize settings with defaults FIRST
         this.settings = { ...DEFAULT_SETTINGS };
@@ -121,7 +126,6 @@ export default class SpaceforgePlugin extends Plugin {
         EstimationUtils.setPlugin(this);
         this.addIcons();
         this.contextMenuHandler.register();
-        // eslint-disable-next-line obsidianmd/ui/sentence-case
         this.addRibbonIcon('calendar-clock', 'Spaceforge review', async () => {
             await this.activateSidebarView();
         });
@@ -130,7 +134,6 @@ export default class SpaceforgePlugin extends Plugin {
 
         this.addCommand({
             id: 'add-selected-file-to-review',
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
             name: 'Add selected file to review schedule (file explorer)',
             callback: async () => {
                 const fileExplorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
@@ -142,7 +145,7 @@ export default class SpaceforgePlugin extends Plugin {
                         await this.savePluginData();
                         new Notice(`Added "${selectedFile.path}" to review schedule.`);
                     } else {
-                        new Notice("Selected item is not a markdown file."); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice("Selected item is not a markdown file.");
                     }
                 } else {
                     new Notice("No file selected in file explorer");
@@ -222,7 +225,7 @@ export default class SpaceforgePlugin extends Plugin {
                         await this.savePluginData();
                     } catch { /* handle error */ }
                 })();
-            } catch (_error) {
+            } catch {
                 try {
                     const minimalBackup = JSON.stringify({ settings: this.settings, reviewData: { schedules: this.reviewScheduleService.schedules || {}, customNoteOrder: this.reviewScheduleService.customNoteOrder || [], lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp, version: this.manifest.version } });
                     this.app.saveLocalStorage('spaceforge-minimal-backup', minimalBackup);
@@ -232,7 +235,7 @@ export default class SpaceforgePlugin extends Plugin {
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- onunload can be async
     async onunload(): Promise<void> {
         if (this.cssHotReloadIntervalId !== null) {
             window.clearInterval(this.cssHotReloadIntervalId);
@@ -351,7 +354,7 @@ export default class SpaceforgePlugin extends Plugin {
                                 rawLoadedData = JSON.parse(oldJsonData);
                                 // Data will be saved to new path by savePluginData later
                             }
-                        } catch (_migrationReadError) { /* handle error */ }
+                        } catch { /* handle error */ }
                     }
                     if (!rawLoadedData) {
                         new Notice(`Spaceforge: No data file found at custom path ${effectivePath}. New data file will be created on save.`, 3000);
@@ -441,7 +444,7 @@ export default class SpaceforgePlugin extends Plugin {
                     if (parsedBackup.reviewData) {
                         this.settings = { ...DEFAULT_SETTINGS, ...parsedBackup.settings };
                         this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA, ...parsedBackup.reviewData };
-                        new Notice("Spaceforge: Recovered data from backup", 5000); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice("Spaceforge: Recovered data from backup", 5000);
                     } else {
                         throw new Error("Invalid backup format");
                     }
@@ -452,7 +455,7 @@ export default class SpaceforgePlugin extends Plugin {
                 console.warn("Spaceforge: Backup recovery failed, using defaults:", backupError);
                 this.settings = { ...DEFAULT_SETTINGS };
                 this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA };
-                new Notice("Spaceforge: Error loading data, using defaults to prevent crash", 5000); // eslint-disable-line obsidianmd/ui/sentence-case
+                new Notice("Spaceforge: Error loading data, using defaults to prevent crash", 5000);
             }
 
             // Repopulate services
@@ -542,16 +545,16 @@ export default class SpaceforgePlugin extends Plugin {
                     if (oldFile instanceof TFile) {
                         // Instead of deleting, we'll keep the old file as a backup
                         // Users can manually clean it up later if needed
-                        new Notice(`Spaceforge: Successfully saved to custom path, original data file kept as backup for safety`, 5000); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice(`Spaceforge: Successfully saved to custom path, original data file kept as backup for safety`, 5000);
                     }
                 } catch (writeError) {
                     new Notice(`Error saving data to custom path ${effectiveSavePath}: ${writeError.message}. Falling back to default path for this save.`, 10000);
                     // Fallback save to default location if custom path write fails
                     try {
                         await this.saveData(dataToSave); // Plugin's internal save
-                        new Notice(`Spaceforge: Data saved to default plugin folder due to error with custom path`, 5000); // eslint-disable-line obsidianmd/ui/sentence-case
-                    } catch (_error) {
-                        new Notice(`CRITICAL: Spaceforge failed to save data to both custom and default locations`, 10000); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice(`Spaceforge: Data saved to default plugin folder due to error with custom path`, 5000);
+                    } catch {
+                        new Notice(`CRITICAL: Spaceforge failed to save data to both custom and default locations`, 10000);
                     }
                 }
             } else {
@@ -563,8 +566,8 @@ export default class SpaceforgePlugin extends Plugin {
             // Removed localStorage backup for settings as it's not the source of truth for the path anymore.
             // If user wants to backup settings, they can use the export feature.
 
-        } catch (_error) {
-            new Notice("Error saving Spaceforge data, check console for details", 5000); // eslint-disable-line obsidianmd/ui/sentence-case
+        } catch {
+            new Notice("Error saving Spaceforge data. Check console for details", 5000);
         }
     }
 
@@ -583,7 +586,7 @@ export default class SpaceforgePlugin extends Plugin {
                 });
                 void this.app.workspace.revealLeaf(leaf); // Reveal the newly created leaf
             } else {
-                new Notice("Spaceforge: Could not open sidebar view"); // eslint-disable-line obsidianmd/ui/sentence-case
+                new Notice("Spaceforge: Could not open sidebar view");
             }
         }
     }
@@ -613,7 +616,7 @@ export default class SpaceforgePlugin extends Plugin {
                 if (activeFile && activeFile instanceof TFile && activeFile.extension === 'md') {
                     void this.reviewController.reviewNote(activeFile.path);
                 } else {
-                    new Notice('No active markdown file to review'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('No active markdown file to review');
                 }
             },
         });
@@ -628,7 +631,7 @@ export default class SpaceforgePlugin extends Plugin {
                     await this.savePluginData();
                     new Notice(`Added "${activeFile.path}" to review schedule`);
                 } else {
-                    new Notice('No active markdown file to add to review'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('No active markdown file to add to review');
                 }
             },
         });
@@ -643,7 +646,7 @@ export default class SpaceforgePlugin extends Plugin {
                     // Use the same logic as the context menu for consistency
                     await this.contextMenuHandler.addFolderToReview(folder);
                 } else {
-                    new Notice("Could not determine the current note's folder, no active file, or parent is not a folder"); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice("Could not determine the current note's folder, no active file, or parent is not a folder");
                 }
             },
         });
@@ -661,7 +664,7 @@ export default class SpaceforgePlugin extends Plugin {
                 // Pass the mcqService for data management, and the new mcqGenerationService for API calls
                 this.mcqController = new MCQController(this, this.mcqService, this.mcqGenerationService);
             } else {
-                new Notice('MCQ generation service could not be initialized, check API provider settings in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                new Notice('MCQ generation service could not be initialized. Check API provider settings in Spaceforge settings');
             }
         }
     }
@@ -670,37 +673,37 @@ export default class SpaceforgePlugin extends Plugin {
         switch (this.settings.mcqApiProvider) {
             case ApiProvider.OpenRouter:
                 if (!this.settings.openRouterApiKey) {
-                    new Notice('OpenRouter API key is not set in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('OpenRouter API key is not set in Spaceforge settings');
                     return undefined;
                 }
                 return new OpenRouterService(this);
             case ApiProvider.OpenAI:
                 if (!this.settings.openaiApiKey) {
-                    new Notice('OpenAI API key is not set in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('OpenAI API key is not set in Spaceforge settings');
                     return undefined;
                 }
                 return new OpenAIService(this);
             case ApiProvider.Ollama:
                 if (!this.settings.ollamaApiUrl || !this.settings.ollamaModel) {
-                    new Notice('Ollama API URL or model is not set in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('Ollama API URL or model is not set in Spaceforge settings');
                     return undefined;
                 }
                 return new OllamaService(this);
             case ApiProvider.Gemini:
                 if (!this.settings.geminiApiKey) {
-                    new Notice('Gemini API key is not set in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('Gemini API key is not set in Spaceforge settings');
                     return undefined;
                 }
                 return new GeminiService(this);
             case ApiProvider.Claude:
                 if (!this.settings.claudeApiKey || !this.settings.claudeModel) {
-                    new Notice('Claude API key or model is not set in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('Claude API key or model is not set in Spaceforge settings');
                     return undefined;
                 }
                 return new ClaudeService(this);
             case ApiProvider.Together:
                 if (!this.settings.togetherApiKey || !this.settings.togetherModel) {
-                    new Notice('Together AI API key or model is not set in Spaceforge settings'); // eslint-disable-line obsidianmd/ui/sentence-case
+                    new Notice('Together AI API key or model is not set in Spaceforge settings');
                     return undefined;
                 }
                 return new TogetherService(this);
@@ -708,7 +711,7 @@ export default class SpaceforgePlugin extends Plugin {
                 // It's good practice to handle unexpected enum values, even if TypeScript provides some safety.
                 // This could happen if settings data is corrupted or from an older version.
                 // const exhaustiveCheck: never = this.settings.mcqApiProvider; // This will cause a type error now, which is good!
-                new Notice(`Unsupported MCQ API provider selected: ${this.settings.mcqApiProvider}`);
+                new Notice(`Unsupported MCQ API provider selected: ${this.settings.mcqApiProvider as any}`);
                 return undefined;
         }
     }

@@ -76,7 +76,7 @@ export class ReviewScheduleService {
         // Check if file exists and is a markdown file
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
         if (!file || !(file instanceof TFile) || file.extension !== "md") {
-            new Notice("Only markdown files can be added to the review schedule."); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice("Only markdown files can be added to the review schedule.");
             return;
         }
 

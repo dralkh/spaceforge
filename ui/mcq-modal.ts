@@ -75,7 +75,7 @@ export class MCQModal extends Modal {
                             new Notice('Could not find note file to regenerate MCQs.');
                         }
                     } else {
-                        new Notice('MCQ generation service not available.'); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice('MCQ generation service not available.');
                     }
                 })();
             });
@@ -205,7 +205,7 @@ export class MCQModal extends Modal {
         }
         const question = this.mcqSet.questions[questionIndex];
         if (!question || !question.choices || question.choices.length < 2) {
-            new Notice('Error: Invalid question data. Moving to next question.'); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Notice('Error: Invalid question data. Moving to next question.');
             this.session.currentQuestionIndex++;
             if (this.session.currentQuestionIndex < this.mcqSet.questions.length) {
                 this.displayCurrentQuestion(containerEl);
@@ -430,7 +430,7 @@ export class MCQModal extends Modal {
                         resultItem.createDiv({ cls: 'mcq-result-time', text: `Time: ${Math.round(answer.timeToAnswer)} seconds` });
 
                         // FSRS/SM-2 data per question removed from here
-                    } catch (_error) { /* Error displaying answer result: ${error} */ }
+                    } catch { /* Error displaying answer result: ${error} */ }
                 });
             }
             const closeBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
@@ -441,9 +441,9 @@ export class MCQModal extends Modal {
                 }
                 this.close();
             });
-        } catch (_error) {
+        } catch {
             new Setting(contentEl).setName('Error completing session').setHeading();
-            contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            contentEl.createEl('p', { text: 'There was an error completing the MCQ session. Please try again.' });
             const errorCloseBtn = contentEl.createEl('button', { cls: 'mcq-close-btn', text: 'Close' });
             errorCloseBtn.addEventListener('click', () => this.close());
         }
@@ -514,7 +514,7 @@ function getSm2RatingText(rating: number): string {
         case 1: return "Incorrect response";
         case 2: return "Incorrect but familiar";
         case 3: return "Correct with difficulty";
-        case 4: return "Correct with hHesitation";
+        case 4: return "Correct with hesitation";
         case 5: return "Perfect recall";
         default: return "Unknown";
     }

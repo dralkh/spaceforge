@@ -13,18 +13,15 @@ export class OllamaService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.ollamaApiUrl) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Ollama API URL is not set, please add it in the Spaceforge settings');
+            new Notice('Ollama API URL is not set. Please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.ollamaModel) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Ollama model is not set, please add it in the Spaceforge settings');
+            new Notice('Ollama model is not set. Please add it in the Spaceforge settings');
             return null;
         }
 
         try {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using Ollama...');
 
             // Determine the number of questions to generate
@@ -41,8 +38,7 @@ export class OllamaService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                // eslint-disable-next-line obsidianmd/ui/sentence-case
-                new Notice('Failed to generate valid MCQs from Ollama, please try again');
+                new Notice('Failed to generate valid MCQs from Ollama. Please try again');
                 return null;
             }
 
@@ -52,8 +48,7 @@ export class OllamaService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Failed to generate MCQs with Ollama, please check console for details');
+            new Notice('Failed to generate MCQs with Ollama. Please check console for details');
             return null;
         }
     }
@@ -176,8 +171,7 @@ export class OllamaService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Error parsing MCQ response from Ollama, please try again');
+            new Notice('Error parsing MCQ response from Ollama. Please try again');
             return [];
         }
     }

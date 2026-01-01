@@ -134,8 +134,7 @@ export class ReviewBatchController implements IReviewBatchController {
         }
 
         if (!this.plugin.mcqController) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice("MCQ controller not initialized, please check MCQ settings");
+            new Notice("MCQ controller not initialized. Please check MCQ settings");
             return;
         }
 

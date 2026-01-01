@@ -265,7 +265,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             this.display(); // Refresh settings UI
                             void this.plugin.getSidebarView()?.refresh();
 
-                        } catch (_error) {
+                        } catch {
                             new Notice('Failed to clear review data. Check console for details.');
                         }
                     }
@@ -301,7 +301,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             this.display(); // Refresh settings UI
                             void this.plugin.getSidebarView()?.refresh();
 
-                        } catch (_error) {
+                        } catch {
                             new Notice('Failed to clear calendar events. Check console for details.');
                         }
                     }
@@ -360,7 +360,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             this.display(); // Refresh settings UI
                             void this.plugin.getSidebarView()?.refresh();
 
-                        } catch (_error) {
+                        } catch {
                             new Notice('Failed to clear all data. Check console for details.');
                         }
                     }
@@ -383,8 +383,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             .setName('Default scheduling algorithm')
             .setDesc('Choose the default algorithm for newly created notes.')
             .addDropdown(dropdown => dropdown
-                .addOption('sm2', 'SM-2') // eslint-disable-line obsidianmd/ui/sentence-case
-                .addOption('fsrs', 'FSRS') // eslint-disable-line obsidianmd/ui/sentence-case
+                .addOption('sm2', 'SM-2')
+                .addOption('fsrs', 'FSRS')
                 .setValue(this.plugin.settings.defaultSchedulingAlgorithm)
                 .onChange(async (value: 'sm2' | 'fsrs') => {
                     this.plugin.settings.defaultSchedulingAlgorithm = value;
@@ -400,13 +400,13 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const sm2ParamsContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const sm2Summary = sm2ParamsContainer.createEl('summary');
         // Changed to h3
-        sm2Summary.setText('SM-2 parameters'); // eslint-disable-line obsidianmd/ui/sentence-case
+        sm2Summary.setText('SM-2 parameters');
         sm2ParamsContainer.open = false; // Initially closed
 
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: base ease factor') // eslint-disable-line obsidianmd/ui/sentence-case
-            .setDesc('Initial ease factor for new SM-2 notes (2.5 is SM-2 default). Higher ease increases interval growth. Value shown is internal format (250 = 2.5).') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('SM-2: base ease factor')
+            .setDesc('Initial ease factor for new SM-2 notes (2.5 is SM-2 default). Higher ease increases interval growth. Value shown is internal format (250 = 2.5).')
             .addSlider(slider => slider
                 .setLimits(130, 500, 10)
                 .setValue(this.plugin.settings.baseEase)
@@ -417,8 +417,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: use initial learning schedule') // eslint-disable-line obsidianmd/ui/sentence-case
-            .setDesc('For new SM-2 notes, use a fixed set of initial intervals before applying the full algorithm.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('SM-2: use initial learning schedule')
+            .setDesc('For new SM-2 notes, use a fixed set of initial intervals before applying the full algorithm.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.useInitialSchedule)
                 .onChange(async (value: boolean) => {
@@ -429,8 +429,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.useInitialSchedule) {
             new Setting(sm2ParamsContainer)
-                .setName('SM-2: custom initial intervals (days)') // eslint-disable-line obsidianmd/ui/sentence-case
-                .setDesc('Comma-separated list for initial SM-2 reviews (e.g., 0,1,3,7). Must start with 0.') // eslint-disable-line obsidianmd/ui/sentence-case
+                .setName('SM-2: custom initial intervals (days)')
+                .setDesc('Comma-separated list for initial SM-2 reviews (e.g., 0,1,3,7). Must start with 0.')
                 .addText(text => text
                     .setValue(this.plugin.settings.initialScheduleCustomIntervals.join(', '))
                     .onChange(async (value: string) => {
@@ -439,15 +439,15 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             this.plugin.settings.initialScheduleCustomIntervals = intervals;
                             await this.plugin.savePluginData();
                         } else {
-                            new Notice("Custom initial SM-2 intervals must start with 0 and be valid numbers.", 5000); // eslint-disable-line obsidianmd/ui/sentence-case
+                            new Notice("Custom initial SM-2 intervals must start with 0 and be valid numbers.", 5000);
                             text.setValue(this.plugin.settings.initialScheduleCustomIntervals.join(', '));
                         }
                     }));
         }
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: maximum interval (days)') // eslint-disable-line obsidianmd/ui/sentence-case
-            .setDesc('Longest possible interval between SM-2 reviews.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('SM-2: maximum interval (days)')
+            .setDesc('Longest possible interval between SM-2 reviews.')
             .addText(text => text
                 .setValue(this.plugin.settings.maximumInterval.toString())
                 .onChange(async (value: string) => {
@@ -459,8 +459,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(sm2ParamsContainer)
-            .setName('SM-2: load balancing') // eslint-disable-line obsidianmd/ui/sentence-case
-            .setDesc('Add slight randomness to SM-2 intervals to prevent reviews clumping on the same day.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('SM-2: load balancing')
+            .setDesc('Add slight randomness to SM-2 intervals to prevent reviews clumping on the same day.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.loadBalance)
                 .onChange(async (value: boolean) => {
@@ -472,7 +472,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const fsrsParamsContainer = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
         const fsrsSummary = fsrsParamsContainer.createEl('summary');
         // Changed to h3
-        fsrsSummary.setText('FSRS parameters'); // eslint-disable-line obsidianmd/ui/sentence-case
+        fsrsSummary.setText('FSRS parameters');
         fsrsParamsContainer.open = false; // Initially closed
 
         new Setting(fsrsParamsContainer)
@@ -487,13 +487,13 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                     } else {
-                        new Notice("FSRS request retention must be between 0.7 and 0.99."); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice("FSRS request retention must be between 0.7 and 0.99.");
                     }
                 }));
 
         new Setting(fsrsParamsContainer)
             .setName('Maximum interval (days)')
-            .setDesc('Longest possible interval FSRS will schedule.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setDesc('Longest possible interval FSRS will schedule.')
             .addText(text => text
                 .setValue(this.plugin.settings.fsrsParameters?.maximum_interval?.toString() ?? DEFAULT_SETTINGS.fsrsParameters.maximum_interval?.toString() ?? '36500')
                 .onChange(async (value) => {
@@ -503,7 +503,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                     } else {
-                        new Notice("FSRS maximum interval must be a positive number."); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice("FSRS maximum interval must be a positive number.");
                     }
                 }));
 
@@ -523,12 +523,12 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                         this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                     } else {
-                        new Notice("FSRS learning steps must be valid comma-separated numbers > 0, or empty."); // eslint-disable-line obsidianmd/ui/sentence-case
+                        new Notice("FSRS learning steps must be valid comma-separated numbers > 0, or empty.");
                     }
                 }));
         new Setting(fsrsParamsContainer)
             .setName('Enable fuzz')
-            .setDesc('Add slight randomness to FSRS intervals (recommended).') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setDesc('Add slight randomness to FSRS intervals (recommended).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.fsrsParameters?.enable_fuzz ?? DEFAULT_SETTINGS.fsrsParameters.enable_fuzz ?? false)
                 .onChange(async (value) => {
@@ -538,7 +538,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
         new Setting(fsrsParamsContainer)
             .setName('Enable short term scheduling')
-            .setDesc('Use FSRS short-term memory model (affects initial learning steps).') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setDesc('Use FSRS short-term memory model (affects initial learning steps).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.fsrsParameters?.enable_short_term ?? DEFAULT_SETTINGS.fsrsParameters.enable_short_term ?? false)
                 .onChange(async (value) => {
@@ -548,7 +548,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
         new Setting(fsrsParamsContainer)
             .setName('Weights (w)')
-            .setDesc('FSRS algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setDesc('FSRS algorithm parameters (17 numbers). Edit with caution. Default weights are generally good.')
             .addTextArea(text => {
                 text.inputEl.rows = 3;
                 text.inputEl.addClass('sf-full-width-textarea');
@@ -560,7 +560,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                             this.plugin.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
                         } else {
-                            new Notice("FSRS weights must be a comma-separated list of 17 valid numbers."); // eslint-disable-line obsidianmd/ui/sentence-case
+                            new Notice("FSRS weights must be a comma-separated list of 17 valid numbers.");
                         }
                     });
             });
@@ -573,31 +573,31 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         conversionContainer.open = false; // Initially closed
 
         new Setting(conversionContainer)
-            .setName('Convert all SM-2 cards to FSRS') // eslint-disable-line obsidianmd/ui/sentence-case
-            .setDesc('Migrate all existing SM-2 cards to use the FSRS algorithm. This will reset their learning state for FSRS.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('Convert all SM-2 cards to FSRS')
+            .setDesc('Migrate all existing SM-2 cards to use the FSRS algorithm. This will reset their learning state for FSRS.')
             .addButton(button => button
-                .setButtonText('Convert SM-2 to FSRS') // eslint-disable-line obsidianmd/ui/sentence-case
+                .setButtonText('Convert SM-2 to FSRS')
                 .setCta() // Call to action style
                 .onClick(() => {
                     new ConfirmationModal(
                         this.app,
-                        'Convert SM-2 to FSRS', // eslint-disable-line obsidianmd/ui/sentence-case
-                        'Are you sure you want to convert ALL SM-2 cards to FSRS? Their FSRS learning state will be reset. This action cannot be easily undone.', // eslint-disable-line obsidianmd/ui/sentence-case
+                        'Convert SM-2 to FSRS',
+                        'Are you sure you want to convert ALL SM-2 cards to FSRS? Their FSRS learning state will be reset. This action cannot be easily undone.',
                         async () => {
-                            new Notice('Converting SM-2 cards to FSRS... This may take a moment.'); // eslint-disable-line obsidianmd/ui/sentence-case
+                            new Notice('Converting SM-2 cards to FSRS... This may take a moment.');
                             this.plugin.reviewScheduleService.convertAllSm2ToFsrs();
                             await this.plugin.savePluginData();
-                            new Notice('All SM-2 cards have been converted to FSRS.'); // eslint-disable-line obsidianmd/ui/sentence-case
+                            new Notice('All SM-2 cards have been converted to FSRS.');
                             this.display(); // Refresh settings tab
                         }
                     ).open();
                 }));
 
         new Setting(conversionContainer)
-            .setName('Convert all FSRS cards to SM-2') // eslint-disable-line obsidianmd/ui/sentence-case
-            .setDesc('Migrate all existing FSRS cards to use the SM-2 algorithm. Their SM-2 learning state will be initialized with defaults.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('Convert all FSRS cards to SM-2')
+            .setDesc('Migrate all existing FSRS cards to use the SM-2 algorithm. Their SM-2 learning state will be initialized with defaults.')
             .addButton(button => button
-                .setButtonText('Convert FSRS to SM-2') // eslint-disable-line obsidianmd/ui/sentence-case
+                .setButtonText('Convert FSRS to SM-2')
                 .setCta()
                 .onClick(() => {
                     new ConfirmationModal(
@@ -605,10 +605,10 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         'Convert FSRS to SM-2',
                         'Are you sure you want to convert ALL FSRS cards to SM-2? Their SM-2 learning state will be reset to defaults. This action cannot be easily undone.',
                         async () => {
-                            new Notice('Converting FSRS cards to SM-2... This may take a moment.'); // eslint-disable-line obsidianmd/ui/sentence-case
+                            new Notice('Converting FSRS cards to SM-2... This may take a moment.');
                             this.plugin.reviewScheduleService.convertAllFsrsToSm2();
                             await this.plugin.savePluginData();
-                            new Notice('All FSRS cards have been converted to SM-2.'); // eslint-disable-line obsidianmd/ui/sentence-case
+                            new Notice('All FSRS cards have been converted to SM-2.');
                             this.display(); // Refresh settings tab
                         }
                     ).open();
@@ -674,7 +674,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(interfaceSection)
-            .setName('Reading speed (WPM)') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('Reading speed (WPM)')
             .setDesc('Words per minute for estimating review time')
             .addSlider(slider => slider
                 .setLimits(100, 500, 10)
@@ -687,7 +687,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         interfaceSection.createEl('div', {
             cls: 'sf-setting-explain',
-            text: 'Average adults read 200-250 WPM for regular content, 100-150 WPM for technical content' // eslint-disable-line obsidianmd/ui/sentence-case
+            text: 'Average adults read 200-250 WPM for regular content, 100-150 WPM for technical content'
         });
 
         new Setting(interfaceSection)
@@ -756,7 +756,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const mcqSection = createCollapsible('Multiple choice questions', 'newspaper', false); // Closed by default
 
         new Setting(mcqSection)
-            .setName('Enable MCQ feature') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setName('Enable MCQ feature')
             .setDesc('Use AI-generated multiple-choice questions to test your knowledge')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableMCQ)
@@ -878,17 +878,17 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setName('Ollama API URL')
                     .setDesc('URL of your running Ollama instance (e.g., http://localhost:11434)')
                     .addText(text => text
-                        .setPlaceholder('http://localhost:11434') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('http://localhost:11434')
                         .setValue(this.plugin.settings.ollamaApiUrl)
                         .onChange(async (value: string) => {
                             this.plugin.settings.ollamaApiUrl = value;
                             await this.plugin.savePluginData();
                         }));
                 new Setting(mcqSection)
-                    .setName('Ollama model') // eslint-disable-line obsidianmd/ui/sentence-case
-                    .setDesc('Name of the Ollama model to use (e.g., llama3, mistral)') // eslint-disable-line obsidianmd/ui/sentence-case
+                    .setName('Ollama model')
+                    .setDesc('Name of the Ollama model to use (e.g., llama3, mistral)')
                     .addText(text => text
-                        .setPlaceholder('Enter Ollama model name') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter Ollama model name')
                         .setValue(this.plugin.settings.ollamaModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.ollamaModel = value;
@@ -901,9 +901,9 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
                     .setName('Gemini API key')
-                    .setDesc('Your Google AI Gemini API key.') // eslint-disable-line obsidianmd/ui/sentence-case
+                    .setDesc('Your Google AI Gemini API key.')
                     .addText(text => text
-                        .setPlaceholder('Enter your Gemini API key') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter your Gemini API key')
                         .setValue(this.plugin.settings.geminiApiKey)
                         .onChange(async (value: string) => {
                             this.plugin.settings.geminiApiKey = value;
@@ -913,7 +913,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setName('Gemini model')
                     .setDesc('Model name (e.g., gemini-pro)')
                     .addText(text => text
-                        .setPlaceholder('Enter Gemini model name') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter Gemini model name')
                         .setValue(this.plugin.settings.geminiModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.geminiModel = value;
@@ -926,9 +926,9 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
                     .setName('Claude API key')
-                    .setDesc('Your Anthropic Claude API key.') // eslint-disable-line obsidianmd/ui/sentence-case
+                    .setDesc('Your Anthropic Claude API key.')
                     .addText(text => text
-                        .setPlaceholder('Enter your Claude API key') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter your Claude API key')
                         .setValue(this.plugin.settings.claudeApiKey)
                         .onChange(async (value: string) => {
                             this.plugin.settings.claudeApiKey = value;
@@ -938,7 +938,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setName('Claude model')
                     .setDesc('Model name (e.g., claude-3-opus-20240229, claude-3-sonnet-20240229)')
                     .addText(text => text
-                        .setPlaceholder('Enter Claude model name') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter Claude model name')
                         .setValue(this.plugin.settings.claudeModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.claudeModel = value;
@@ -951,9 +951,9 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setClass("sf-settings-subsection-provider-header");
                 new Setting(mcqSection)
                     .setName('Together AI API key')
-                    .setDesc('Your Together AI API key.') // eslint-disable-line obsidianmd/ui/sentence-case
+                    .setDesc('Your Together AI API key.')
                     .addText(text => text
-                        .setPlaceholder('Enter your Together AI API key') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter your Together AI API key')
                         .setValue(this.plugin.settings.togetherApiKey)
                         .onChange(async (value: string) => {
                             this.plugin.settings.togetherApiKey = value;
@@ -963,7 +963,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setName('Together AI model')
                     .setDesc('Model identifier from Together AI (e.g., meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)')
                     .addText(text => text
-                        .setPlaceholder('Enter Together AI model identifier') // eslint-disable-line obsidianmd/ui/sentence-case
+                        .setPlaceholder('Enter Together AI model identifier')
                         .setValue(this.plugin.settings.togetherModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.togetherModel = value;
@@ -1056,7 +1056,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             const promptTypeContainer = mcqFormattingGrid.createEl('div');
             new Setting(promptTypeContainer)
                 .setName('Prompt type')
-                .setDesc('Format for MCQ generation') // eslint-disable-line obsidianmd/ui/sentence-case
+                .setDesc('Format for MCQ generation')
                 .addDropdown(dropdown => dropdown
                     .addOption('basic', 'Basic')
                     .addOption('detailed', 'Detailed')
@@ -1069,7 +1069,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // Second item in grid
             const difficultyContainer = mcqFormattingGrid.createEl('div');
             new Setting(difficultyContainer)
-                .setName('MCQ difficulty') // eslint-disable-line obsidianmd/ui/sentence-case
+                .setName('MCQ difficulty')
                 .setDesc('Complexity level')
                 .addDropdown(dropdown => dropdown
                     .addOption(MCQDifficulty.Basic, 'Basic recall')
@@ -1177,8 +1177,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             if (this.plugin.settings.enableQuestionRegenerationOnRating) {
                 new Setting(mcqSection)
-                    .setName('Min SM-2 rating for MCQ regeneration') // eslint-disable-line obsidianmd/ui/sentence-case
-                    .setDesc('For SM-2: Regenerate MCQs if review rating (0-5) is this value or higher. (0:Blackout, 5:Perfect)') // eslint-disable-line obsidianmd/ui/sentence-case
+                    .setName('Min SM-2 rating for MCQ regeneration')
+                    .setDesc('For SM-2: Regenerate MCQs if review rating (0-5) is this value or higher. (0:Blackout, 5:Perfect)')
                     .addSlider(slider => slider
                         .setLimits(0, 5, 1)
                         .setValue(this.plugin.settings.minSm2RatingForQuestionRegeneration)
@@ -1189,8 +1189,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         }));
 
                 new Setting(mcqSection)
-                    .setName('Min FSRS rating for MCQ regeneration') // eslint-disable-line obsidianmd/ui/sentence-case
-                    .setDesc('For FSRS: Regenerate MCQs if review rating (1-4) is this value or higher. (1:Again, 4:Easy)') // eslint-disable-line obsidianmd/ui/sentence-case
+                    .setName('Min FSRS rating for MCQ regeneration')
+                    .setDesc('For FSRS: Regenerate MCQs if review rating (1-4) is this value or higher. (1:Again, 4:Easy)')
                     .addSlider(slider => slider
                         .setLimits(1, 4, 1) // FSRS ratings are 1-4
                         .setValue(this.plugin.settings.minFsrsRatingForQuestionRegeneration)
@@ -1205,7 +1205,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // If MCQ is disabled, show a message about enabling it
             const mcqDisabledMessage = mcqSection.createEl('div', { cls: 'sf-info-box' });
             mcqDisabledMessage.createEl('p', {
-                text: 'Multiple Choice Questions are currently disabled. Enable it to configure durations and notifications.' // eslint-disable-line obsidianmd/ui/sentence-case
+                text: 'Multiple choice questions are currently disabled. Enable it to configure durations and notifications.'
             });
         }
 
@@ -1214,7 +1214,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         new Setting(pomodoroSection)
             .setName('Enable pomodoro timer')
-            .setDesc('Show the Pomodoro timer in the sidebar.') // eslint-disable-line obsidianmd/ui/sentence-case
+            .setDesc('Show the Pomodoro timer in the sidebar.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.pomodoroEnabled)
                 .onChange(async (value: boolean) => {
@@ -1310,7 +1310,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         } else {
             const pomodoroDisabledMessage = pomodoroSection.createEl('div', { cls: 'sf-info-box' });
             pomodoroDisabledMessage.createEl('p', {
-                text: 'Pomodoro Timer is currently disabled. Enable it to configure durations and notifications.' // eslint-disable-line obsidianmd/ui/sentence-case
+                text: 'Pomodoro timer is currently disabled. Enable it to configure durations and notifications.'
             });
         }
 
@@ -1331,7 +1331,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             .setDesc(locationDesc)
             .addExtraButton(button => button
                 .setIcon('info')
-                .setTooltip('Current location of your Spaceforge data') // eslint-disable-line obsidianmd/ui/sentence-case
+                .setTooltip('Current location of your Spaceforge data')
                 .onClick(() => {
                     const message = this.plugin.settings.useCustomDataPath && this.plugin.settings.customDataPath
                         ? `Your data is stored at: ${this.plugin.settings.customDataPath.endsWith('/data.json') ? this.plugin.settings.customDataPath : `${this.plugin.settings.customDataPath}/data.json`}`
@@ -1385,7 +1385,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         container.empty(); // Clear previous content
 
         if (algorithm === 'sm2') {
-            new Setting(container).setName('About the modified SM-2 algorithm').setHeading(); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Setting(container).setName('About the modified SM-2 algorithm').setHeading();
             container.createEl('p', {
                 text: 'Spaceforge uses a modified version of the SuperMemo SM-2 algorithm (1991) which schedules reviews based on how well you recall information. ' +
                     'When you rate your recall quality from 0-5, the algorithm adjusts the interval and difficulty (ease factor) accordingly.'
@@ -1394,8 +1394,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 text: 'Our implementation includes specific handling for overdue or skipped items to prevent them from accumulating in a backlog:'
             });
             const sm2List = container.createEl('ul');
-            sm2List.createEl('li', { text: 'Overdue items: Automatically set to review tomorrow with a quality rating of 0.' }); // eslint-disable-line obsidianmd/ui/sentence-case
-            sm2List.createEl('li', { text: 'Postponed items: Explicitly moved to tomorrow with a one-step quality penalty.' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            sm2List.createEl('li', { text: 'Overdue items: Automatically set to review tomorrow with a quality rating of 0.' });
+            sm2List.createEl('li', { text: 'Postponed items: Explicitly moved to tomorrow with a one-step quality penalty.' });
             sm2List.createEl('li', { text: 'Both cases reset the repetition count to 1 and update the ease factor.' });
 
             const ratingsTable = container.createEl('table', { cls: 'sf-ratings-table' }); // Added a class for potential styling
@@ -1426,19 +1426,19 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             row4.createEl('td', { text: 'Perfect recall' });
             row4.createEl('td', { text: 'Largest increase' });
         } else if (algorithm === 'fsrs') {
-            new Setting(container).setName('About the FSRS algorithm').setHeading(); // eslint-disable-line obsidianmd/ui/sentence-case
+            new Setting(container).setName('About the FSRS algorithm').setHeading();
             container.createEl('p', {
                 text: 'FSRS (Free Spaced Repetition Scheduler) is a modern, evidence-based algorithm that models memory retention to optimize review schedules. ' +
                     'It calculates card difficulty and stability dynamically based on your review history and aims for a target retention rate.'
-            }); // eslint-disable-line obsidianmd/ui/sentence-case
+            });
             container.createEl('p', {
-                text: 'Key concepts in FSRS:' // eslint-disable-line obsidianmd/ui/sentence-case
+                text: 'Key concepts in FSRS:'
             });
             const fsrsList = container.createEl('ul');
-            fsrsList.createEl('li', { text: 'Difficulty: How hard a card is to remember.' }); // eslint-disable-line obsidianmd/ui/sentence-case
-            fsrsList.createEl('li', { text: 'Stability: How long a card is likely to be remembered.' }); // eslint-disable-line obsidianmd/ui/sentence-case
-            fsrsList.createEl('li', { text: 'Retention: The probability of recalling a card at the time of review.' }); // eslint-disable-line obsidianmd/ui/sentence-case
-            fsrsList.createEl('li', { text: 'Learning Steps: Initial short intervals for new cards (configurable).' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            fsrsList.createEl('li', { text: 'Difficulty: How hard a card is to remember.' });
+            fsrsList.createEl('li', { text: 'Stability: How long a card is likely to be remembered.' });
+            fsrsList.createEl('li', { text: 'Retention: The probability of recalling a card at the time of review.' });
+            fsrsList.createEl('li', { text: 'Learning steps: Initial short intervals for new cards (configurable).' });
 
             const ratingsTable = container.createEl('table', { cls: 'sf-ratings-table' });
             const thead = ratingsTable.createTHead();
@@ -1449,22 +1449,22 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             headerRow.createEl('th', { text: 'Effect on stability/difficulty' });
 
             const row1 = tbody.insertRow();
-            row1.createEl('td', { text: '1 (Again)' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            row1.createEl('td', { text: '1 (Again)' });
             row1.createEl('td', { text: 'Forgot the card' });
             row1.createEl('td', { text: 'Decreases stability, may increase difficulty' });
 
             const row2 = tbody.insertRow();
-            row2.createEl('td', { text: '2 (Hard)' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            row2.createEl('td', { text: '2 (Hard)' });
             row2.createEl('td', { text: 'Recalled with significant difficulty' });
             row2.createEl('td', { text: 'Smaller increase in stability' });
 
             const row3 = tbody.insertRow();
-            row3.createEl('td', { text: '3 (Good)' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            row3.createEl('td', { text: '3 (Good)' });
             row3.createEl('td', { text: 'Recalled correctly' });
             row3.createEl('td', { text: 'Standard increase in stability' });
 
             const row4 = tbody.insertRow();
-            row4.createEl('td', { text: '4 (Easy)' }); // eslint-disable-line obsidianmd/ui/sentence-case
+            row4.createEl('td', { text: '4 (Easy)' });
             row4.createEl('td', { text: 'Recalled easily' });
             row4.createEl('td', { text: 'Largest increase in stability' });
         }

@@ -259,7 +259,7 @@ export class ReviewControllerCore implements IReviewController {
 
         if (advanced) {
             await this.plugin.savePluginData();
-            await this.handleNoteAdvanced(path); // New handler for advancing
+            this.handleNoteAdvanced(path); // New handler for advancing
 
             void this.plugin.getSidebarView()?.refresh();
             new Notice(`Note advanced.`); // Controller handles notice for advance
@@ -320,7 +320,7 @@ export class ReviewControllerCore implements IReviewController {
         }
 
         // Update custom order in storage
-        await this.plugin.dataStorage.reviewScheduleService.updateCustomNoteOrder(this.traversalOrder);
+        this.plugin.dataStorage.reviewScheduleService.updateCustomNoteOrder(this.traversalOrder);
         // Removed redundant savePluginData() here; postponeNote already saves.
 
         // If the postponed note was the current one, select a new note

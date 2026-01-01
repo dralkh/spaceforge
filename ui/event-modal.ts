@@ -246,7 +246,7 @@ export class EventModal extends Modal {
      * Validate form and enable/disable save button
      */
     private validateForm(): void {
-        const saveButton = this.contentEl.querySelector(".event-modal-btn-primary") as HTMLButtonElement;
+        const saveButton = this.contentEl.querySelector<HTMLButtonElement>(".event-modal-btn-primary");
         const isValid = this.titleInput.value.trim() !== "" && this.dateInput.value !== "";
 
         if (saveButton) {

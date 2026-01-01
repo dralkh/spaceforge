@@ -15,18 +15,15 @@ export class GeminiService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.geminiApiKey) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Gemini API key is not set, please add it in the Spaceforge settings');
+            new Notice('Gemini API key is not set. Please add it in the Spaceforge settings');
             return null;
         }
         if (!settings.geminiModel) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Gemini model is not set, please add it in the Spaceforge settings');
+            new Notice('Gemini model is not set. Please add it in the Spaceforge settings');
             return null;
         }
 
         try {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Generating MCQs using Gemini...');
 
             // Determine the number of questions to generate
@@ -43,8 +40,7 @@ export class GeminiService implements IMCQGenerationService {
             const questions = this.parseResponse(response, settings, numQuestionsToGenerate);
 
             if (questions.length === 0) {
-                // eslint-disable-next-line obsidianmd/ui/sentence-case
-                new Notice('Failed to generate valid MCQs from Gemini, please try again');
+                new Notice('Failed to generate valid MCQs from Gemini. Please try again');
                 return null;
             }
 
@@ -54,8 +50,7 @@ export class GeminiService implements IMCQGenerationService {
                 generatedAt: Date.now()
             };
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Failed to generate MCQs with Gemini, please check console for details');
+            new Notice('Failed to generate MCQs with Gemini. Please check console for details');
             return null;
         }
     }
@@ -179,8 +174,7 @@ export class GeminiService implements IMCQGenerationService {
             }
             return questions.slice(0, numQuestionsToGenerate); // Use calculated number
         } catch {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Error parsing MCQ response from Gemini, please try again');
+            new Notice('Error parsing MCQ response from Gemini. Please try again');
             return [];
         }
     }
