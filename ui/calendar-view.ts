@@ -101,7 +101,7 @@ export class CalendarView {
     private ensureCalendarBaseStructure(): void {
         if (!this.containerEl) return;
 
-        let calendarContainer = this.containerEl.children[1].querySelector<HTMLElement>(".calendar-container");
+        let calendarContainer = this.containerEl.querySelector<HTMLElement>(".calendar-container");
         if (!calendarContainer) {
             calendarContainer = this.containerEl.createDiv("calendar-container");
         }
@@ -629,8 +629,8 @@ export class CalendarView {
             top = rect.top - this.tooltipEl.offsetHeight - 8;
         }
 
-        this.tooltipEl.style.left = `${left} px`;
-        this.tooltipEl.style.top = `${top} px`;
+        this.tooltipEl.style.left = `${left}px`;
+        this.tooltipEl.style.top = `${top}px`;
 
         // Add fade-in animation using CSS class
         this.tooltipEl.classList.remove('visible');
