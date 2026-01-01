@@ -235,7 +235,7 @@ export default class SpaceforgePlugin extends Plugin {
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- onunload can be async
+    // @typescript-eslint/no-misused-promises -- onunload can be async
     async onunload(): Promise<void> {
         if (this.cssHotReloadIntervalId !== null) {
             window.clearInterval(this.cssHotReloadIntervalId);

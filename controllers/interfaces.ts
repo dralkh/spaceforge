@@ -58,7 +58,7 @@ export interface IReviewController {
      * 
      * @param path Path to the postponed note
      */
-    handleNotePostponed(path: string): Promise<void>;
+    handleNotePostponed(path: string): void;
 
     /**
      * Get the currently loaded notes due for review

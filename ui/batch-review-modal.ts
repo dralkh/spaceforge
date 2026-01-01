@@ -163,15 +163,13 @@ export class BatchReviewModal extends Modal {
                     this.allMCQSets,
                     (results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>) => {
                         this.results = results;
-                        void (async () => {
-                            await this.recordAllReviews(results);
-                            this.open();
-                            this.showSummary();
-                        })();
+                        this.recordAllReviews(results);
+                        this.open();
+                        this.showSummary();
                     }
                 );
                 consolidatedModal.open();
-            } catch (_error) {
+            } catch {
                 new Notice("Error showing MCQ review. Falling back to manual review.");
                 this.open();
                 void this.processNextManual();
@@ -183,9 +181,9 @@ export class BatchReviewModal extends Modal {
         }
     }
 
-    async recordAllReviews(results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>): Promise<void> {
+    recordAllReviews(results: Array<{ path: string, success: boolean, response: ReviewResponse, score?: number }>): void {
         for (const result of results) {
-            await this.plugin.dataStorage.recordReview(result.path, result.response);
+            this.plugin.dataStorage.recordReview(result.path, result.response);
         }
     }
 
@@ -304,11 +302,11 @@ export class BatchReviewModal extends Modal {
         });
     }
 
-    async recordManualResult(path: string, response: ReviewResponse): Promise<void> {
+    recordManualResult(path: string, response: ReviewResponse): void {
         this.results.push({ path, success: response >= ReviewResponse.CorrectWithDifficulty, response }); // Assuming 3+ is success
 
         // Use the data storage method to get the return value
-        const wasRecorded = await this.plugin.dataStorage.recordReview(path, response);
+        const wasRecorded = this.plugin.dataStorage.recordReview(path, response);
 
         if (!wasRecorded) {
             // Note was not due, this is just a preview

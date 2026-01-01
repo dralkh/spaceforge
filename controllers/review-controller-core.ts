@@ -242,7 +242,7 @@ export class ReviewControllerCore implements IReviewController {
         await this.plugin.savePluginData();
 
         // Explicitly update navigation state in controller to ensure UI consistency
-        await this.handleNotePostponed(path);
+        this.handleNotePostponed(path);
 
         // Refresh the sidebar view if available
         void this.plugin.getSidebarView()?.refresh();
@@ -287,7 +287,7 @@ export class ReviewControllerCore implements IReviewController {
      *
      * @param path Path to the postponed note
      */
-    async handleNotePostponed(path: string): Promise<void> {
+    handleNotePostponed(path: string): void {
 
         if (this.todayNotes.length === 0) return;
 

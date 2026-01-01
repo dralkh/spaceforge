@@ -1,9 +1,9 @@
 /**
  * Simple event emitter implementation
  */
-export type EventMap = Record<string, any[]>;
+export type EventMap = Record<string, unknown[]>;
 
-export class EventEmitter<Events extends { [K in keyof Events]: any[] } = Record<string, any[]>> {
+export class EventEmitter<Events extends { [K in keyof Events]: any[] } = Record<string, unknown[]>> {
     /**
      * Event listeners by event name
      */

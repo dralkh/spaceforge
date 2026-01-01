@@ -13,14 +13,14 @@ export class MCQModal extends Modal {
     questionStartTime = 0;
     isFreshGeneration = false;
     // Modified callback to include score
-    private onCompleteCallback: ((path: string, score: number, completed: boolean) => void) | null;
+    private onCompleteCallback: ((this: void, path: string, score: number, completed: boolean) => void) | null;
     private selectedAnswerIndex = -1;
 
     constructor(
         plugin: SpaceforgePlugin,
         notePath: string,
         mcqSet: MCQSet,
-        onCompleteCallback: ((path: string, score: number, completed: boolean) => void) | null = null
+        onCompleteCallback: ((this: void, path: string, score: number, completed: boolean) => void) | null = null
     ) {
         super(plugin.app);
         this.plugin = plugin;
