@@ -534,28 +534,9 @@
 }
 
 .review-note-item.drag-over {
-  background-color: var(--sf-primary-light);
-  border: 1px dashed var(--sf-primary);
-}
-
-.review-note-item.drag-over-above::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: var(--sf-primary);
-}
-
-.review-note-item.drag-over-below::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: var(--sf-primary);
+  background-color: var(--interactive-accent-hover);
+  border: 2px dashed var(--interactive-accent);
+  transform: scale(1.02);
 }
 
 .review-all-caught-up {

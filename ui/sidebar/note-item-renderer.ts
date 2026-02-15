@@ -287,23 +287,30 @@ export class NoteItemRenderer {
             }
         });
 
+        // Enable dragging on mousedown of the drag handle
         dragHandleEl.addEventListener("mousedown", (e) => {
             e.stopPropagation();
-            // Only enable dragging if not disabled (checked by _populateNoteItemDetails via class)
             if (!dragHandleEl.classList.contains("is-disabled")) {
                 noteEl.setAttribute("draggable", "true");
+                noteEl.classList.add("is-drag-enabled");
             }
         });
+
         noteEl.addEventListener("dragstart", (e) => {
             const path = noteEl.dataset.notePath;
-            if (path && noteEl.getAttribute("draggable") === "true") { // Check if draggable
+            // Only allow drag if it was enabled via drag handle
+            if (path && noteEl.classList.contains("is-drag-enabled")) {
                 e.dataTransfer?.setData("text/plain", path);
+                e.dataTransfer!.effectAllowed = "move";
+                noteEl.classList.add("dragging");
             } else {
-                e.preventDefault(); // Prevent drag if not supposed to be draggable
+                e.preventDefault();
             }
         });
+
         noteEl.addEventListener("dragend", () => {
             noteEl.removeAttribute("draggable");
+            noteEl.classList.remove("is-drag-enabled", "dragging");
         });
 
         noteEl.addEventListener("click", (e: MouseEvent) => {

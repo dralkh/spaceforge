@@ -760,93 +760,116 @@ export class ListViewRenderer {
       * Setup drag-and-drop event handlers for the container
       */
      private setupDragAndDrop(container: HTMLElement): void {
-         // Add drag-over event handler
+         // Track the current drag target for visual feedback
+         let currentDragTarget: HTMLElement | null = null;
+         
+         // Add drag-over event handler - only prevent default to allow drop
          container.addEventListener('dragover', (e) => {
+             // Just allow the drop, don't do expensive calculations here
              e.preventDefault();
-             const target = e.target as HTMLElement;
-             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
-             
-             if (noteItem) {
-                 // Find the drop target container
-                 const notesContainer = noteItem.closest('.review-notes-container');
-                 if (notesContainer) {
-                     // Find all note items in this container
-                     const noteItems = Array.from(notesContainer.querySelectorAll('.review-note-item')) as HTMLElement[];
-                     
-                     // Find the position where we should insert
-                     const targetRect = noteItem.getBoundingClientRect();
-                     const midPoint = targetRect.top + targetRect.height / 2;
-                     
-                     // Remove any existing drag-over indicators
-                     noteItems.forEach(item => item.classList.remove('drag-over', 'drag-over-above', 'drag-over-below'));
-                     
-                     if (e.clientY < midPoint) {
-                         noteItem.classList.add('drag-over', 'drag-over-above');
-                     } else {
-                         noteItem.classList.add('drag-over', 'drag-over-below');
-                     }
-                 }
-             }
          });
 
          // Add drop event handler
          container.addEventListener('drop', async (e) => {
              e.preventDefault();
+             
+             const draggedPath = e.dataTransfer?.getData('text/plain');
+             if (!draggedPath) return;
+             
+             // Find the drop target note item
              const target = e.target as HTMLElement;
              const noteItem = target.closest('.review-note-item') as HTMLElement | null;
-             const draggedPath = e.dataTransfer?.getData('text/plain');
              
-             if (noteItem && draggedPath) {
-                 const notesContainer = noteItem.closest('.review-notes-container');
-                 if (notesContainer) {
-                     // Remove drag-over indicators
-                     const noteItems = Array.from(notesContainer.querySelectorAll('.review-note-item')) as HTMLElement[];
-                     noteItems.forEach(item => item.classList.remove('drag-over', 'drag-over-above', 'drag-over-below'));
-                     
-                     // Find the target note path
-                     const targetPath = noteItem.dataset.notePath;
-                     
-                     if (targetPath && draggedPath !== targetPath) {
-                         // Get the current custom order
-                         const currentOrder = [...this.plugin.reviewScheduleService.customNoteOrder];
-                         
-                         // Find the positions of the dragged and target notes
-                         const draggedIndex = currentOrder.indexOf(draggedPath);
-                         const targetIndex = currentOrder.indexOf(targetPath);
-                         
-                         if (draggedIndex !== -1 && targetIndex !== -1) {
-                             // Remove the dragged note from its current position
-                             currentOrder.splice(draggedIndex, 1);
-                             
-                             // Check if we're dropping above or below the target
-                             const targetRect = noteItem.getBoundingClientRect();
-                             const midPoint = targetRect.top + targetRect.height / 2;
-                             const isAbove = e.clientY < midPoint;
-                             
-                             // Insert the dragged note at the new position
-                             const insertIndex = isAbove ? targetIndex : targetIndex + 1;
-                             currentOrder.splice(insertIndex, 0, draggedPath);
-                             
-                             // Update the custom order
-                             await this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
-                             await this.plugin.savePluginData();
-                             
-                             // Refresh the view to show the new order
-                             await this.refreshSidebarView();
-                         }
-                     }
+             if (!noteItem) return;
+             
+             const targetPath = noteItem.dataset.notePath;
+             if (!targetPath || draggedPath === targetPath) return;
+             
+             // Get due notes to initialize custom order if needed
+             const dueNotes = this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true);
+             
+             // Initialize custom order if empty - use current display order
+             let currentOrder = [...this.plugin.reviewScheduleService.customNoteOrder];
+             if (currentOrder.length === 0) {
+                 // Use the order of currently displayed due notes
+                 currentOrder = dueNotes.map(n => n.path);
+             }
+             
+             // Ensure both paths are in the order
+             if (!currentOrder.includes(draggedPath)) {
+                 currentOrder.push(draggedPath);
+             }
+             if (!currentOrder.includes(targetPath)) {
+                 currentOrder.push(targetPath);
+             }
+             
+             // Find positions
+             const draggedIndex = currentOrder.indexOf(draggedPath);
+             const targetIndex = currentOrder.indexOf(targetPath);
+             
+             if (draggedIndex === -1 || targetIndex === -1) return;
+             
+             // Remove dragged from current position
+             currentOrder.splice(draggedIndex, 1);
+             
+             // Calculate insert position based on mouse Y relative to target
+             const rect = noteItem.getBoundingClientRect();
+             const insertIndex = e.clientY < rect.top + rect.height / 2 
+                 ? targetIndex 
+                 : targetIndex + 1;
+             
+             // Insert at new position
+             currentOrder.splice(insertIndex, 0, draggedPath);
+             
+             // Update and save
+             await this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
+             await this.plugin.savePluginData();
+             
+             // Refresh view
+             await this.refreshSidebarView();
+         });
+
+         // Add drag-enter for visual feedback
+         container.addEventListener('dragenter', (e) => {
+             const target = e.target as HTMLElement;
+             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+             
+             if (noteItem && noteItem !== currentDragTarget) {
+                 // Clear previous target
+                 if (currentDragTarget) {
+                     currentDragTarget.classList.remove('drag-over');
                  }
+                 // Set new target
+                 currentDragTarget = noteItem;
+                 noteItem.classList.add('drag-over');
              }
          });
 
-         // Add drag-leave event handler to clean up indicators
+         // Add drag-leave event handler
          container.addEventListener('dragleave', (e) => {
              const target = e.target as HTMLElement;
              const noteItem = target.closest('.review-note-item') as HTMLElement | null;
              
-             if (noteItem) {
-                 noteItem.classList.remove('drag-over', 'drag-over-above', 'drag-over-below');
+             if (noteItem && noteItem === currentDragTarget) {
+                 // Check if we're actually leaving the element, not just entering a child
+                 const relatedTarget = e.relatedTarget as HTMLElement;
+                 if (!noteItem.contains(relatedTarget)) {
+                     noteItem.classList.remove('drag-over');
+                     currentDragTarget = null;
+                 }
              }
+         });
+
+         // Clean up on drag end
+         container.addEventListener('dragend', () => {
+             if (currentDragTarget) {
+                 currentDragTarget.classList.remove('drag-over');
+                 currentDragTarget = null;
+             }
+             // Clear all drag-over classes as safety
+             container.querySelectorAll('.review-note-item.drag-over').forEach(el => {
+                 el.classList.remove('drag-over');
+             });
          });
      }
 
