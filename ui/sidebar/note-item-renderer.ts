@@ -25,7 +25,7 @@ export class NoteItemRenderer {
         noteEl.removeAttribute("title");
         if (dateStr === "Due notes") {
             noteEl.addClass("overdue-note");
-            const daysOverdue = Math.abs(Math.floor((note.nextReviewDate - DateUtils.startOfDay()) / (24 * 60 * 60 * 1000)));
+            const daysOverdue = Math.abs(Math.floor((note.nextReviewDate - DateUtils.startOfUTCDay()) / (24 * 60 * 60 * 1000)));
             const originalDueDate = new Date(note.nextReviewDate).toLocaleDateString();
             noteEl.setAttribute("title", `Originally due: ${originalDueDate} (${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'} overdue)`);
         }
@@ -90,8 +90,8 @@ export class NoteItemRenderer {
         // Advance button state
         const advanceBtn = noteEl.querySelector<HTMLButtonElement>(".review-note-advance");
         if (advanceBtn) {
-            const todayStartTs = DateUtils.startOfDay(new Date()); // Returns timestamp
-            const noteReviewDayStartTs = DateUtils.startOfDay(new Date(note.nextReviewDate)); // Returns timestamp
+            const todayStartTs = DateUtils.startOfUTCDay(new Date()); // Returns timestamp
+            const noteReviewDayStartTs = DateUtils.startOfUTCDay(new Date(note.nextReviewDate)); // Returns timestamp
             const isEligibleForAdvance = noteReviewDayStartTs > todayStartTs;
             advanceBtn.disabled = !isEligibleForAdvance;
             if (isEligibleForAdvance) {
@@ -335,8 +335,8 @@ export class NoteItemRenderer {
             // Conditional "Advance note" context menu item
             const schedule = this.plugin.reviewScheduleService.schedules[path];
             if (schedule) {
-                const todayStart = DateUtils.startOfDay(new Date()); // Returns timestamp
-                const noteReviewDayStart = DateUtils.startOfDay(new Date(schedule.nextReviewDate)); // Returns timestamp
+                const todayStart = DateUtils.startOfUTCDay(new Date()); // Returns timestamp
+                const noteReviewDayStart = DateUtils.startOfUTCDay(new Date(schedule.nextReviewDate)); // Returns timestamp
                 if (noteReviewDayStart > todayStart) {
                     menu.addItem((item) => item
                         .setTitle("Advance note")

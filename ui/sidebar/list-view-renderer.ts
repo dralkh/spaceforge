@@ -117,7 +117,7 @@ export class ListViewRenderer {
     //         statsCountEl = statsEl.createEl("div", { cls: "review-stats-count" });
     //     }
 
-    //     const overdueNotes = dueNotesForStats.filter(note => note.nextReviewDate < DateUtils.startOfDay());
+    //     const overdueNotes = dueNotesForStats.filter(note => note.nextReviewDate < DateUtils.startOfUTCDay());
     //     let totalTime = 0;
     //     for (const note of dueNotesForStats) {
     //         totalTime += await this.plugin.reviewScheduleService.estimateReviewTime(note.path);
@@ -313,9 +313,9 @@ export class ListViewRenderer {
                 headerContainer.createEl("h3"); // Placeholder for heading
 
                 // "Advance All" button for future sections
-                const todayStart = DateUtils.startOfDay(new Date()); // Returns timestamp
+                const todayStart = DateUtils.startOfUTCDay(new Date()); // Returns timestamp
                 const sectionDateKeyIsFuture = !["Due notes", "Today"].includes(dateStr) &&
-                    (notesForSection[0] && DateUtils.startOfDay(new Date(notesForSection[0].nextReviewDate)) > todayStart);
+                    (notesForSection[0] && DateUtils.startOfUTCDay(new Date(notesForSection[0].nextReviewDate)) > todayStart);
 
                 if (sectionDateKeyIsFuture) {
                     const advanceAllBtn = headerContainer.createEl("button", { text: "Advance all", cls: "review-date-action-button review-date-advance-all" });
@@ -393,7 +393,7 @@ export class ListViewRenderer {
             dateHeading.setText(displayHeader);
 
             let overdueBadge = dateHeading.querySelector<HTMLElement>(".review-overdue-badge");
-            const todayActualStart = DateUtils.startOfDay(); // Timestamp for actual today's midnight
+            const todayActualStart = DateUtils.startOfUTCDay(); // Timestamp for actual today's midnight
 
             // Condition for showing overdue badge:
             // The overdue badge should only show for the "Due notes" section.
@@ -411,7 +411,7 @@ export class ListViewRenderer {
                         //   "Due notes" might be the category for notes *on* that day.
                         //   In this case, overdue days relative to that selected past date will be 0.
                         const baseDate = this.getActiveListBaseDate();
-                        const referenceDateForDiff = baseDate ? DateUtils.startOfDay(baseDate) : todayActualStart;
+                        const referenceDateForDiff = baseDate ? DateUtils.startOfUTCDay(baseDate) : todayActualStart;
                         return Math.floor((referenceDateForDiff - new Date(note.nextReviewDate).getTime()) / (24 * 60 * 60 * 1000));
                     });
                     const maxDays = Math.max(0, ...daysDiff.filter(d => d >= 0 && !isNaN(d))); // Ensure positive days and filter NaN
@@ -497,7 +497,7 @@ export class ListViewRenderer {
         const upcomingKeys = this.getSortedDateKeys(upcomingGroupedNotes)
             .filter(key => {
                 if (key === 'Due notes') return false;
-                const actualTodayStart = DateUtils.startOfDay(new Date());
+                const actualTodayStart = DateUtils.startOfUTCDay(new Date());
                 if (key === DateUtils.formatDate(actualTodayStart, 'relative', null)) return false; // Exclude "Today" if it's empty or handled by main list
                 if (key === DateUtils.formatDate(DateUtils.addDays(actualTodayStart, 1), 'relative', null)) return false; // Exclude "Tomorrow"
                 return true;
@@ -694,10 +694,10 @@ export class ListViewRenderer {
             const advanceSelectedBtn = bulkActionsContainer.querySelector<HTMLButtonElement>('.review-bulk-advance');
             if (advanceSelectedBtn) {
                 if (selectedNotesPaths.length > 1) {
-                    const todayStart = DateUtils.startOfDay(new Date()); // Returns timestamp
+                    const todayStart = DateUtils.startOfUTCDay(new Date()); // Returns timestamp
                     const hasEligibleFutureNote = selectedNotesPaths.some(path => {
                         const schedule = this.plugin.reviewScheduleService.schedules[path];
-                        return schedule && DateUtils.startOfDay(new Date(schedule.nextReviewDate)) > todayStart;
+                        return schedule && DateUtils.startOfUTCDay(new Date(schedule.nextReviewDate)) > todayStart;
                     });
                     advanceSelectedBtn.disabled = !hasEligibleFutureNote;
                     advanceSelectedBtn.toggleClass('sf-hidden', false); // Always show if bulk actions are visible, rely on disabled state
@@ -717,7 +717,7 @@ export class ListViewRenderer {
         if (!headerStatsEl) return;
 
         const dueNotesForStats = this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true);
-        const overdueNotes = dueNotesForStats.filter(note => note.nextReviewDate < DateUtils.startOfDay());
+        const overdueNotes = dueNotesForStats.filter(note => note.nextReviewDate < DateUtils.startOfUTCDay());
         let totalTime = 0;
         for (const note of dueNotesForStats) {
             totalTime += await this.plugin.reviewScheduleService.estimateReviewTime(note.path);
@@ -806,7 +806,7 @@ export class ListViewRenderer {
                     const daysDiff = notesInSection.map(noteEl => {
                         const path = (noteEl as HTMLElement).dataset.notePath;
                         const noteSchedule = path ? this.plugin.reviewScheduleService.schedules[path] : null;
-                        return noteSchedule ? Math.abs(Math.floor((noteSchedule.nextReviewDate - DateUtils.startOfDay()) / (24 * 60 * 60 * 1000))) : 0;
+                        return noteSchedule ? Math.abs(Math.floor((noteSchedule.nextReviewDate - DateUtils.startOfUTCDay()) / (24 * 60 * 60 * 1000))) : 0;
                     });
                     const maxDays = Math.max(0, ...daysDiff.filter(d => !isNaN(d)));
                     if (maxDays > 0) {
@@ -842,13 +842,13 @@ export class ListViewRenderer {
      */
     groupNotesByDate(notes: ReviewSchedule[], _includeFuture = false): Record<string, ReviewSchedule[]> {
         const grouped: Record<string, ReviewSchedule[]> = {};
-        const actualTodayStart = DateUtils.startOfDay(new Date());
+        const actualTodayStart = DateUtils.startOfUTCDay(new Date());
         const activeListBaseDate = this.getActiveListBaseDate();
-        const refDateForFilteringStart = activeListBaseDate ? DateUtils.startOfDay(new Date(activeListBaseDate)) : actualTodayStart;
+        const refDateForFilteringStart = activeListBaseDate ? DateUtils.startOfUTCDay(new Date(activeListBaseDate)) : actualTodayStart;
 
         for (const note of notes) {
             const noteDate = new Date(note.nextReviewDate);
-            const noteDateStart = DateUtils.startOfDay(noteDate); // Timestamp for note's due day midnight
+            const noteDateStart = DateUtils.startOfUTCDay(noteDate); // Timestamp for note's due day midnight (UTC)
 
             if (activeListBaseDate) {
                 // When a specific date is selected from the calendar (activeListBaseDate is set),

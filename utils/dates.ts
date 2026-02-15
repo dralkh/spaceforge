@@ -40,8 +40,8 @@ export class DateUtils {
             // Determine the reference date for relative calculations
 
             // Normalize dates to their start of day for accurate day-based comparison
-            const normalizedNoteEventDate = this.startOfDay(noteEventDate);
-            const normalizedActualCurrentDate = this.startOfDay(new Date()); // Actual current day, for "Due notes"
+            const normalizedNoteEventDate = this.startOfUTCDay(noteEventDate);
+            const normalizedActualCurrentDate = this.startOfUTCDay(new Date()); // Actual current day, for "Due notes"
 
             // "Due notes" are always relative to the *actual* current day, regardless of baseDateParam
             if (normalizedNoteEventDate < normalizedActualCurrentDate) {
@@ -52,11 +52,11 @@ export class DateUtils {
             // The label for the group of notes (which are all for baseDateParam's day)
             // should reflect how baseDateParam's day relates to the actual current day.
             if (baseDateParam) {
-                const normalizedBaseDate = this.startOfDay(new Date(baseDateParam)); // The day being viewed in the calendar
+                const normalizedBaseDate = this.startOfUTCDay(new Date(baseDateParam)); // The day being viewed in the calendar
 
                 if (normalizedBaseDate === normalizedActualCurrentDate) {
                     return 'Today'; // e.g., Calendar view is set to actual today
-                } else if (normalizedBaseDate === this.startOfDay(new Date(this.addDays(normalizedActualCurrentDate, 1)))) {
+                } else if (normalizedBaseDate === this.startOfUTCDay(new Date(this.addDays(normalizedActualCurrentDate, 1)))) {
                     return 'Tomorrow'; // e.g., Calendar view is set to actual tomorrow
                 } else {
                     // Calendar view is set to a specific day that is not actual today or actual tomorrow.
