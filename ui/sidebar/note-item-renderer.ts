@@ -37,6 +37,22 @@ export class NoteItemRenderer {
             noteEl.removeClass("selected");
         }
 
+        // Recurrence status
+        const isRecurring = this.plugin.recurringNotesService.isNoteRecurring(note.path);
+        if (isRecurring) {
+            noteEl.addClass("recurring-note");
+            const recurrenceInfo = this.plugin.recurringNotesService.getRecurrenceInfo(note.path);
+            if (recurrenceInfo) {
+                const recurrenceBadge = noteEl.querySelector('.recurrence-badge') || noteEl.createSpan('recurrence-badge');
+                recurrenceBadge.setText(`↻ ${recurrenceInfo.interval}d`);
+                (recurrenceBadge as HTMLElement).title = `This note recurs every ${recurrenceInfo.interval} days`;
+            }
+        } else {
+            noteEl.removeClass("recurring-note");
+            const existingBadge = noteEl.querySelector('.recurrence-badge');
+            if (existingBadge) existingBadge.remove();
+        }
+
         // Title
         const titleEl = noteEl.querySelector<HTMLElement>(".review-note-title");
         if (titleEl) {
@@ -156,6 +172,11 @@ export class NoteItemRenderer {
         setIcon(removeBtn, "trash-2");
         removeBtn.title = "Remove";
 
+        // Add recurrence button
+        const recurrenceBtn = actionBtnsEl.createEl("button", { cls: "review-note-button review-note-recurrence" });
+        setIcon(recurrenceBtn, "repeat");
+        recurrenceBtn.title = "Toggle recurrence";
+
         const dragHandleEl = buttonsEl.createDiv("review-note-drag-handle"); // Create drag handle structure
         dragHandleEl.setAttribute('aria-label', 'Drag to reorder');
         for (let i = 0; i < 3; i++) {
@@ -216,29 +237,53 @@ export class NoteItemRenderer {
             }
         });
 
-        removeBtn.addEventListener("click", (e) => {
+         removeBtn.addEventListener("click", (e) => {
+             e.stopPropagation();
+             const path = noteEl.dataset.notePath;
+             if (path) {
+                 const file = this.plugin.app.vault.getAbstractFileByPath(path);
+                 new ConfirmationModal(
+                     this.plugin.app,
+                     'Remove Note',
+                     `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
+                     () => {
+                         void (async () => {
+                             try {
+                                 this.plugin.reviewScheduleService.removeFromReview(path);
+                                 await this.plugin.savePluginData();
+                                 new Notice(`Note removed from review schedule`);
+                                 await onNoteAction();
+                             } catch (_error) {
+                                 new Notice("Failed to remove note from schedule.");
+                                 await onNoteAction();
+                             }
+                         })();
+                     }
+                 ).open();
+             }
+         });
+
+        // Add event handler for recurrence button
+        recurrenceBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             const path = noteEl.dataset.notePath;
             if (path) {
-                const file = this.plugin.app.vault.getAbstractFileByPath(path);
-                new ConfirmationModal(
-                    this.plugin.app,
-                    'Remove Note',
-                    `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
-                    () => {
-                        void (async () => {
-                            try {
-                                this.plugin.reviewScheduleService.removeFromReview(path);
-                                await this.plugin.savePluginData();
-                                new Notice(`Note removed from review schedule`);
-                                await onNoteAction();
-                            } catch (_error) {
-                                new Notice("Failed to remove note from schedule.");
-                                await onNoteAction();
-                            }
-                        })();
+                void (async () => {
+                    const isCurrentlyRecurring = this.plugin.recurringNotesService.isNoteRecurring(path);
+                    
+                    if (isCurrentlyRecurring) {
+                        // Convert back to regular note
+                        await this.plugin.recurringNotesService.convertToRegularNote(path);
+                        new Notice(`Note is no longer recurring`);
+                    } else {
+                        // Convert to recurring note with default interval
+                        const defaultInterval = this.plugin.settings.defaultRecurrenceInterval;
+                        await this.plugin.recurringNotesService.convertToRecurringNote(path, defaultInterval);
+                        new Notice(`Note is now recurring every ${defaultInterval} days`);
                     }
-                ).open();
+                    
+                    await onNoteAction();
+                })();
             }
         });
 
@@ -349,25 +394,64 @@ export class NoteItemRenderer {
                 }
             }
 
-            menu.addItem((item) => item
-                .setTitle("Remove from review")
-                .setIcon("trash")
-                .onClick(() => {
-                    const file = this.plugin.app.vault.getAbstractFileByPath(path);
-                    new ConfirmationModal(
-                        this.plugin.app,
-                        'Remove Note',
-                        `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
-                        () => {
-                            void (async () => {
-                                this.plugin.reviewScheduleService.removeFromReview(path);
-                                await this.plugin.savePluginData();
-                                new Notice("Note removed from review schedule.");
-                                await onNoteAction();
-                            })();
+            // Add recurrence context menu items
+            const isCurrentlyRecurring = this.plugin.recurringNotesService.isNoteRecurring(path);
+            if (isCurrentlyRecurring) {
+                menu.addItem((item) => item
+                    .setTitle("Stop recurrence")
+                    .setIcon("x-circle")
+                    .onClick(async () => {
+                        await this.plugin.recurringNotesService.convertToRegularNote(path);
+                        new Notice("Note is no longer recurring");
+                        await onNoteAction();
+                    }));
+                
+                // Add option to change recurrence interval
+                menu.addItem((item) => item
+                    .setTitle("Change recurrence interval")
+                    .setIcon("calendar-range")
+                    .onClick(async () => {
+                        const recurrenceInfo = this.plugin.recurringNotesService.getRecurrenceInfo(path);
+                        if (recurrenceInfo) {
+                            // For now, just cycle through common intervals
+                            const currentInterval = recurrenceInfo.interval;
+                            const newInterval = currentInterval === 7 ? 14 : currentInterval === 14 ? 30 : 7;
+                            await this.plugin.recurringNotesService.updateRecurrenceInterval(path, newInterval);
+                            new Notice(`Recurrence interval changed to ${newInterval} days`);
+                            await onNoteAction();
                         }
-                    ).open();
-                }));
+                    }));
+            } else {
+                menu.addItem((item) => item
+                    .setTitle("Make recurring")
+                    .setIcon("repeat")
+                    .onClick(async () => {
+                        const defaultInterval = this.plugin.settings.defaultRecurrenceInterval;
+                        await this.plugin.recurringNotesService.convertToRecurringNote(path, defaultInterval);
+                        new Notice(`Note is now recurring every ${defaultInterval} days`);
+                        await onNoteAction();
+                    }));
+            }
+
+            menu.addItem((item) => item
+                 .setTitle("Remove from review")
+                 .setIcon("trash")
+                 .onClick(() => {
+                     const file = this.plugin.app.vault.getAbstractFileByPath(path);
+                     new ConfirmationModal(
+                         this.plugin.app,
+                         'Remove Note',
+                         `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
+                         () => {
+                             void (async () => {
+                                 this.plugin.reviewScheduleService.removeFromReview(path);
+                                 await this.plugin.savePluginData();
+                                 new Notice("Note removed from review schedule.");
+                                 await onNoteAction();
+                             })();
+                         }
+                     ).open();
+                 }));
             menu.showAtMouseEvent(e);
         });
 

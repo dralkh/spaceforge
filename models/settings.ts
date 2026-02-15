@@ -335,6 +335,18 @@ export interface SpaceforgeSettings {
      * Default: 'personal'
      */
     defaultEventCategory: string;
+    
+    /**
+     * Enable recurring notes feature
+     * Default: false
+     */
+    enableRecurringNotes: boolean;
+    
+    /**
+     * Default recurrence interval for new recurring notes (in days)
+     * Default: 7
+     */
+    defaultRecurrenceInterval: number;
 }
 
 /**
@@ -434,4 +446,8 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     showUpcomingEvents: true,
     upcomingEventsDays: 7,
     defaultEventCategory: 'personal',
+    
+    // Recurring Notes Defaults
+    enableRecurringNotes: false,
+    defaultRecurrenceInterval: 7,
 };

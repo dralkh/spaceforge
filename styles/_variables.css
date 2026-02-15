@@ -21,6 +21,11 @@
   --sf-overdue-accent: #ff8c42; /* Warm orange/amber */
   --sf-overdue-bg: rgba(255, 140, 66, 0.08); /* Very light orange tint */
   
+  /* Recurring colors - aligned with other button backgrounds */
+  --sf-recurring-accent: var(--interactive-accent, #5e81ac); /* Use same accent color as other buttons */
+  --sf-recurring-accent-hover: color-mix(in srgb, var(--interactive-accent, #5e81ac), white 85%); /* Lighter version for hover */
+  --sf-recurring-bg: rgba(94, 129, 172, 0.05); /* Very light blue tint to match accent */
+  
   /* Text colors */
   --sf-text: var(--text-normal, #333);
   --sf-text-muted: var(--text-muted, #888);

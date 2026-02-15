@@ -65,6 +65,12 @@ export interface ReviewSchedule {
     };
 
     schedulingAlgorithm: 'sm2' | 'fsrs'; // Determines which algo rules apply
+    
+    // Recurring notes settings
+    isRecurring?: boolean;
+    recurrenceInterval?: number; // Interval in days for recurring notes
+    recurrenceEndDate?: number | null; // Optional end date for recurrence (timestamp)
+    originalSchedule?: ReviewSchedule | null; // Store original schedule for reference
 }
 
 // Removed INITIAL_INTERVALS, isInitialPhase, and getInitialInterval.

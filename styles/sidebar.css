@@ -367,6 +367,7 @@
   flex-wrap: wrap;
   transition: var(--sf-transition);
   border: 1px solid transparent;
+  position: relative;
 }
 
 .review-note-item:last-child {
@@ -535,6 +536,26 @@
 .review-note-item.drag-over {
   background-color: var(--sf-primary-light);
   border: 1px dashed var(--sf-primary);
+}
+
+.review-note-item.drag-over-above::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--sf-primary);
+}
+
+.review-note-item.drag-over-below::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--sf-primary);
 }
 
 .review-all-caught-up {
@@ -909,4 +930,39 @@
 }
 .pomodoro-container.is-idle .pomodoro-timer-display {
   opacity: 0.5; /* Dim timer more when idle */
+}
+
+/* Recurring Notes Styles */
+.review-note-item.recurring-note {
+  border-left: 3px solid var(--sf-recurring-accent);
+  background-color: var(--sf-recurring-bg);
+}
+
+.recurrence-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 100px;
+  background-color: var(--sf-recurring-accent);
+  color: white;
+  font-weight: 500;
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.recurrence-badge::before {
+  content: "↻";
+  font-size: 10px;
+}
+
+.review-note-button.review-note-recurrence {
+  background-color: var(--sf-recurring-accent);
+  color: white;
+  border-color: var(--sf-recurring-accent);
+}
+
+.review-note-button.review-note-recurrence:hover {
+  background-color: var(--sf-recurring-accent-hover);
+  border-color: var(--sf-recurring-accent-hover);
 }

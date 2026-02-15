@@ -25,6 +25,7 @@ import { ReviewSessionService } from './services/review-session-service';
 import { MCQService } from './services/mcq-service';
 import { PomodoroService } from './services/pomodoro-service';
 import { CalendarEventService } from './services/calendar-event-service';
+import { RecurringNotesService } from './services/recurring-notes-service';
 
 /**
  * Spaceforge: Spaced Repetition Plugin for Obsidian
@@ -44,6 +45,7 @@ export default class SpaceforgePlugin extends Plugin {
     mcqService: MCQService;
     pomodoroService: PomodoroService;
     calendarEventService: CalendarEventService;
+    recurringNotesService: RecurringNotesService;
 
 
     private readonly stylesheetPath: string = "styles.css";
@@ -98,6 +100,9 @@ export default class SpaceforgePlugin extends Plugin {
         this.calendarEventService = new CalendarEventService();
         const eventsArray = Object.values(this.pluginState.calendarEvents);
         this.calendarEventService.initialize(eventsArray);
+
+        // Initialize RecurringNotesService after settings are loaded
+        this.recurringNotesService = new RecurringNotesService(this);
 
 
 

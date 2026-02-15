@@ -54,16 +54,19 @@ export class ListViewRenderer {
         this.refreshSidebarView = stateAccessors.refreshSidebarView;
     }
 
-    /**
-     * Render the list view content into the provided container.
-     * @param container Container element for list view content
-     */
-    async render(container: HTMLElement): Promise<void> {
-        // container.empty(); // Clear only the list view content area -- REMOVED
+     /**
+      * Render the list view content into the provided container.
+      * @param container Container element for list view content
+      */
+     async render(container: HTMLElement): Promise<void> {
+         // container.empty(); // Clear only the list view content area -- REMOVED
 
-        const activeListBaseDate = this.getActiveListBaseDate();
-        const selectedNotes = this.getSelectedNotes();
-        const dueNotesForStats = this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true);
+         const activeListBaseDate = this.getActiveListBaseDate();
+         const selectedNotes = this.getSelectedNotes();
+         const dueNotesForStats = this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true);
+
+         // Setup drag-and-drop event handlers for the container
+         this.setupDragAndDrop(container);
 
         // --- Stats Section (REMOVED as per user request) ---
         // await this._ensureAndUpdateStatsSection(container, dueNotesForStats);
@@ -727,31 +730,125 @@ export class ListViewRenderer {
      * Updates the visibility of the bulk action buttons based on selection count.
      * (Called by handleSelectionChange and render)
      */
-    private updateBulkActionButtonsVisibility(container: HTMLElement): void {
-        const selectedNotesPaths = this.getSelectedNotes();
-        const bulkActionsContainer = container.querySelector<HTMLElement>('.review-bulk-actions');
+     private updateBulkActionButtonsVisibility(container: HTMLElement): void {
+         const selectedNotesPaths = this.getSelectedNotes();
+         const bulkActionsContainer = container.querySelector<HTMLElement>('.review-bulk-actions');
 
-        if (bulkActionsContainer) {
-            bulkActionsContainer.toggleClass('sf-hidden', selectedNotesPaths.length <= 1);
+         if (bulkActionsContainer) {
+             bulkActionsContainer.toggleClass('sf-hidden', selectedNotesPaths.length <= 1);
 
-            // Handle visibility/disabled state of "Advance Selected" button
-            const advanceSelectedBtn = bulkActionsContainer.querySelector<HTMLButtonElement>('.review-bulk-advance');
-            if (advanceSelectedBtn) {
-                if (selectedNotesPaths.length > 1) {
-                    const todayStart = DateUtils.startOfUTCDay(new Date()); // Returns timestamp
-                    const hasEligibleFutureNote = selectedNotesPaths.some(path => {
-                        const schedule = this.plugin.reviewScheduleService.schedules[path];
-                        return schedule && DateUtils.startOfUTCDay(new Date(schedule.nextReviewDate)) > todayStart;
-                    });
-                    advanceSelectedBtn.disabled = !hasEligibleFutureNote;
-                    advanceSelectedBtn.toggleClass('sf-hidden', false); // Always show if bulk actions are visible, rely on disabled state
-                } else {
-                    advanceSelectedBtn.disabled = true;
-                    // advanceSelectedBtn.style.display = 'none'; // Or hide if no selection
-                }
-            }
-        }
-    }
+             // Handle visibility/disabled state of "Advance Selected" button
+             const advanceSelectedBtn = bulkActionsContainer.querySelector<HTMLButtonElement>('.review-bulk-advance');
+             if (advanceSelectedBtn) {
+                 if (selectedNotesPaths.length > 1) {
+                     const todayStart = DateUtils.startOfUTCDay(new Date()); // Returns timestamp
+                     const hasEligibleFutureNote = selectedNotesPaths.some(path => {
+                         const schedule = this.plugin.reviewScheduleService.schedules[path];
+                         return schedule && DateUtils.startOfUTCDay(new Date(schedule.nextReviewDate)) > todayStart;
+                     });
+                     advanceSelectedBtn.disabled = !hasEligibleFutureNote;
+                     advanceSelectedBtn.toggleClass('sf-hidden', false); // Always show if bulk actions are visible, rely on disabled state
+                 } else {
+                     advanceSelectedBtn.disabled = true;
+                     // advanceSelectedBtn.style.display = 'none'; // Or hide if no selection
+                 }
+             }
+         }
+     }
+
+     /**
+      * Setup drag-and-drop event handlers for the container
+      */
+     private setupDragAndDrop(container: HTMLElement): void {
+         // Add drag-over event handler
+         container.addEventListener('dragover', (e) => {
+             e.preventDefault();
+             const target = e.target as HTMLElement;
+             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+             
+             if (noteItem) {
+                 // Find the drop target container
+                 const notesContainer = noteItem.closest('.review-notes-container');
+                 if (notesContainer) {
+                     // Find all note items in this container
+                     const noteItems = Array.from(notesContainer.querySelectorAll('.review-note-item')) as HTMLElement[];
+                     
+                     // Find the position where we should insert
+                     const targetRect = noteItem.getBoundingClientRect();
+                     const midPoint = targetRect.top + targetRect.height / 2;
+                     
+                     // Remove any existing drag-over indicators
+                     noteItems.forEach(item => item.classList.remove('drag-over', 'drag-over-above', 'drag-over-below'));
+                     
+                     if (e.clientY < midPoint) {
+                         noteItem.classList.add('drag-over', 'drag-over-above');
+                     } else {
+                         noteItem.classList.add('drag-over', 'drag-over-below');
+                     }
+                 }
+             }
+         });
+
+         // Add drop event handler
+         container.addEventListener('drop', async (e) => {
+             e.preventDefault();
+             const target = e.target as HTMLElement;
+             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+             const draggedPath = e.dataTransfer?.getData('text/plain');
+             
+             if (noteItem && draggedPath) {
+                 const notesContainer = noteItem.closest('.review-notes-container');
+                 if (notesContainer) {
+                     // Remove drag-over indicators
+                     const noteItems = Array.from(notesContainer.querySelectorAll('.review-note-item')) as HTMLElement[];
+                     noteItems.forEach(item => item.classList.remove('drag-over', 'drag-over-above', 'drag-over-below'));
+                     
+                     // Find the target note path
+                     const targetPath = noteItem.dataset.notePath;
+                     
+                     if (targetPath && draggedPath !== targetPath) {
+                         // Get the current custom order
+                         const currentOrder = [...this.plugin.reviewScheduleService.customNoteOrder];
+                         
+                         // Find the positions of the dragged and target notes
+                         const draggedIndex = currentOrder.indexOf(draggedPath);
+                         const targetIndex = currentOrder.indexOf(targetPath);
+                         
+                         if (draggedIndex !== -1 && targetIndex !== -1) {
+                             // Remove the dragged note from its current position
+                             currentOrder.splice(draggedIndex, 1);
+                             
+                             // Check if we're dropping above or below the target
+                             const targetRect = noteItem.getBoundingClientRect();
+                             const midPoint = targetRect.top + targetRect.height / 2;
+                             const isAbove = e.clientY < midPoint;
+                             
+                             // Insert the dragged note at the new position
+                             const insertIndex = isAbove ? targetIndex : targetIndex + 1;
+                             currentOrder.splice(insertIndex, 0, draggedPath);
+                             
+                             // Update the custom order
+                             await this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
+                             await this.plugin.savePluginData();
+                             
+                             // Refresh the view to show the new order
+                             await this.refreshSidebarView();
+                         }
+                     }
+                 }
+             }
+         });
+
+         // Add drag-leave event handler to clean up indicators
+         container.addEventListener('dragleave', (e) => {
+             const target = e.target as HTMLElement;
+             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+             
+             if (noteItem) {
+                 noteItem.classList.remove('drag-over', 'drag-over-above', 'drag-over-below');
+             }
+         });
+     }
 
     /**
      * Updates the main header statistics display.
