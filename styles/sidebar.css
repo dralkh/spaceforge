@@ -254,6 +254,28 @@
   transform: translateY(0);
 }
 
+.review-selection-info {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: center;
+  margin-bottom: var(--sf-space-sm);
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  border-radius: var(--sf-radius-sm);
+  background-color: var(--background-modifier-border);
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  width: 100%;
+}
+
+.review-selection-count {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.review-selection-time {
+  color: var(--text-accent);
+  font-weight: 500;
+}
 
 .review-date-section {
   margin-bottom: var(--sf-space-lg);

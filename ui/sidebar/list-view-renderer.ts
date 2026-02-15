@@ -187,10 +187,16 @@ export class ListViewRenderer {
             reviewButtonsContainer.classList.remove('sf-hidden');
 
             // Bulk action buttons
-            let bulkActionButtons = container.querySelector<HTMLElement>(".review-bulk-actions");
-            if (!bulkActionButtons) {
-                bulkActionButtons = container.createDiv("review-bulk-actions");
-                const reviewSelectedBtn = bulkActionButtons.createEl("button", { text: "Review selected", cls: "review-bulk-button" });
+             let bulkActionButtons = container.querySelector<HTMLElement>(".review-bulk-actions");
+             if (!bulkActionButtons) {
+                 bulkActionButtons = container.createDiv("review-bulk-actions");
+                 
+                 // Add cumulative time display
+                 const selectionInfo = bulkActionButtons.createDiv("review-selection-info");
+                 selectionInfo.createSpan("review-selection-count");
+                 selectionInfo.createSpan("review-selection-time");
+                 
+                 const reviewSelectedBtn = bulkActionButtons.createEl("button", { text: "Review selected", cls: "review-bulk-button" });
                 reviewSelectedBtn.addEventListener("click", () => {
                     void this.plugin.reviewController.reviewNotes(this.getSelectedNotes(), false); // Use getter
                     this.setSelectedNotes([]);
@@ -646,12 +652,15 @@ export class ListViewRenderer {
     }
 
 
-    /**
+     /**
      * Callback function passed to NoteItemRenderer to handle UI updates after selection changes.
+     *
+     * @param container The container element
      */
     private handleSelectionChange(container: HTMLElement): void {
         this.updateSelectionClasses(container);
         this.updateBulkActionButtonsVisibility(container);
+        this.updateSelectionInfo(container);
     }
 
     /**
@@ -677,6 +686,41 @@ export class ListViewRenderer {
                 el.classList.remove('selected');
             }
         });
+    }
+
+     /**
+     * Updates the selection info display with count and cumulative time.
+     * (Called by handleSelectionChange)
+     */
+    private async updateSelectionInfo(container: HTMLElement): Promise<void> {
+        const selectedNotesPaths = this.getSelectedNotes();
+        const bulkActionsContainer = container.querySelector<HTMLElement>('.review-bulk-actions');
+        
+        if (bulkActionsContainer && selectedNotesPaths.length > 0) {
+            let selectionInfo = bulkActionsContainer.querySelector<HTMLElement>('.review-selection-info');
+            if (!selectionInfo) {
+                selectionInfo = bulkActionsContainer.createDiv('review-selection-info');
+                selectionInfo.createSpan('review-selection-count');
+                selectionInfo.createSpan('review-selection-time');
+            }
+            
+            const countSpan = selectionInfo.querySelector('.review-selection-count');
+            const timeSpan = selectionInfo.querySelector('.review-selection-time');
+            
+            if (countSpan && timeSpan) {
+                // Update count
+                countSpan.setText(`${selectedNotesPaths.length} ${selectedNotesPaths.length === 1 ? 'note' : 'notes'} selected`);
+                
+                // Calculate cumulative time
+                let totalTime = 0;
+                for (const path of selectedNotesPaths) {
+                    totalTime += await this.plugin.reviewScheduleService.estimateReviewTime(path);
+                }
+                
+                // Update time display
+                timeSpan.setText(`(${EstimationUtils.formatTime(totalTime)})`);
+            }
+        }
     }
 
     /**
