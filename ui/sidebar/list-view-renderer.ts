@@ -663,7 +663,7 @@ export class ListViewRenderer {
     private handleSelectionChange(container: HTMLElement): void {
         this.updateSelectionClasses(container);
         this.updateBulkActionButtonsVisibility(container);
-        this.updateSelectionInfo(container);
+        void this.updateSelectionInfo(container);
     }
 
     /**
@@ -769,67 +769,68 @@ export class ListViewRenderer {
              e.preventDefault();
          });
 
-         // Add drop event handler
-         container.addEventListener('drop', async (e) => {
-             e.preventDefault();
-             
-             const draggedPath = e.dataTransfer?.getData('text/plain');
-             if (!draggedPath) return;
-             
-             // Find the drop target note item
-             const target = e.target as HTMLElement;
-             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
-             
-             if (!noteItem) return;
-             
-             const targetPath = noteItem.dataset.notePath;
-             if (!targetPath || draggedPath === targetPath) return;
-             
-             // Get due notes to initialize custom order if needed
-             const dueNotes = this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true);
-             
-             // Initialize custom order if empty - use current display order
-             let currentOrder = [...this.plugin.reviewScheduleService.customNoteOrder];
-             if (currentOrder.length === 0) {
-                 // Use the order of currently displayed due notes
-                 currentOrder = dueNotes.map(n => n.path);
-             }
-             
-             // Ensure both paths are in the order
-             if (!currentOrder.includes(draggedPath)) {
-                 currentOrder.push(draggedPath);
-             }
-             if (!currentOrder.includes(targetPath)) {
-                 currentOrder.push(targetPath);
-             }
-             
-             // Find positions
-             const draggedIndex = currentOrder.indexOf(draggedPath);
-             const targetIndex = currentOrder.indexOf(targetPath);
-             
-             if (draggedIndex === -1 || targetIndex === -1) return;
-             
-             // Remove dragged from current position
-             currentOrder.splice(draggedIndex, 1);
-             
-             // Calculate insert position based on mouse Y relative to target
-             const rect = noteItem.getBoundingClientRect();
-             const insertIndex = e.clientY < rect.top + rect.height / 2 
-                 ? targetIndex 
-                 : targetIndex + 1;
-             
-             // Insert at new position
-             currentOrder.splice(insertIndex, 0, draggedPath);
-             
-             // Update and save
-             await this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
-             await this.plugin.savePluginData();
-             
-             // Refresh view
-             await this.refreshSidebarView();
-         });
+        // Add drop event handler
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            void (async () => {
+                const draggedPath = e.dataTransfer?.getData('text/plain');
+                if (!draggedPath) return;
 
-         // Add drag-enter for visual feedback
+                // Find the drop target note item
+                const target = e.target as HTMLElement;
+                const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+
+                if (!noteItem) return;
+
+                const targetPath = noteItem.dataset.notePath;
+                if (!targetPath || draggedPath === targetPath) return;
+
+                // Get due notes to initialize custom order if needed
+                const dueNotes = this.plugin.reviewScheduleService.getDueNotesWithCustomOrder(Date.now(), true);
+
+                // Initialize custom order if empty - use current display order
+                let currentOrder = [...this.plugin.reviewScheduleService.customNoteOrder];
+                if (currentOrder.length === 0) {
+                    // Use the order of currently displayed due notes
+                    currentOrder = dueNotes.map(n => n.path);
+                }
+
+                // Ensure both paths are in the order
+                if (!currentOrder.includes(draggedPath)) {
+                    currentOrder.push(draggedPath);
+                }
+                if (!currentOrder.includes(targetPath)) {
+                    currentOrder.push(targetPath);
+                }
+
+                // Find positions
+                const draggedIndex = currentOrder.indexOf(draggedPath);
+                const targetIndex = currentOrder.indexOf(targetPath);
+
+                if (draggedIndex === -1 || targetIndex === -1) return;
+
+                // Remove dragged from current position
+                currentOrder.splice(draggedIndex, 1);
+
+                // Calculate insert position based on mouse Y relative to target
+                const rect = noteItem.getBoundingClientRect();
+                const insertIndex = e.clientY < rect.top + rect.height / 2
+                    ? targetIndex
+                    : targetIndex + 1;
+
+                // Insert at new position
+                currentOrder.splice(insertIndex, 0, draggedPath);
+
+                // Update and save
+                await this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
+                await this.plugin.savePluginData();
+
+                // Refresh view
+                await this.refreshSidebarView();
+            })();
+        });
+
+        // Add drag-enter for visual feedback
          container.addEventListener('dragenter', (e) => {
              const target = e.target as HTMLElement;
              const noteItem = target.closest('.review-note-item') as HTMLElement | null;

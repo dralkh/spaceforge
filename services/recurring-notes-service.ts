@@ -1,6 +1,5 @@
 import SpaceforgePlugin from '../main';
 import { ReviewSchedule } from '../models/review-schedule';
-import { DateUtils } from '../utils/dates';
 
 /**
  * Service for managing recurring notes functionality
