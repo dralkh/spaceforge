@@ -568,13 +568,13 @@ export class ConsolidatedMCQModal extends Modal {
 
             const noteScoreEl = noteScoresEl.createDiv('mcq-note-score');
 
-            noteScoreEl.createEl('div', {
+            noteScoreEl.createDiv({
                 text: noteScore.fileName,
                 cls: 'mcq-note-score-title'
             });
 
             const scorePercent = Math.round(noteScore.score * 100);
-            const scoreTextValueEl = noteScoreEl.createEl('div', {
+            const scoreTextValueEl = noteScoreEl.createDiv({
                 text: `Score: ${scorePercent}% (${noteScore.correctAnswers}/${noteScore.totalQuestions})`,
                 cls: 'mcq-note-score-value'
             });

@@ -3,7 +3,16 @@ import { OPENAI, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
+
+interface OpenAIResponse {
+    choices: Array<{ message: { content: string } }>;
+}
+
+interface OpenAIErrorResponse {
+    error?: { message?: string };
+    message?: string;
+}
 
 export class OpenAIService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -102,22 +111,23 @@ export class OpenAIService implements IMCQGenerationService {
             });
 
             if (response.status !== 200) {
-                const errorData = response.json || { message: response.text };
-                throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
+                const errorData: OpenAIErrorResponse = response.json ?? { message: response.text };
+                throw new Error(`API request failed (${response.status}): ${errorData.error?.message ?? errorData.message ?? 'Unknown error'}`);
             }
 
-            const data = response.json;
-            if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
+            const data = response.json as OpenAIResponse;
+            if (!data.choices?.length || !data.choices[0]?.message?.content) {
                 throw new Error('Invalid API response format from OpenAI - missing content');
             }
             return data.choices[0].message.content;
         } catch (error) {
-            new Notice(`OpenAI API error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            new Notice(`OpenAI API error: ${msg}`);
             throw error;
         }
     }
 
-    private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
+    private parseResponse(response: string, _settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
             const questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);

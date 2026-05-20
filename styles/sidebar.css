@@ -11,21 +11,38 @@
 
 /* Upcoming Reviews Section */
 .review-upcoming-section {
-    margin-top: 15px;
+    margin-top: var(--sf-space-lg);
     padding-top: 10px;
     border-top: 1px solid var(--background-modifier-border);
 }
 
+.review-upcoming-section h3 {
+    font-size: 16px;
+    margin-bottom: var(--sf-space-sm);
+    color: var(--sf-text);
+    font-weight: 600;
+}
+
 .review-upcoming-list {
+    margin-top: var(--sf-space-xs);
     display: flex;
     flex-direction: column;
-    gap: 5px; /* Space between day items */
+    gap: var(--sf-space-xs);
 }
 
 .review-upcoming-day {
-    padding: 5px 8px;
-    border-radius: var(--radius-s);
-    transition: background-color 0.2s ease;
+    padding: var(--sf-space-xs) var(--sf-space-sm);
+    border-radius: var(--sf-radius-sm);
+    background-color: var(--sf-bg-secondary);
+    transition: var(--sf-transition);
+    border: 1px solid transparent;
+    display: flex;
+    justify-content: space-between;
+}
+
+.review-upcoming-day:hover {
+    border-color: var(--interactive-accent);
+    transform: translateX(3px);
 }
 
 .review-upcoming-day.clickable {
@@ -48,8 +65,11 @@
 }
 
 .review-upcoming-day-count {
-    font-size: 0.9em;
-    color: var(--text-muted);
+    color: var(--sf-text-muted);
+    font-size: 12px;
+    background-color: var(--sf-bg-primary);
+    padding: 1px 6px;
+    border-radius: 100px;
 }
 
 /* Style for expanded day */
@@ -136,8 +156,8 @@
   background-color: var(--text-accent); /* Using theme variable */
 }
 
-.review-stats-custom-order {
-  color: var(--interactive-accent) !important; /* Using theme variable */
+.review-stats-custom-order.review-stats-custom-order {
+  color: var(--interactive-accent); /* Using theme variable */
   font-style: italic;
   font-size: 0.85em;
   display: flex;
@@ -159,16 +179,16 @@
 }
 
 /* Force ALL direct children to have zero margins to let gap control spacing */
-.review-buttons-container > * {
-  margin: 0 !important; /* Override any potential conflicting margins */
+.review-buttons-container.review-buttons-container > * {
+  margin: 0; /* Override any potential conflicting margins */
 }
 
 
-.review-all-button,
-.review-all-mcq-button {
+.review-all-button.review-all-button,
+.review-all-mcq-button.review-all-mcq-button {
   width: 100%;
   padding: var(--sf-space-sm) var(--sf-space-md);
-  margin: 0 !important; /* Ensure no margin */
+  margin: 0; /* Ensure no margin */
   border-radius: var(--sf-radius-md);
   cursor: pointer;
   font-weight: 500;
@@ -662,63 +682,18 @@
   box-shadow: var(--sf-shadow-lg); /* Using defined shadow variable */
 }
 
-.review-upcoming-section {
-  margin-top: var(--sf-space-lg);
-}
-
-.review-upcoming-section h3 {
-  font-size: 16px;
-  margin-bottom: var(--sf-space-sm);
-  color: var(--sf-text);
-  font-weight: 600;
-}
-
-.review-upcoming-list {
-  margin-top: var(--sf-space-xs);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sf-space-xs);
-}
-
-.review-upcoming-day {
-  padding: var(--sf-space-xs) var(--sf-space-sm);
-  border-radius: var(--sf-radius-sm);
-  background-color: var(--sf-bg-secondary);
-  transition: var(--sf-transition);
-  border: 1px solid transparent;
-  display: flex;
-  justify-content: space-between;
-}
-
-.review-upcoming-day:hover {
-  border-color: var(--interactive-accent); /* Using theme variable */
-  transform: translateX(3px);
-}
-
-.review-upcoming-day-name {
-  font-weight: 500;
-}
-
-.review-upcoming-day-count {
-  color: var(--sf-text-muted);
-  font-size: 12px;
-  background-color: var(--sf-bg-primary);
-  padding: 1px 6px;
-  border-radius: 100px;
-}
-
 
 /* --- Pomodoro Timer Styles --- */
 /* Styles for Pomodoro section when inside review-buttons-container */
 .review-buttons-container .pomodoro-toggle-container {
   width: 100%; /* Make toggle container take full width */
-  margin: 0 !important; /* Ensure no margin */
+  margin: 0; /* Ensure no margin */
 }
 
 .review-buttons-container .pomodoro-visibility-toggle-btn {
   width: 100%;
   padding: calc(var(--sf-space-xs) / 1.5) var(--sf-space-sm); /* Reduced vertical padding */
-  margin: 0 !important; /* Ensure no margin */
+  margin: 0; /* Ensure no margin */
   border-radius: var(--sf-radius-md);
   cursor: pointer;
   font-weight: 500;
@@ -735,13 +710,13 @@
 
 .review-buttons-container .pomodoro-section-content {
   width: 100%; /* Make content take full width */
-  margin: 0 !important; /* Ensure no margin */
+  margin: 0; /* Ensure no margin */
 }
 
-.pomodoro-container {
+.pomodoro-container.pomodoro-container {
   /* margin-top is removed as it's handled by pomodoro-toggle-container or pomodoro-section-content */
   padding: 2px var(--sf-space-xs); /* Minimal vertical padding, keep horizontal */
-  margin: 0 !important; /* Ensure no margin */
+  margin: 0; /* Ensure no margin */
   background-color: var(--background-secondary); /* Slightly different background */
   border-radius: var(--radius-m);
   border: 1px solid var(--background-modifier-border);
@@ -769,7 +744,8 @@
   text-align: center;
   order: 2; /* Order for flex: Start(1) Timer(2) Skip(3) Cog(4) */
   flex-grow: 1; /* Allow timer to take some space */
-  border: none; /* Base border is none */
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
   transition: border-color 0.3s ease; /* Transition border color */
 }
 
@@ -781,16 +757,8 @@
   opacity: 1;
   visibility: visible;
 }
-/* .timer-hidden is no longer used to hide, opacity is handled by .is-paused or .is-idle */
 
 
-/* Mode-specific styling (using border-left and border-right) */
-.pomodoro-timer-display {
-  border-left: 3px solid transparent; /* Default transparent border */
-  border-right: 3px solid transparent; /* Default transparent border */
-  background-color: var(--background-primary); /* Reset background */
-  color: var(--text-normal); /* Reset text color */
-}
 .pomodoro-timer-display.mode-work { 
   border-left-color: var(--interactive-accent); 
   border-right-color: var(--interactive-accent); 

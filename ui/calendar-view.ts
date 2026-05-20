@@ -250,7 +250,7 @@ export class CalendarView {
 
         const { year, month, firstDay, daysInMonth } = this.getCalendarData();
         const totalCells = 42; // Standard 6 weeks * 7 days grid
-        let dayCells = Array.from(gridEl.querySelectorAll(".calendar-day")) as HTMLElement[];
+        let dayCells = Array.from(gridEl.querySelectorAll<HTMLElement>(".calendar-day"));
 
         // Adjust number of day cell elements if necessary
         if (dayCells.length < totalCells) {
@@ -571,7 +571,7 @@ export class CalendarView {
         this.hideEventTooltip();
 
         // Create tooltip element
-        this.tooltipEl = document.body.createEl("div");
+        this.tooltipEl = document.body.createDiv();
         this.tooltipEl.className = "calendar-event-tooltip";
 
         // Format event details

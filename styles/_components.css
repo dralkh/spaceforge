@@ -161,35 +161,22 @@
 }
 
 /* ====== Utility Classes ====== */
-.sf-hidden {
-  display: none !important;
+.sf-hidden.sf-hidden {
+  display: none;
 }
 
-.sf-visible {
-  display: block !important;
+.sf-visible.sf-visible {
+  display: block;
 }
 
-.sf-flex {
-  display: flex !important;
+.sf-flex.sf-flex {
+  display: flex;
 }
 
-.sf-invisible {
-  opacity: 0 !important;
+.sf-invisible.sf-invisible {
+  opacity: 0;
 }
 
-.sf-visible-opacity {
-  opacity: 1 !important;
-}
-
-/* ====== Display Utilities ====== */
-.sf-hidden {
-  display: none !important;
-}
-
-.sf-visible {
-  display: block !important;
-}
-
-.sf-flex {
-  display: flex !important;
+.sf-visible-opacity.sf-visible-opacity {
+  opacity: 1;
 }

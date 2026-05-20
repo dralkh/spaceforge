@@ -258,7 +258,7 @@ export default class SpaceforgePlugin extends Plugin {
         try {
             this.loadData().then(loaded => {
                 if (loaded) {
-                    existingData = loaded;
+                    existingData = loaded as Partial<SpaceforgePluginData>;
                 }
             }).catch(() => { /* handle error */ });
         }
@@ -346,7 +346,7 @@ export default class SpaceforgePlugin extends Plugin {
                 const file = this.app.vault.getAbstractFileByPath(effectivePath);
                 if (file instanceof TFile) {
                     const jsonData = await this.app.vault.read(file);
-                    if (jsonData) rawLoadedData = JSON.parse(jsonData);
+                    if (jsonData) rawLoadedData = JSON.parse(jsonData) as SpaceforgePluginData;
                     new Notice(`Spaceforge: Loaded data from custom path: ${effectivePath}`, 3000);
                 } else {
                     // Custom path specified but file doesn't exist.
@@ -357,7 +357,7 @@ export default class SpaceforgePlugin extends Plugin {
                         try {
                             const oldJsonData = await this.app.vault.read(oldFile);
                             if (oldJsonData) {
-                                rawLoadedData = JSON.parse(oldJsonData);
+                                rawLoadedData = JSON.parse(oldJsonData) as SpaceforgePluginData;
                                 // Data will be saved to new path by savePluginData later
                             }
                         } catch { /* handle error */ }
@@ -368,7 +368,7 @@ export default class SpaceforgePlugin extends Plugin {
                 }
             } else {
                 // Using default plugin storage path
-                rawLoadedData = await this.loadData(); // This is the plugin's internal save/load
+                rawLoadedData = await this.loadData() as SpaceforgePluginData | undefined;
             }
 
             let loadedSettings = {}; // Start with empty object
@@ -444,9 +444,9 @@ export default class SpaceforgePlugin extends Plugin {
 
             // SIMPLE RECOVERY: Try localStorage backup once, then use defaults
             try {
-                const backupData = await this.app.loadLocalStorage('spaceforge-backup');
+                const backupData: unknown = await this.app.loadLocalStorage('spaceforge-backup');
                 if (backupData && typeof backupData === 'string') {
-                    const parsedBackup = JSON.parse(backupData);
+                    const parsedBackup = JSON.parse(backupData) as { reviewData?: Partial<PluginStateData>; settings?: Partial<SpaceforgeSettings> };
                     if (parsedBackup.reviewData) {
                         this.settings = { ...DEFAULT_SETTINGS, ...parsedBackup.settings };
                         this.pluginState = { ...DEFAULT_PLUGIN_STATE_DATA, ...parsedBackup.reviewData };
@@ -483,7 +483,7 @@ export default class SpaceforgePlugin extends Plugin {
         try {
             // Ensure settings object exists and is valid, applying defaults if necessary
             if (!this.settings || typeof this.settings !== 'object') {
-                this.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+                this.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as SpaceforgeSettings;
             } else {
                 // Ensure all default keys are present
                 this.settings = { ...DEFAULT_SETTINGS, ...this.settings };
@@ -554,7 +554,8 @@ export default class SpaceforgePlugin extends Plugin {
                         new Notice(`Successfully saved to custom path, original data file kept as backup for safety`, 5000);
                     }
                 } catch (writeError) {
-                    new Notice(`Error saving data to custom path ${effectiveSavePath}: ${writeError.message}. Falling back to default path for this save.`, 10000);
+                    const msg = writeError instanceof Error ? writeError.message : String(writeError);
+                    new Notice(`Error saving data to custom path ${effectiveSavePath}: ${msg}. Falling back to default path for this save.`, 10000);
                     // Fallback save to default location if custom path write fails
                     try {
                         await this.saveData(dataToSave); // Plugin's internal save
@@ -717,7 +718,7 @@ export default class SpaceforgePlugin extends Plugin {
                 // It's good practice to handle unexpected enum values, even if TypeScript provides some safety.
                 // This could happen if settings data is corrupted or from an older version.
                 // const exhaustiveCheck: never = this.settings.mcqApiProvider; // This will cause a type error now, which is good!
-                new Notice(`Unsupported MCQ API provider selected: ${this.settings.mcqApiProvider as any}`);
+                new Notice(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
                 return undefined;
         }
     }

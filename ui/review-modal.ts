@@ -55,7 +55,7 @@ export class ReviewModal extends Modal {
             createSm2Button("5: Perfect recall", "review-button review-button-perfect-recall", ReviewResponse.PerfectRecall);
         }
 
-        buttonsContainer.createEl("div", { cls: "review-button-separator" });
+        buttonsContainer.createDiv({ cls: "review-button-separator" });
 
         // Postpone Button
         const postponeButton = buttonsContainer.createEl("button", { text: "Postpone to tomorrow", cls: "review-button review-button-postpone" });
@@ -75,7 +75,7 @@ export class ReviewModal extends Modal {
 
         // MCQ Buttons (if enabled)
         if (this.plugin.settings.enableMCQ) {
-            buttonsContainer.createEl("div", { cls: "review-button-separator" });
+            buttonsContainer.createDiv({ cls: "review-button-separator" });
 
 
             const mcqButton = buttonsContainer.createEl("button", { cls: "review-button review-button-mcq" });

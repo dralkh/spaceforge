@@ -3,9 +3,16 @@ import { GEMINI, MCQS, MCQ, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
 
+interface GeminiResponse {
+    candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+}
 
+interface GeminiErrorResponse {
+    error?: { message?: string };
+    message?: string;
+}
 
 export class GeminiService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -104,24 +111,24 @@ export class GeminiService implements IMCQGenerationService {
             });
 
             if (response.status !== 200) {
-                const errorData = response.json;
-                const errorMessage = errorData?.error?.message || errorData?.message || 'Unknown error';
+                const errorData = response.json as GeminiErrorResponse;
+                const errorMessage = errorData?.error?.message ?? errorData?.message ?? 'Unknown error';
                 throw new Error(`API request failed (${response.status}): ${errorMessage}`);
             }
 
-            const data = response.json;
-            // Gemini response structure: data.candidates[0].content.parts[0].text
-            if (!data.candidates || !data.candidates.length || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts.length || !data.candidates[0].content.parts[0].text) {
+            const data = response.json as GeminiResponse;
+            if (!data.candidates?.length || !data.candidates[0]?.content?.parts?.length || !data.candidates[0]?.content?.parts[0]?.text) {
                 throw new Error('Invalid API response format from Gemini - missing content');
             }
             return data.candidates[0].content.parts[0].text;
         } catch (error) {
-            new Notice(`Gemini API error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            new Notice(`Gemini API error: ${msg}`);
             throw error;
         }
     }
 
-    private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
+    private parseResponse(response: string, _settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
             const questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);

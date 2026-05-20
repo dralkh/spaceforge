@@ -56,7 +56,7 @@ export class ReviewSidebarView extends ItemView {
     getIcon(): string { return "calendar-clock"; }
 
     async onOpen(): Promise<void> {
-        this.plugin.events.on('sidebar-update', this.refresh.bind(this));
+        this.plugin.events.on('sidebar-update', () => { void this.refresh(); });
         this.plugin.events.on('pomodoro-update', () => {
             if (this.pomodoroUIManager) {
                 this.pomodoroUIManager.updatePomodoroUI();
@@ -71,7 +71,7 @@ export class ReviewSidebarView extends ItemView {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-        this.plugin.events.off('sidebar-update', this.refresh.bind(this));
+        this.plugin.events.off('sidebar-update', () => { void this.refresh(); });
         // No need to explicitly unregister pomodoro-update as the manager handles its own logic
         return Promise.resolve();
     }
@@ -131,7 +131,7 @@ export class ReviewSidebarView extends ItemView {
                 setExpandedUpcomingDayKey: (key) => { this.expandedUpcomingDayKey = key; },
                 getLastSelectedNotePath: () => this.lastSelectedNotePath,
                 setLastSelectedNotePath: (path) => { this.lastSelectedNotePath = path; },
-                refreshSidebarView: this.refresh.bind(this)
+                refreshSidebarView: async () => { await this.refresh(); }
             });
         }
 

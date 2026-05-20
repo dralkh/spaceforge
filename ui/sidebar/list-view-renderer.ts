@@ -551,7 +551,7 @@ export class ListViewRenderer {
                     dayItemEl.addClass("clickable");
                     dayItemEl.dataset.dayKey = dayKey;
                     const daySummary = dayItemEl.createDiv("review-upcoming-day-summary");
-                    daySummary.createEl("span", { cls: "review-upcoming-day-name" }); // Placeholder for name
+                    daySummary.createSpan({ cls: "review-upcoming-day-name" }); // Placeholder for name
 
                     dayItemEl.addEventListener("click", (e) => { // Attach listener once
                         const currentDayKey = (e.currentTarget as HTMLElement).dataset.dayKey;
@@ -634,7 +634,7 @@ export class ListViewRenderer {
                     this.getSelectedNotes(),
                     lastSelectedNotePathRef,
                     () => this.handleSelectionChange(parentContainerForBulkActions),
-                    this.handleNoteAction.bind(this)
+                    async () => { await this.handleNoteAction(); }
                 );
             }
             if (noteEl) notesInOrder.push(noteEl);
@@ -680,7 +680,7 @@ export class ListViewRenderer {
      */
     private updateSelectionClasses(container: HTMLElement): void {
         const selectedNotes = this.getSelectedNotes();
-        const allNoteElements = container.querySelectorAll('.review-note-item[data-note-path]') as NodeListOf<HTMLElement>;
+        const allNoteElements = container.querySelectorAll<HTMLElement>('.review-note-item[data-note-path]');
         allNoteElements.forEach(el => {
             const path = el.dataset.notePath;
             if (path && selectedNotes.includes(path)) {
@@ -778,7 +778,7 @@ export class ListViewRenderer {
 
                 // Find the drop target note item
                 const target = e.target as HTMLElement;
-                const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+                const noteItem = target.closest<HTMLElement>('.review-note-item');
 
                 if (!noteItem) return;
 
@@ -966,7 +966,7 @@ export class ListViewRenderer {
                 }
                 headerTextEl.textContent = displayHeader;
 
-                let overdueBadge = headerTextEl.querySelector(".review-overdue-badge") as HTMLElement | null;
+                let overdueBadge = headerTextEl.querySelector(".review-overdue-badge");
                 if (dateStr === "Due notes") {
                     const daysDiff = notesInSection.map(noteEl => {
                         const path = (noteEl as HTMLElement).dataset.notePath;
@@ -1053,7 +1053,7 @@ export class ListViewRenderer {
             const aIsSpecial = a in dateOrder;
             const bIsSpecial = b in dateOrder;
 
-            if (aIsSpecial && bIsSpecial) return dateOrder[a as keyof typeof dateOrder] - dateOrder[b as keyof typeof dateOrder];
+            if (aIsSpecial && bIsSpecial) return dateOrder[a] - dateOrder[b];
             if (aIsSpecial) return -1;
             if (bIsSpecial) return 1;
 

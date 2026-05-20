@@ -129,7 +129,7 @@ export enum ReviewResponse {
  */
 export function toSM2Quality(response: ReviewResponse): number {
     // Ensure response is within 0-5 range
-    if (response >= 0 && response <= 5) {
+    if (response as number >= 0 && response as number <= 5) {
         return response;
     }
     // Default fallback

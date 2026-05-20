@@ -95,7 +95,7 @@ export class EventModal extends Modal {
         this.isAllDayToggle = allDayGroup.createEl("input", {
             type: "checkbox",
             cls: "event-modal-checkbox"
-        }) as HTMLInputElement;
+        });
         this.isAllDayToggle.checked = this.event?.isAllDay ?? false;
         this.isAllDayToggle.addEventListener("change", () => this.toggleTimeInput());
 
@@ -147,7 +147,7 @@ export class EventModal extends Modal {
         this.colorInput = colorPickerContainer.createEl("input", {
             type: "color",
             cls: "event-modal-color-input"
-        }) as HTMLInputElement;
+        });
 
         if (this.event?.color) {
             this.colorInput.value = this.event.color;

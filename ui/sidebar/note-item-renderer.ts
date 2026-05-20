@@ -321,7 +321,7 @@ export class NoteItemRenderer {
             // Logic for selection (ctrl/meta/shift click)
             // This part uses selectedNotesArray and lastSelectedNotePathRef directly, which are passed in.
             // This is fine as they are managed by the calling ListViewRenderer.
-            const allVisibleNoteElements = Array.from(parentContainerForBulkActions.querySelectorAll('.review-note-item[data-note-path]')) as HTMLElement[];
+            const allVisibleNoteElements = Array.from(parentContainerForBulkActions.querySelectorAll<HTMLElement>('.review-note-item[data-note-path]'));
             const allVisibleNotePaths = allVisibleNoteElements.map(el => el.dataset.notePath).filter(p => p) as string[];
             const currentIndex = allVisibleNotePaths.indexOf(currentPath);
 
@@ -335,7 +335,7 @@ export class NoteItemRenderer {
                         notesToSelectInRange.forEach(p => { if (p && !selectedNotesArray.includes(p)) selectedNotesArray.push(p); });
                     } else {
                         selectedNotesArray.length = 0;
-                        selectedNotesArray.push(...notesToSelectInRange.filter(p => p) as string[]);
+                        selectedNotesArray.push(...notesToSelectInRange.filter(p => p));
                     }
                 } else {
                     selectedNotesArray.length = 0;

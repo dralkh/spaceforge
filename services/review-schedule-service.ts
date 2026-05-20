@@ -319,7 +319,7 @@ export class ReviewScheduleService {
                 newEase = Math.max(1.3, newEase);
                 schedule.ease = Math.round(newEase * 100);
 
-                if (qualityRating >= ReviewResponse.CorrectWithDifficulty) {
+                if (qualityRating >= (ReviewResponse.CorrectWithDifficulty as number)) {
                     schedule.consecutive += 1;
                     if (qualityRating >= 3) {
                         // repetitionCount for initial phase should increment if successful, reset if not.
@@ -342,7 +342,7 @@ export class ReviewScheduleService {
                 schedule.ease = ease;
                 schedule.repetitionCount = repetitionCount;
 
-                if (qualityRating >= ReviewResponse.CorrectWithDifficulty) {
+                if (qualityRating >= (ReviewResponse.CorrectWithDifficulty as number)) {
                     schedule.consecutive += 1;
                 } else {
                     schedule.consecutive = 0;

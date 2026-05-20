@@ -335,7 +335,7 @@ export class BatchReviewModal extends Modal {
             const resultItemEl = resultsListEl.createDiv("batch-review-result-item");
             const file = this.plugin.app.vault.getAbstractFileByPath(result.path);
             const fileName = file instanceof TFile ? file.basename : result.path;
-            resultItemEl.createEl("div", { text: fileName, cls: "batch-review-result-filename" });
+            resultItemEl.createDiv({ text: fileName, cls: "batch-review-result-filename" });
             let responseText: string; let responseClass: string;
             switch (result.response) {
                 case ReviewResponse.CompleteBlackout: responseText = "Complete Blackout (0)"; responseClass = "batch-review-complete-blackout"; break;
@@ -346,9 +346,9 @@ export class BatchReviewModal extends Modal {
                 case ReviewResponse.PerfectRecall: responseText = "Perfect Recall (5)"; responseClass = "batch-review-perfect-recall"; break;
                 default: responseText = "Unknown"; responseClass = "";
             }
-            resultItemEl.createEl("div", { text: responseText, cls: `batch-review-result-response ${responseClass}` });
+            resultItemEl.createDiv({ text: responseText, cls: `batch-review-result-response ${responseClass}` });
             if (result.score !== undefined) {
-                resultItemEl.createEl("div", { text: `MCQ Score: ${Math.round(result.score * 100)}%`, cls: "batch-review-result-mcq-score" });
+                resultItemEl.createDiv({ text: `MCQ Score: ${Math.round(result.score * 100)}%`, cls: "batch-review-result-mcq-score" });
             }
         }
         const closeButton = contentEl.createEl("button", { text: "Close", cls: "batch-review-close-button" });

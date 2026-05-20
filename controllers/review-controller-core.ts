@@ -427,12 +427,12 @@ export class ReviewControllerCore implements IReviewController {
         if (schedule && this.plugin.settings.enableQuestionRegenerationOnRating && this.plugin.mcqService && typeof response === 'number') {
             if (schedule.schedulingAlgorithm === 'fsrs') {
                 // FSRS: response is FsrsRating (1-4), setting is minFsrsRatingForQuestionRegeneration (1-4)
-                if (response >= this.plugin.settings.minFsrsRatingForQuestionRegeneration) {
+                if ((response as number) >= this.plugin.settings.minFsrsRatingForQuestionRegeneration) {
                     triggerRegeneration = true;
                 }
             } else { // SM-2
                 // SM-2: response is ReviewResponse (0-5), setting is minSm2RatingForQuestionRegeneration (0-5)
-                if (response >= this.plugin.settings.minSm2RatingForQuestionRegeneration) {
+                if ((response as number) >= this.plugin.settings.minSm2RatingForQuestionRegeneration) {
                     triggerRegeneration = true;
                 }
             }

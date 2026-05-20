@@ -3,7 +3,7 @@
  */
 export type EventMap = Record<string, unknown[]>;
 
-export class EventEmitter<Events extends { [K in keyof Events]: any[] } = Record<string, unknown[]>> {
+export class EventEmitter<Events extends { [K in keyof Events]: unknown[] } = Record<string, unknown[]>> {
     /**
      * Event listeners by event name
      */

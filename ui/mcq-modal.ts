@@ -177,9 +177,9 @@ export class MCQModal extends Modal {
 
         // Cleanup handled by Modal's onClose automatically if using this.scope.register
         // Original onClose logic for saving partial progress:
-        const originalOnClose = this.onClose;
+        const originalOnClose = this.onClose.bind(this);
         this.onClose = () => {
-            originalOnClose.call(this);
+            originalOnClose();
             if (!this.session.completed && this.session.answers.length > 0) {
                 // Session was closed prematurely but some answers were given
                 this.session.completedAt = Date.now();

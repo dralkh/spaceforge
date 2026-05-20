@@ -3,7 +3,16 @@ import { CLAUDE, MCQS, MCQ, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
+
+interface ClaudeResponse {
+    content: Array<{ text: string }>;
+}
+
+interface ClaudeErrorResponse {
+    error?: { message?: string };
+    message?: string;
+}
 
 export class ClaudeService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -105,17 +114,18 @@ export class ClaudeService implements IMCQGenerationService {
             });
 
             if (response.status !== 200) {
-                const errorData = response.json || { message: response.text };
-                throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
+                const errorData: ClaudeErrorResponse = response.json ?? { message: response.text };
+                throw new Error(`API request failed (${response.status}): ${errorData.error?.message ?? errorData.message ?? 'Unknown error'}`);
             }
 
-            const data = response.json;
-            if (!data.content || !data.content.length || !data.content[0].text) {
+            const data = response.json as ClaudeResponse;
+            if (!data.content?.length || !data.content[0]?.text) {
                 throw new Error('Invalid API response format from Claude - missing content');
             }
             return data.content[0].text;
         } catch (error) {
-            new Notice(`Claude API error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            new Notice(`Claude API error: ${msg}`);
             throw error;
         }
     }

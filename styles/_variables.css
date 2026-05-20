@@ -27,8 +27,8 @@
   --sf-recurring-bg: rgba(94, 129, 172, 0.05); /* Very light blue tint to match accent */
   
   /* Text colors */
-  --sf-text: var(--text-normal, #333);
-  --sf-text-muted: var(--text-muted, #888);
+  --sf-text: var(--text-normal, #333333);
+  --sf-text-muted: var(--text-muted, #888888);
   --sf-text-on-primary: var(--text-on-accent, white);
   
   /* Background colors */

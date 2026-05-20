@@ -26,7 +26,9 @@ export class ContextMenuHandler {
     register(): void {
         // Register for the 'file-menu' event, which handles both files and folders.
         this.plugin.registerEvent(
-            this.plugin.app.workspace.on("file-menu", this.handleFileMenuEvent.bind(this))
+            this.plugin.app.workspace.on("file-menu", (menu: Menu, abstractFile: TAbstractFile) => {
+                this.handleFileMenuEvent(menu, abstractFile);
+            })
         );
     }
 

@@ -3,7 +3,12 @@ import { OPENROUTER, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
+
+interface OpenRouterResponse {
+    choices: Array<{ message: { content: string } }>;
+}
+
 
 /**
  * Service for generating MCQs using the OpenRouter API
@@ -171,15 +176,16 @@ For example:
                 throw new Error(`API request failed (${response.status}): ${response.text}`);
             }
 
-            const data = response.json;
+            const data = response.json as OpenRouterResponse;
 
-            if (!data.choices || !data.choices.length || !data.choices[0].message) {
+            if (!data.choices?.length || !data.choices[0]?.message) {
                 throw new Error('Invalid API response format from OpenRouter - missing choices');
             }
 
             return data.choices[0].message.content;
         } catch (error) {
-            new Notice(`OpenRouter API error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            new Notice(`OpenRouter API error: ${msg}`);
             throw error;
         }
     }
@@ -192,7 +198,7 @@ For example:
      * @param numQuestionsToGenerate The target number of questions expected
      * @returns Array of parsed MCQ questions
      */
-    private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
+    private parseResponse(response: string, _settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
 
         try {

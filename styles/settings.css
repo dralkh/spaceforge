@@ -164,9 +164,9 @@
 }
 
 /* Enhance setting items */
-.setting-item {
+.setting-item.setting-item {
   padding: var(--sf-space-sm) 0;
-  border-top: none !important;
+  border-top: none;
 }
 
 .setting-item-info {

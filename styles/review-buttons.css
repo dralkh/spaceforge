@@ -158,9 +158,9 @@
 .review-note-button:disabled, /* General class for individual note buttons */
 .review-bulk-button:disabled, /* General class for bulk action buttons */
 .review-date-action-button:disabled, /* General class for date section buttons */
-button.disabled { /* Fallback for any button with .disabled class */
+button.disabled.disabled { /* Fallback for any button with .disabled class */
   opacity: 0.5;
-  cursor: not-allowed !important; /* Ensure cursor changes */
+  cursor: not-allowed; /* Ensure cursor changes */
   filter: grayscale(60%);
   box-shadow: none;
 }

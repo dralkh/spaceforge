@@ -1,4 +1,4 @@
-const fs = require('fs-extra');
+const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const readline = require('readline');
@@ -40,7 +40,7 @@ function installPlugin(obsidianPluginsDir) {
   const pluginDir = path.join(obsidianPluginsDir, pluginName);
 
   // Ensure plugin directory exists
-  fs.ensureDirSync(pluginDir);
+  fs.mkdirSync(pluginDir, { recursive: true });
 
   console.log('Installing plugin files...');
 
@@ -52,7 +52,7 @@ function installPlugin(obsidianPluginsDir) {
     const destPath = path.join(pluginDir, file);
     
     if (fs.existsSync(sourcePath)) {
-      fs.copySync(sourcePath, destPath, { overwrite: true });
+      fs.copyFileSync(sourcePath, destPath);
       console.log(`✓ Copied ${file}`);
     } else {
       console.log(`⚠ Warning: ${file} not found in project directory`);

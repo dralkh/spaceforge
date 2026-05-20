@@ -292,7 +292,7 @@ export class CalendarEventService {
      */
     importEvents(json: string): number {
         try {
-            const events: CalendarEvent[] = JSON.parse(json);
+            const events = JSON.parse(json) as CalendarEvent[];
             let importedCount = 0;
 
             events.forEach(event => {

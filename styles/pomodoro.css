@@ -1,6 +1,7 @@
 /* Pomodoro Styles */
-.pomodoro-visibility-toggle-container {
-  display: none !important; /* Hide the old toggle button */
+.pomodoro-visibility-toggle-container.pomodoro-visibility-toggle-container {
+  display: none; /* Hide the old toggle button */
+  margin-bottom: 8px; /* Space between toggle and timer content */
 }
 
 .sidebar-pomodoro-section {
@@ -23,10 +24,6 @@
   border-radius: var(--radius-m); /* Consistent border radius */
   border: 1px solid var(--background-modifier-border); /* Consistent border */
   box-sizing: border-box; /* Ensure padding and border are within width */
-}
-
-.pomodoro-visibility-toggle-container {
-  margin-bottom: 8px; /* Space between toggle and timer content */
 }
 
 .pomodoro-visibility-toggle-container .pomodoro-visibility-toggle-btn {

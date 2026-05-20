@@ -3,7 +3,11 @@ import { OLLAMA, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
+
+interface OllamaResponse {
+    message: { role: string; content: string };
+}
 
 export class OllamaService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -14,7 +18,7 @@ export class OllamaService implements IMCQGenerationService {
 
     async generateMCQs(notePath: string, noteContent: string, settings: SpaceforgeSettings): Promise<MCQSet | null> {
         if (!settings.ollamaApiUrl) {
-            new Notice(`${OLLAMA} ${API} ${URL} not set in settings.`);
+            new Notice(`${OLLAMA} ${API} URL not set in settings.`);
             return null;
         }
         if (!settings.ollamaModel) {
@@ -106,19 +110,19 @@ export class OllamaService implements IMCQGenerationService {
                 throw new Error(`API request failed (${response.status}): ${errorText}`);
             }
 
-            const data = response.json;
-            // Ollama's non-streaming chat response structure is typically { model, created_at, message: { role, content }, done }
-            if (!data.message || !data.message.content) {
+            const data = response.json as OllamaResponse;
+            if (!data.message?.content) {
                 throw new Error('Invalid API response format from Ollama - missing message content');
             }
             return data.message.content;
         } catch (error) {
-            new Notice(`Ollama API error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            new Notice(`Ollama API error: ${msg}`);
             throw error;
         }
     }
 
-    private parseResponse(response: string, settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
+    private parseResponse(response: string, _settings: SpaceforgeSettings, numQuestionsToGenerate: number): MCQQuestion[] {
         const questions: MCQQuestion[] = [];
         try {
             const questionBlocks: string[] = response.split(/\d+\.\s+/).filter(block => block.trim().length > 0);

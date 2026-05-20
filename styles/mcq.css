@@ -116,7 +116,6 @@
   flex-direction: column;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   flex-grow: 1; /* Allow to grow and take available space */
-  overflow-y: auto; /* Add scrolling if content overflows */
 }
 
 /* Improve question text visibility */
@@ -131,37 +130,37 @@
 }
 
 /* Ensure the MCQ modal takes more space */
-.spaceforge-mcq-modal.modal-content {
+.spaceforge-mcq-modal.modal-content.spaceforge-mcq-modal {
   min-width: 500px; /* Ensure modal has minimum width */
   max-width: 90vw; /* Allow up to 90% of viewport width */
   min-height: 300px; /* Ensure minimum height */
-  padding: 28px !important;
+  padding: 28px;
   display: flex; /* Make modal content a flex container */
   flex-direction: column; /* Stack children vertically */
 }
 
 /* Enhanced progress indicator with more granular steps */
-[data-progress="0"] .mcq-progress::before { width: 0% !important; }
-[data-progress="5"] .mcq-progress::before { width: 5% !important; }
-[data-progress="10"] .mcq-progress::before { width: 10% !important; }
-[data-progress="15"] .mcq-progress::before { width: 15% !important; }
-[data-progress="20"] .mcq-progress::before { width: 20% !important; }
-[data-progress="25"] .mcq-progress::before { width: 25% !important; }
-[data-progress="30"] .mcq-progress::before { width: 30% !important; }
-[data-progress="35"] .mcq-progress::before { width: 35% !important; }
-[data-progress="40"] .mcq-progress::before { width: 40% !important; }
-[data-progress="45"] .mcq-progress::before { width: 45% !important; }
-[data-progress="50"] .mcq-progress::before { width: 50% !important; }
-[data-progress="55"] .mcq-progress::before { width: 55% !important; }
-[data-progress="60"] .mcq-progress::before { width: 60% !important; }
-[data-progress="65"] .mcq-progress::before { width: 65% !important; }
-[data-progress="70"] .mcq-progress::before { width: 70% !important; }
-[data-progress="75"] .mcq-progress::before { width: 75% !important; }
-[data-progress="80"] .mcq-progress::before { width: 80% !important; }
-[data-progress="85"] .mcq-progress::before { width: 85% !important; }
-[data-progress="90"] .mcq-progress::before { width: 90% !important; }
-[data-progress="95"] .mcq-progress::before { width: 95% !important; }
-[data-progress="100"] .mcq-progress::before { width: 100% !important; }
+[data-progress="0"] .mcq-progress::before {   width: 0%; }
+[data-progress="5"] .mcq-progress::before { width: 5%; }
+[data-progress="10"] .mcq-progress::before { width: 10%; }
+[data-progress="15"] .mcq-progress::before { width: 15%; }
+[data-progress="20"] .mcq-progress::before { width: 20%; }
+[data-progress="25"] .mcq-progress::before { width: 25%; }
+[data-progress="30"] .mcq-progress::before { width: 30%; }
+[data-progress="35"] .mcq-progress::before { width: 35%; }
+[data-progress="40"] .mcq-progress::before { width: 40%; }
+[data-progress="45"] .mcq-progress::before { width: 45%; }
+[data-progress="50"] .mcq-progress::before { width: 50%; }
+[data-progress="55"] .mcq-progress::before { width: 55%; }
+[data-progress="60"] .mcq-progress::before { width: 60%; }
+[data-progress="65"] .mcq-progress::before { width: 65%; }
+[data-progress="70"] .mcq-progress::before { width: 70%; }
+[data-progress="75"] .mcq-progress::before { width: 75%; }
+[data-progress="80"] .mcq-progress::before { width: 80%; }
+[data-progress="85"] .mcq-progress::before { width: 85%; }
+[data-progress="90"] .mcq-progress::before { width: 90%; }
+[data-progress="95"] .mcq-progress::before { width: 95%; }
+[data-progress="100"] .mcq-progress::before { width: 100%; }
 
 /* ====== MCQ Warning Message ====== */
 .mcq-attempt-warning {
@@ -211,7 +210,8 @@
   line-height: 1.4;
   color: var(--text-normal);
   position: relative;
-  /* overflow: hidden; Removed to prevent clipping */
+  overflow: hidden;
+  z-index: 1;
   min-height: auto; /* Allow button to grow with content */
   height: auto; /* Allow button to grow with content */
   margin-bottom: 6px;
@@ -305,17 +305,17 @@
 }
 
 /* MCQ Choice Correct/Incorrect Styling - fixed dimensions with modern colors */
-.mcq-choice-correct {
-  background-color: var(--sf-success-light) !important; /* Modern green with lower opacity */
-  border-color: var(--sf-success) !important; /* Modern green */
-  color: var(--text-normal) !important;
-  box-shadow: 0 2px 8px rgba(56, 161, 105, 0.1) !important;
+.mcq-choice-correct.mcq-choice-correct {
+  background-color: var(--sf-success-light); /* Modern green with lower opacity */
+  border-color: var(--sf-success); /* Modern green */
+  color: var(--text-normal);
+  box-shadow: 0 2px 8px rgba(56, 161, 105, 0.1);
   animation: correctPulse 0.5s ease-out;
-  transform: none !important; /* Prevent layout shifts */
+  transform: none; /* Prevent layout shifts */
 }
 
-.mcq-choice-correct::before {
-  background-color: var(--sf-success) !important; /* Modern green */
+.mcq-choice-correct.mcq-choice-correct::before {
+  background-color: var(--sf-success); /* Modern green */
   width: 6px;
 }
 
@@ -323,16 +323,16 @@
   color: var(--sf-success); /* Modern green */
 }
 
-.mcq-choice-incorrect {
-  background-color: var(--sf-danger-light) !important; /* Modern red with lower opacity */
-  border-color: var(--sf-danger) !important; /* Modern red */
-  color: var(--text-normal) !important;
+.mcq-choice-incorrect.mcq-choice-incorrect {
+  background-color: var(--sf-danger-light); /* Modern red with lower opacity */
+  border-color: var(--sf-danger); /* Modern red */
+  color: var(--text-normal);
   animation: none; /* Remove the shake animation to prevent layout shifts */
-  box-shadow: 0 2px 8px rgba(229, 62, 62, 0.1) !important;
+  box-shadow: 0 2px 8px rgba(229, 62, 62, 0.1);
 }
 
-.mcq-choice-incorrect::before {
-  background-color: var(--sf-danger) !important; /* Modern red */
+.mcq-choice-incorrect.mcq-choice-incorrect::before {
+  background-color: var(--sf-danger); /* Modern red */
   width: 6px;
 }
 
@@ -681,10 +681,10 @@
   color: white;
 }
 
-.batch-review-cancel-button {
+.batch-review-cancel-button.batch-review-cancel-button {
   background-color: var(--sf-bg-secondary);
   color: var(--sf-text);
-  border: 1px solid var(--background-modifier-border) !important;
+  border: 1px solid var(--background-modifier-border);
 }
 
 .batch-review-progress {
@@ -748,15 +748,106 @@
   margin-left: 10px;
 }
 
-.batch-review-complete-blackout,
-.batch-review-incorrect,
-.batch-review-incorrect-familiar,
-.batch-review-correct-difficulty,
-.batch-review-correct-hesitation,
-.batch-review-perfect-recall,
-.batch-review-hard,
-.batch-review-fair,
-.batch-review-good,
+.batch-review-complete-blackout {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-incorrect {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-incorrect-familiar {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-correct-difficulty {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.batch-review-correct-hesitation {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.batch-review-perfect-recall {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+/* Legacy result styles */
+.batch-review-hard {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.batch-review-fair {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-warning-light);
+  color: var(--sf-warning);
+}
+
+.batch-review-good {
+  padding: 5px 10px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
 .batch-review-perfect {
   padding: 5px 10px;
   border-radius: 100px;
@@ -764,55 +855,6 @@
   text-align: center;
   font-weight: 500;
   font-size: 13px;
-}
-
-.batch-review-complete-blackout {
-  background-color: var(--sf-danger-light);
-  color: var(--sf-danger);
-}
-
-.batch-review-incorrect {
-  background-color: var(--sf-danger-light);
-  color: var(--sf-danger);
-}
-
-.batch-review-incorrect-familiar {
-  background-color: var(--sf-danger-light); /* Using light danger variable */
-  color: var(--sf-danger); /* Using danger variable */
-}
-
-.batch-review-correct-hesitation {
-  background-color: var(--sf-success-light); /* Using light success variable */
-  color: var(--sf-success); /* Using success variable */
-}
-
-/* Legacy result styles */
-.batch-review-hard {
-  background-color: var(--sf-danger-light);
-  color: var(--sf-danger);
-}
-
-.batch-review-fair {
-  background-color: var(--sf-warning-light);
-  color: var(--sf-warning);
-}
-
-.batch-review-good {
-  background-color: var(--sf-success-light); /* Using light success variable */
-  color: var(--sf-success); /* Using success variable */
-}
-
-.batch-review-perfect {
-  background-color: var(--sf-success-light);
-  color: var(--sf-success);
-}
-
-.batch-review-good {
-  background-color: var(--sf-success-light);
-  color: var(--sf-success);
-}
-
-.batch-review-perfect {
   background-color: var(--sf-success-light);
   color: var(--sf-success);
 }
@@ -837,12 +879,6 @@
 }
 
 /* Additional MCQ enhancements */
-.mcq-choice-btn {
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
-}
-
 .mcq-choice-btn::after {
   content: '';
   position: absolute;
@@ -888,19 +924,19 @@
 }
 
 /* Fix for letter indicators in MCQ UI */
-[class*=" or "], [class^="or "] {
-  background-color: var(--sf-bg-primary) !important;
-  color: var(--sf-text) !important;
-  border: 1px solid var(--background-modifier-border) !important;
-  padding: 2px 6px !important;
-  border-radius: 4px !important;
+[class*=" or "][class*=" or "], [class^="or "][class^="or "] {
+  background-color: var(--sf-bg-primary);
+  color: var(--sf-text);
+  border: 1px solid var(--background-modifier-border);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* Preserve legacy class function while improving appearance */
 
 /* Style for the selected answer using keyboard navigation */
-.mcq-choice-selected {
-  border-color: var(--interactive-accent) !important;
+.mcq-choice-selected.mcq-choice-selected {
+  border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.5), 0 1px 3px rgba(0, 0, 0, 0.1);
   transform: translateX(4px); /* Consistent with hover */
 }
@@ -912,16 +948,14 @@
 }
 
 /* Dark theme specific overrides for text visibility - MORE SPECIFIC */
-.theme-dark .spaceforge-mcq-modal .mcq-choice-btn {
-    color: var(--text-normal) !important; /* Attempt with !important if necessary */
+.theme-dark .spaceforge-mcq-modal .mcq-choice-btn.mcq-choice-btn {
+    color: var(--text-normal);
 }
-.theme-dark .spaceforge-mcq-modal .mcq-choice-btn .mcq-choice-text {
-    color: var(--text-normal) !important; /* Attempt with !important if necessary */
+.theme-dark .spaceforge-mcq-modal .mcq-choice-btn .mcq-choice-text.mcq-choice-text {
+    color: var(--text-normal);
 }
-.theme-dark .spaceforge-mcq-modal .mcq-choice-btn .mcq-shortcut-hint {
-    color: var(--text-muted) !important; /* Attempt with !important if necessary */
-    /* Consider a lighter background for the hint if still problematic */
-    /* background-color: var(--background-modifier-hover) !important; */
+.theme-dark .spaceforge-mcq-modal .mcq-choice-btn .mcq-shortcut-hint.mcq-shortcut-hint {
+    color: var(--text-muted);
 }
 
 /* Styles for Algorithm Details in Results */

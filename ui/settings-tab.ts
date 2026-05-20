@@ -1,8 +1,8 @@
 import { App, Notice, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import { ConfirmationModal } from './confirmation-modal';
 import SpaceforgePlugin from '../main';
-import { ApiProvider, DEFAULT_SETTINGS, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
-import { SpaceforgePluginData, DEFAULT_PLUGIN_STATE_DATA } from '../models/plugin-data';
+import { ApiProvider, DEFAULT_SETTINGS, MCQQuestionAmountMode, MCQDifficulty, SpaceforgeSettings } from '../models/settings';
+import { SpaceforgePluginData, DEFAULT_PLUGIN_STATE_DATA, PluginStateData } from '../models/plugin-data';
 import { SM2, FSRS, POMODORO, MCQS, API, SPACEFORGE, CLAUDE, GEMINI, OLLAMA, TOGETHER_AI, WPM } from './constants';
 
 /**
@@ -37,7 +37,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         // Add a utility for creating collapsible sections
         const createCollapsible = (title: string, iconName: string, defaultOpen = true) => {
             // Create section container
-            const sectionContainer = containerEl.createEl('div', { cls: 'sf-settings-section' });
+            const sectionContainer = containerEl.createDiv({ cls: 'sf-settings-section' });
 
             // Create heading using Setting.setHeading()
             const headingSetting = new Setting(sectionContainer)
@@ -46,21 +46,21 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             // Add icon if provided
             if (iconName) {
-                const iconEl = headingSetting.settingEl.createEl('span', { cls: 'sf-settings-icon' });
+                const iconEl = headingSetting.settingEl.createSpan({ cls: 'sf-settings-icon' });
                 setIcon(iconEl, iconName);
                 // Insert icon before the name
                 headingSetting.nameEl.prepend(iconEl);
             }
 
             // Add collapse indicator
-            const collapseIndicator = headingSetting.settingEl.createEl('span', {
+            const collapseIndicator = headingSetting.settingEl.createSpan({
                 cls: 'sf-settings-collapse-indicator',
                 text: defaultOpen ? '▾' : '▸'
             });
             headingSetting.nameEl.appendChild(collapseIndicator);
 
             // Create content container
-            const contentContainer = sectionContainer.createEl('div', {
+            const contentContainer = sectionContainer.createDiv({
                 cls: 'sf-settings-section-content'
             });
 
@@ -84,7 +84,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         // Create action buttons for global data operations
         const createActionButtons = () => {
-            const actionsContainer = containerEl.createEl('div', { cls: 'sf-settings-actions' });
+            const actionsContainer = containerEl.createDiv({ cls: 'sf-settings-actions' });
 
             // Export all data button
             const exportBtn = actionsContainer.createEl('button', { text: 'Export all data', cls: 'sf-btn sf-btn-primary' });
@@ -178,7 +178,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
                             new Notice('All data imported successfully. Plugin may require a reload for all changes to take effect.');
                         } catch (error) {
-                            new Notice(`Failed to import data: ${error.message} `);
+                            const msg = error instanceof Error ? error.message : String(error);
+                            new Notice(`Failed to import data: ${msg} `);
                         }
                     }
                 };
@@ -194,8 +195,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     'Are you sure you want to reset all plugin data (settings and state) to defaults? This cannot be undone.',
                     async () => {
                         // Apply default settings and default plugin state
-                        this.plugin.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-                        this.plugin.pluginState = JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA));
+                        this.plugin.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as SpaceforgeSettings;
+                        this.plugin.pluginState = JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA)) as PluginStateData;
 
                         // Repopulate services with defaults
                         this.plugin.reviewScheduleService.schedules = this.plugin.pluginState.schedules;
@@ -321,7 +322,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     async () => {
                         try {
                             // Reset all plugin state to defaults
-                            this.plugin.pluginState = JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA));
+                            this.plugin.pluginState = JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA)) as PluginStateData;
 
                             // Update all services
                             this.plugin.reviewScheduleService.schedules = this.plugin.pluginState.schedules;
@@ -377,7 +378,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         // Changed to h3 and removed sf-settings-subsection class for potentially better contrast
         new Setting(spacedRepSection).setName('Algorithm configuration').setHeading();
 
-        const algorithmContainer = spacedRepSection.createEl('div', { cls: 'sf-settings-subsection' }); // Define algorithmContainer
+        const algorithmContainer = spacedRepSection.createDiv({ cls: 'sf-settings-subsection' }); // Define algorithmContainer
 
         new Setting(algorithmContainer)
             .setName('Default scheduling algorithm')
@@ -393,7 +394,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         // --- Dynamic "About Algorithm" Section ---
-        const aboutAlgoContainer = spacedRepSection.createEl('div', { cls: 'sf-info-box sf-algo-about-box' });
+        const aboutAlgoContainer = spacedRepSection.createDiv({ cls: 'sf-info-box sf-algo-about-box' });
         this.renderAboutAlgorithmSection(aboutAlgoContainer, this.plugin.settings.defaultSchedulingAlgorithm);
 
         // --- SM-2 Parameters ---
@@ -685,10 +686,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     await this.plugin.savePluginData();
                 }));
 
-        interfaceSection.createEl('div', {
-            cls: 'sf-setting-explain',
-            text: `Average adults read 200-250 ${WPM} for regular content, 100-150 ${WPM} for technical content`
-        });
+        interfaceSection.createDiv({ cls: 'sf-setting-explain', text: `Average adults read 200-250 ${WPM} for regular content, 100-150 ${WPM} for technical content` });
 
         new Setting(interfaceSection)
             .setName("Navigation command")
@@ -819,7 +817,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setName("OpenRouter configuration")
                     .setHeading()
                     .setClass("sf-settings-subsection-provider-header");
-                const apiKeyContainer = mcqSection.createEl('div', { cls: 'sf-setting-highlight' });
+                const apiKeyContainer = mcqSection.createDiv({ cls: 'sf-setting-highlight' });
                 new Setting(apiKeyContainer)
                     .setName('API key')
                     .setDesc('Required for generating MCQs via OpenRouter.')
@@ -831,7 +829,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                             await this.plugin.savePluginData();
                         }));
                 // Removed sf-setting-explain class
-                apiKeyContainer.createEl('div').setText('Get your API key at https://openrouter.ai/keys');
+                apiKeyContainer.createDiv().setText('Get your API key at https://openrouter.ai/keys');
 
                 new Setting(mcqSection)
                     .setName('Model')
@@ -1050,10 +1048,10 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     }));
 
             // Use CSS grid for the two dropdowns side by side
-            const mcqFormattingGrid = mcqSection.createEl('div', { cls: 'sf-setting-grid' });
+            const mcqFormattingGrid = mcqSection.createDiv({ cls: 'sf-setting-grid' });
 
             // First item in grid
-            const promptTypeContainer = mcqFormattingGrid.createEl('div');
+            const promptTypeContainer = mcqFormattingGrid.createDiv();
             new Setting(promptTypeContainer)
                 .setName('Prompt type')
                 .setDesc('Format for question generation')
@@ -1067,7 +1065,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     }));
 
             // Second item in grid
-            const difficultyContainer = mcqFormattingGrid.createEl('div');
+            const difficultyContainer = mcqFormattingGrid.createDiv();
             new Setting(difficultyContainer)
                 .setName('Difficulty')
                 .setDesc('Complexity level')
@@ -1124,7 +1122,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             systemPromptsContainer.createEl('summary', { text: 'System prompts (advanced)', cls: 'sf-settings-subsection' });
 
             // Basic prompt textarea
-            systemPromptsContainer.createEl('div', { text: 'Basic difficulty prompt', cls: 'sf-prompt-label' });
+            systemPromptsContainer.createDiv({ text: 'Basic difficulty prompt', cls: 'sf-prompt-label' });
             const basicTextarea = systemPromptsContainer.createEl('textarea', {
                 attr: {
                     placeholder: 'Enter system prompt for basic difficulty',
@@ -1141,7 +1139,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             });
 
             // Advanced prompt textarea
-            systemPromptsContainer.createEl('div', { text: 'Advanced difficulty prompt', cls: 'sf-prompt-label' });
+            systemPromptsContainer.createDiv({ text: 'Advanced difficulty prompt', cls: 'sf-prompt-label' });
             const advancedTextarea = systemPromptsContainer.createEl('textarea', {
                 attr: {
                     placeholder: 'Enter system prompt for advanced difficulty',
@@ -1203,7 +1201,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         } else {
             // If MCQ is disabled, show a message about enabling it
-            const mcqDisabledMessage = mcqSection.createEl('div', { cls: 'sf-info-box' });
+            const mcqDisabledMessage = mcqSection.createDiv({ cls: 'sf-info-box' });
             mcqDisabledMessage.createEl('p', {
                 text: `${MCQS} are currently disabled. Enable it to configure durations and notifications.`
             });
@@ -1308,7 +1306,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         await this.plugin.savePluginData();
                     }));
         } else {
-            const pomodoroDisabledMessage = pomodoroSection.createEl('div', { cls: 'sf-info-box' });
+            const pomodoroDisabledMessage = pomodoroSection.createDiv({ cls: 'sf-info-box' });
             pomodoroDisabledMessage.createEl('p', {
                 text: `${POMODORO} timer is currently disabled. Enable it to configure durations and notifications.`
             });
@@ -1369,7 +1367,8 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                                         new Notice('Legacy data file deleted successfully.', 3000);
                                         this.display(); // Refresh settings
                                     } catch (error) {
-                                        new Notice('Failed to delete legacy file: ' + error.message, 5000);
+                                        const msg = error instanceof Error ? error.message : String(error);
+                                        new Notice('Failed to delete legacy file: ' + msg, 5000);
                                     }
                                 }
                             ).open();

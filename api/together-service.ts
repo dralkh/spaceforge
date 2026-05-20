@@ -3,7 +3,16 @@ import { TOGETHER_AI, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
-import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings'; // Import MCQQuestionAmountMode
+import { SpaceforgeSettings, MCQQuestionAmountMode, MCQDifficulty } from '../models/settings';
+
+interface TogetherResponse {
+    choices: Array<{ message: { content: string } }>;
+}
+
+interface TogetherErrorResponse {
+    error?: { message?: string };
+    message?: string;
+}
 
 export class TogetherService implements IMCQGenerationService {
     plugin: SpaceforgePlugin;
@@ -103,17 +112,18 @@ export class TogetherService implements IMCQGenerationService {
             });
 
             if (response.status !== 200) {
-                const errorData = response.json || { message: response.text };
-                throw new Error(`API request failed (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
+                const errorData: TogetherErrorResponse = response.json ?? { message: response.text };
+                throw new Error(`API request failed (${response.status}): ${errorData.error?.message ?? errorData.message ?? 'Unknown error'}`);
             }
 
-            const data = response.json;
-            if (!data.choices || !data.choices.length || !data.choices[0].message || !data.choices[0].message.content) {
+            const data = response.json as TogetherResponse;
+            if (!data.choices?.length || !data.choices[0]?.message?.content) {
                 throw new Error('Invalid API response format from Together AI - missing content');
             }
             return data.choices[0].message.content;
         } catch (error) {
-            new Notice(`Together AI API error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            new Notice(`Together AI API error: ${msg}`);
             throw error;
         }
     }
