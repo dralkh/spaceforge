@@ -4,6 +4,8 @@
 
 Spaceforge transforms your Obsidian notes into a powerful learning and revision tool. It enhances your learning workflow by providing intelligent flashcards, automated multiple-choice question generation, and focused study sessions, all designed for optimal memory retention and active recall.
 
+<img width="1935" height="1307" alt="image" src="https://github.com/user-attachments/assets/c42a177b-b550-41f7-9b40-cd3120a4a2a9" />
+
 ![image](https://github.com/user-attachments/assets/064adc71-0769-46cb-8b46-21dafbc42b31)
 
 ## Preview
