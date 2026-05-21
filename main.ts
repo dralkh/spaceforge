@@ -18,6 +18,7 @@ import { OllamaService } from './api/ollama-service';
 import { GeminiService } from './api/gemini-service';
 import { ClaudeService } from './api/claude-service';
 import { TogetherService } from './api/together-service';
+import { OpenAICompatibleService } from './api/openai-compatible-service';
 import { IMCQGenerationService } from './api/mcq-generation-service';
 import { ReviewScheduleService } from './services/review-schedule-service';
 import { ReviewHistoryService } from './services/review-history-service';
@@ -714,6 +715,12 @@ export default class SpaceforgePlugin extends Plugin {
                     return undefined;
                 }
                 return new TogetherService(this);
+            case ApiProvider.OpenAICompatible:
+                if (!this.settings.openaiCompatibleApiUrl || !this.settings.openaiCompatibleModel) {
+                    new Notice('OpenAI Compatible API URL or model is not set in settings');
+                    return undefined;
+                }
+                return new OpenAICompatibleService(this);
             default:
                 // It's good practice to handle unexpected enum values, even if TypeScript provides some safety.
                 // This could happen if settings data is corrupted or from an older version.

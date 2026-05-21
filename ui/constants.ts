@@ -13,6 +13,7 @@ export const CLAUDE = 'Claude';
 export const GEMINI = 'Gemini';
 export const OLLAMA = 'Ollama';
 export const OPENAI = 'OpenAI';
+export const OPENAI_COMPATIBLE = 'OpenAI Compatible';
 export const TOGETHER_AI = 'Together AI';
 export const OPENROUTER = 'OpenRouter';
 export const WPM = 'WPM';

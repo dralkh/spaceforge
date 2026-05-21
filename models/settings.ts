@@ -250,6 +250,24 @@ export interface SpaceforgeSettings {
      * Default: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8'
      */
     togetherModel: string;
+
+    /**
+     * OpenAI Compatible API URL
+     * Default: ''
+     */
+    openaiCompatibleApiUrl: string;
+
+    /**
+     * OpenAI Compatible API Key
+     * Default: ''
+     */
+    openaiCompatibleApiKey: string;
+
+    /**
+     * OpenAI Compatible Model
+     * Default: ''
+     */
+    openaiCompatibleModel: string;
     
     /**
      * System prompt for basic difficulty MCQs
@@ -358,7 +376,8 @@ export enum ApiProvider {
     Ollama = 'ollama',
     Gemini = 'gemini',
     Claude = 'claude',
-    Together = 'together'
+    Together = 'together',
+    OpenAICompatible = 'openai-compatible'
 }
 
 /**
@@ -394,6 +413,9 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     claudeModel: 'claude-3-sonnet-20240229',
     togetherApiKey: '',
     togetherModel: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
+    openaiCompatibleApiUrl: '',
+    openaiCompatibleApiKey: '',
+    openaiCompatibleModel: '',
     mcqPromptType: 'detailed',
     mcqQuestionsPerNote: 4,
     mcqChoicesPerQuestion: 5,

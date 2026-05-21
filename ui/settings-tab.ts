@@ -3,7 +3,7 @@ import { ConfirmationModal } from './confirmation-modal';
 import SpaceforgePlugin from '../main';
 import { ApiProvider, DEFAULT_SETTINGS, MCQQuestionAmountMode, MCQDifficulty, SpaceforgeSettings } from '../models/settings';
 import { SpaceforgePluginData, DEFAULT_PLUGIN_STATE_DATA, PluginStateData } from '../models/plugin-data';
-import { SM2, FSRS, POMODORO, MCQS, API, SPACEFORGE, CLAUDE, GEMINI, OLLAMA, TOGETHER_AI, WPM } from './constants';
+import { SM2, FSRS, POMODORO, MCQS, API, SPACEFORGE, CLAUDE, GEMINI, OLLAMA, OPENAI_COMPATIBLE, TOGETHER_AI, WPM } from './constants';
 
 /**
  * Settings tab for the plugin
@@ -800,6 +800,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         .addOption(ApiProvider.Gemini, 'Gemini')
                         .addOption(ApiProvider.Claude, 'Claude')
                         .addOption(ApiProvider.Together, 'Together AI')
+                        .addOption(ApiProvider.OpenAICompatible, 'OpenAI Compatible')
                         .setValue(this.plugin.settings.mcqApiProvider)
                         .onChange(async (value: ApiProvider) => {
                             this.plugin.settings.mcqApiProvider = value;
@@ -965,6 +966,41 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         .setValue(this.plugin.settings.togetherModel)
                         .onChange(async (value: string) => {
                             this.plugin.settings.togetherModel = value;
+                            await this.plugin.savePluginData();
+                        }));
+            } else if (provider === ApiProvider.OpenAICompatible) {
+                new Setting(mcqSection)
+                    .setName("OpenAI Compatible configuration")
+                    .setHeading()
+                    .setClass("sf-settings-subsection-provider-header");
+                new Setting(mcqSection)
+                    .setName('API URL')
+                    .setDesc(`Base URL of the ${OPENAI_COMPATIBLE} API (e.g., http://localhost:8000/v1)`)
+                    .addText(text => text
+                        .setPlaceholder('http://localhost:8000/v1')
+                        .setValue(this.plugin.settings.openaiCompatibleApiUrl)
+                        .onChange(async (value: string) => {
+                            this.plugin.settings.openaiCompatibleApiUrl = value;
+                            await this.plugin.savePluginData();
+                        }));
+                new Setting(mcqSection)
+                    .setName('API key')
+                    .setDesc(`API key for ${OPENAI_COMPATIBLE} (optional).`)
+                    .addText(text => text
+                        .setPlaceholder(`Enter ${OPENAI_COMPATIBLE} ${API} key`)
+                        .setValue(this.plugin.settings.openaiCompatibleApiKey)
+                        .onChange(async (value: string) => {
+                            this.plugin.settings.openaiCompatibleApiKey = value;
+                            await this.plugin.savePluginData();
+                        }));
+                new Setting(mcqSection)
+                    .setName('Model')
+                    .setDesc(`Model name to use (e.g., gpt-4, local-model-name)`)
+                    .addText(text => text
+                        .setPlaceholder(`Enter model name`)
+                        .setValue(this.plugin.settings.openaiCompatibleModel)
+                        .onChange(async (value: string) => {
+                            this.plugin.settings.openaiCompatibleModel = value;
                             await this.plugin.savePluginData();
                         }));
             }
