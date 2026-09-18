@@ -15,6 +15,7 @@ export class ListViewRenderer {
     private plugin: SpaceforgePlugin;
     private pomodoroUIManager: PomodoroUIManager;
     private noteItemRenderer: NoteItemRenderer;
+    private dragAndDropInitialized = false;
 
     // State properties needed from ReviewSidebarView (passed during render or managed via callbacks)
     private getActiveListBaseDate: () => Date | null;
@@ -611,11 +612,17 @@ export class ListViewRenderer {
         const existingNoteElements = Array.from(notesContainer.querySelectorAll<HTMLElement>('.review-note-item[data-note-path]'));
         const existingNotesMap = new Map(existingNoteElements.map(el => [el.dataset.notePath, el]));
         const notesInOrder: HTMLElement[] = [];
+        const processedPaths = new Set<string>();
 
         const lastSelectedNotePath = this.getLastSelectedNotePath();
         const lastSelectedNotePathRef = { current: lastSelectedNotePath };
 
         for (const note of notes) {
+            // Guard against duplicate entries in the provided list; a path must
+            // only ever produce a single note item in the container.
+            if (processedPaths.has(note.path)) continue;
+            processedPaths.add(note.path);
+
             let noteEl = existingNotesMap.get(note.path);
             if (noteEl) {
                 await this.noteItemRenderer.updateNoteItem(
@@ -760,6 +767,11 @@ export class ListViewRenderer {
       * Setup drag-and-drop event handlers for the container
       */
      private setupDragAndDrop(container: HTMLElement): void {
+         // Attach the drag-and-drop listeners only once; render() runs on every
+         // refresh, and stacking duplicate handlers would run actions repeatedly.
+         if (this.dragAndDropInitialized) return;
+         this.dragAndDropInitialized = true;
+
          // Track the current drag target for visual feedback
          let currentDragTarget: HTMLElement | null = null;
          

@@ -31,6 +31,14 @@ export class ReviewSidebarView extends ItemView {
     private lastScrollPosition = 0;
     private expandedUpcomingDayKey: string | null = null; // State for upcoming section
     private resizeObserver: ResizeObserver | null = null;
+    private refreshPromise: Promise<void> | null = null;
+    private refreshQueued = false;
+    private readonly onSidebarUpdate = () => { void this.refresh(); };
+    private readonly onPomodoroUpdate = () => {
+        if (this.pomodoroUIManager) {
+            this.pomodoroUIManager.updatePomodoroUI();
+        }
+    };
 
     // Sub-components for rendering different parts
     private pomodoroUIManager: PomodoroUIManager;
@@ -56,12 +64,8 @@ export class ReviewSidebarView extends ItemView {
     getIcon(): string { return "calendar-clock"; }
 
     async onOpen(): Promise<void> {
-        this.plugin.events.on('sidebar-update', () => { void this.refresh(); });
-        this.plugin.events.on('pomodoro-update', () => {
-            if (this.pomodoroUIManager) {
-                this.pomodoroUIManager.updatePomodoroUI();
-            }
-        });
+        this.plugin.events.on('sidebar-update', this.onSidebarUpdate);
+        this.plugin.events.on('pomodoro-update', this.onPomodoroUpdate);
 
         // Ensure structure and render on first open
         await this.refresh();
@@ -71,8 +75,8 @@ export class ReviewSidebarView extends ItemView {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-        this.plugin.events.off('sidebar-update', () => { void this.refresh(); });
-        // No need to explicitly unregister pomodoro-update as the manager handles its own logic
+        this.plugin.events.off('sidebar-update', this.onSidebarUpdate);
+        this.plugin.events.off('pomodoro-update', this.onPomodoroUpdate);
         return Promise.resolve();
     }
 
@@ -155,6 +159,31 @@ export class ReviewSidebarView extends ItemView {
     }
 
     async refresh(): Promise<void> {
+        // Coalesce concurrent refresh requests. Overlapping renders mutate shared
+        // DOM containers and can transiently duplicate note items, so renders are
+        // serialized here: while one is running, further requests are collapsed
+        // into a single follow-up pass.
+        if (this.refreshPromise) {
+            this.refreshQueued = true;
+            return this.refreshPromise;
+        }
+
+        const refreshPromise = (async () => {
+            try {
+                do {
+                    this.refreshQueued = false;
+                    await this._refreshView();
+                } while (this.refreshQueued);
+            } finally {
+                this.refreshPromise = null;
+            }
+        })();
+        this.refreshPromise = refreshPromise;
+
+        return refreshPromise;
+    }
+
+    private async _refreshView(): Promise<void> {
         // Capture the state of activeListBaseDate *before* any potential changes in this refresh cycle.
         const previousActiveListBaseDateEpoch = this.activeListBaseDate ? DateUtils.startOfUTCDay(this.activeListBaseDate) : null;
 
@@ -274,6 +303,12 @@ export class ReviewSidebarView extends ItemView {
         // Add resize observer logic
         // The resizeObserver should still observe this.containerEl (the root of the sidebar view)
         // but updateCalendarContainerClass needs to target the correct element within CalendarView's structure.
+        // Disconnect any previous observer first so repeated renders don't leak them.
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+
         const resizeObserver = new ResizeObserver(entries => {
             for (const entry of entries) {
                 if (entry.target === this.containerEl) {

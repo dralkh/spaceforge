@@ -298,10 +298,10 @@ export class CalendarView {
                     const timeEstimate = dayCell.createDiv("calendar-time-estimate");
                     timeEstimate.setText(EstimationUtils.formatTime(dateReviews.totalTime));
 
-                    dayCell.addEventListener("click", () => {
-                        // today assignment removed
-
-
+                    // Assign the handler (instead of addEventListener) so repeated
+                    // calendar renders replace it rather than stacking duplicate
+                    // listeners, which would trigger a burst of concurrent refreshes.
+                    dayCell.onclick = () => {
                         this.plugin.settings.sidebarViewType = 'list';
                         this.plugin.clickedDateFromCalendar = currentDateObj;
 
@@ -315,7 +315,7 @@ export class CalendarView {
                                 new Notice("Switched to list view. Sidebar will update.");
                             }
                         })();
-                    });
+                    };
 
                     if (dateReviews.notes.length > 10) dayCell.addClass("heavy-load");
                     else if (dateReviews.notes.length > 5) dayCell.addClass("medium-load");

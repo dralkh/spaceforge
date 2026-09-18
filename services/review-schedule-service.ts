@@ -874,8 +874,9 @@ export class ReviewScheduleService {
         const orderedPaths: Set<string> = new Set<string>();
 
         // First, add notes that have a defined order
+        // (skip duplicates so a corrupted custom order cannot duplicate notes)
         for (const path of this.customNoteOrder) {
-            if (notesByPath[path]) {
+            if (notesByPath[path] && !orderedPaths.has(path)) {
                 notesInOrder.push(notesByPath[path]);
                 orderedPaths.add(path);
             }
