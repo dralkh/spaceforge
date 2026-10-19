@@ -1,0 +1,122 @@
+/* AnkiWeb search: the modal that finds shared decks and imports one. */
+
+.sf-ankiweb-modal {
+    min-width: min(30em, 90vw);
+}
+
+.sf-ankiweb-search-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.sf-ankiweb-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--sf-font-text);
+}
+
+.sf-ankiweb-search-button {
+    flex: 0 0 auto;
+}
+
+.sf-ankiweb-status {
+    margin-top: 0.75em;
+    font-size: var(--sf-font-ui);
+    color: var(--text-normal);
+}
+
+.sf-ankiweb-warning {
+    margin-top: 0.5em;
+    font-size: var(--sf-font-ui);
+    color: var(--text-muted);
+}
+
+.sf-ankiweb-action {
+    margin-top: 0.75em;
+}
+
+.sf-ankiweb-open-button {
+    font-size: var(--sf-font-ui);
+}
+
+.sf-ankiweb-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    margin-top: 0.75em;
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.sf-ankiweb-result {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.25em 0.5em;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+}
+
+.sf-ankiweb-result.is-highlighted {
+    border-color: var(--interactive-accent);
+    background-color: var(--background-modifier-hover);
+}
+
+.sf-ankiweb-result-open {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15em;
+    text-align: left;
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0.25em 0;
+    cursor: pointer;
+}
+
+.sf-ankiweb-result-open:hover {
+    background: none;
+}
+
+.sf-ankiweb-result-name {
+    font-size: var(--sf-font-text);
+    color: var(--text-normal);
+    overflow-wrap: anywhere;
+}
+
+.sf-ankiweb-result-meta {
+    font-size: var(--sf-font-small);
+    color: var(--text-muted);
+}
+
+.sf-ankiweb-result-import {
+    flex: 0 0 auto;
+    font-size: var(--sf-font-ui);
+}
+
+.sf-ankiweb-hint {
+    margin-top: 0.75em;
+    font-size: var(--sf-font-small);
+    color: var(--text-faint);
+}
+
+/* The action a refusal comes with: AnkiWeb's own search page, in the browser
+   the reader is already signed in to. */
+.sf-ankiweb-warning-text {
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-ankiweb-browser {
+  height: auto !important;
+  padding: var(--sf-space-xs) var(--sf-space-md);
+  font-size: var(--sf-font-ui);
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+  border: none;
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+}

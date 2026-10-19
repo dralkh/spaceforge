@@ -1,0 +1,1223 @@
+/* Spaceforge Study — the visual board and the summary.
+ *
+ * Two surfaces, one stylesheet, because they are the same piece of Study: the
+ * forms a discipline reasons in (a comparison matrix is a table, a decision is
+ * a numbered step with its branches, a cycle is a ring, a sequence is a
+ * timeline) and the condensed summary with its pearls set apart.
+ *
+ * Several of those forms are also operated — a comparison revealed cell by
+ * cell, a process stepped, a timeline scrubbed — and an asset's state is drawn
+ * as a class on the nodes it already has (`is-covered`, `is-current`,
+ * `is-stepped`), so nothing in this file moves geometry: the reveal never
+ * changes the table, the stepper never changes the ring's angles, and a step
+ * keeps its place while the reader walks past it.
+ *
+ * Two of them also *move*: a process with a motion carries the same
+ * `is-current` class from step to step on a repeating tick, or breathes
+ * (`is-pulsing`), and a comparison row states its verdict with a drawn mark
+ * (`is-mark-better|worse|equal`) rather than with a sentence. Both are drawn
+ * here, from those classes, and both are switched off for a reader whose
+ * system asks for reduced motion.
+ *
+ * Two rules hold for every rule below. Nothing clips text silently: a cell or
+ * a label wraps, and anything that must stay one line is cut with an ellipsis
+ * the reader can see. And nothing here sizes the host: a table wider than the
+ * sidebar scrolls inside its own box (`max-width: 100%` + `overflow-x: auto`),
+ * so the board can be dropped into a 340px sidebar or a full-width pane and
+ * ask for no more than it was given.
+ *
+ * Text sizes come from the house scale in `_variables.css` (`--sf-font-*`),
+ * never from a literal: a reader who changes their text size moves all of it.
+ * Ring geometry is in `em`, so the drawing scales with the reader's text too.
+ */
+
+/* ============================== Board shell ============================== */
+
+.sf-vb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sf-vb-visual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  padding: var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+}
+
+.sf-vb-title {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  color: var(--text-normal);
+  /* The one line the card is about: it wraps rather than being cut. */
+  overflow-wrap: anywhere;
+}
+
+/* What to watch for while an asset moves — or while the reader moves it. Quiet,
+   under the title, so the asset itself is still the first thing seen: a teach
+   line is the point the motion is making, not a caption to the drawing. */
+.sf-vb-teach {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The pearl line every form ends with: the tag says what it is, the text is
+   the thing worth keeping, and the accent edge keeps it findable at a glance
+   without recolouring the sentence itself. */
+.sf-vb-pearl {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding-left: var(--sf-space-sm);
+  border-left: 3px solid var(--sf-primary);
+}
+
+.sf-vb-pearl-tag {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-primary);
+}
+
+.sf-vb-pearl-text {
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Matrix / compare ============================== */
+
+/* The table's own box. A matrix with more columns than the host has width
+   scrolls here; the host is never asked to be wider than it is. */
+.sf-vb-table-scroll {
+  max-width: 100%;
+  max-height: min(60vh, 460px);
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+}
+
+.sf-vb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-vb-table-head {
+  background: var(--background-secondary);
+}
+
+/* Sticky so the columns' names stay readable while a long matrix scrolls. */
+.sf-vb-th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px var(--sf-space-sm);
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--sf-font-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: normal;
+  color: var(--sf-text-muted);
+}
+
+/* The corner above the row labels carries nothing, and must not claim width. */
+.sf-vb-th-label {
+  width: 1%;
+}
+
+.sf-vb-table-body {
+  background: var(--background-primary);
+}
+
+.sf-vb-row:nth-child(even) {
+  background: var(--background-secondary);
+}
+
+.sf-vb-row-label {
+  padding: 6px var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-normal);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.sf-vb-cell {
+  padding: 6px var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text);
+  vertical-align: top;
+  /* No cell may clip its text silently: it wraps, anywhere it must. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* The row the comparison is making: an edge and a wash, not a colour applied
+   to the words, so the text stays as readable as every other row's. */
+.sf-vb-row.is-emphasis .sf-vb-row-label {
+  border-left: 3px solid var(--sf-primary);
+  background: var(--sf-primary-light);
+}
+
+.sf-vb-row.is-emphasis .sf-vb-cell {
+  background: var(--sf-primary-light);
+}
+
+/* The verdict of a row, drawn rather than said. Three tones, one per mark, in
+   the semantic palette the rest of the plugin uses: the positive tone for
+   `better`, the warning tone for `worse`, and muted for `equal` — so a
+   comparison that has a winner shows it before a word of it is read.
+
+   The bar is the chip's own left edge and the row's, so the verdict survives
+   however narrow the row's name is; the glyph is drawn by this stylesheet
+   because it is a mark and not content, while the word travels with the chip
+   (`title` + the accessible name) for a reader who cannot see the colour. */
+.sf-vb-mark {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-right: 6px;
+  padding: 0 3px;
+  border-left: 3px solid var(--sf-text-muted);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-modifier-hover);
+  font-size: var(--sf-font-small);
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--sf-text-muted);
+}
+
+.sf-vb-mark::before {
+  content: '=';
+}
+
+.sf-vb-row.is-mark-better .sf-vb-row-label {
+  box-shadow: inset 3px 0 0 var(--sf-success);
+}
+
+.sf-vb-row.is-mark-better .sf-vb-mark {
+  border-left-color: var(--sf-success);
+  background: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.sf-vb-row.is-mark-better .sf-vb-mark::before {
+  content: '▲';
+}
+
+.sf-vb-row.is-mark-worse .sf-vb-row-label {
+  box-shadow: inset 3px 0 0 var(--sf-warning);
+}
+
+.sf-vb-row.is-mark-worse .sf-vb-mark {
+  border-left-color: var(--sf-warning);
+  background: var(--sf-warning-light);
+  color: var(--sf-warning);
+}
+
+.sf-vb-row.is-mark-worse .sf-vb-mark::before {
+  content: '▼';
+}
+
+.sf-vb-row.is-mark-equal .sf-vb-row-label {
+  box-shadow: inset 3px 0 0 var(--sf-text-muted);
+}
+
+.sf-vb-row.is-mark-equal .sf-vb-mark {
+  border-left-color: var(--sf-text-muted);
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Flow ============================== */
+
+.sf-vb-steps {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-vb-step {
+  position: relative;
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding-bottom: var(--sf-space-sm);
+  /* The highlight travels rather than jumps, so a moving process reads as one
+     walk through the steps instead of a series of stills. */
+  transition: background-color var(--sf-transition), box-shadow var(--sf-transition), opacity var(--sf-transition);
+}
+
+/* The connector between steps: the numbered list's own vertical line. */
+.sf-vb-step::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 24px;
+  bottom: 0;
+  width: 2px;
+  background: var(--background-modifier-border);
+}
+
+.sf-vb-step:last-child::before {
+  display: none;
+}
+
+.sf-vb-step-num {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 50%;
+  background: var(--background-primary);
+  font-size: var(--sf-font-small);
+  line-height: 20px;
+  text-align: center;
+  color: var(--sf-text-muted);
+}
+
+.sf-vb-step-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.sf-vb-step-label {
+  font-size: var(--sf-font-text);
+  line-height: 1.45;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-vb-step-detail {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* A decision is a step with something to decide: its number takes the info
+   colour and the tag says so in words. */
+.sf-vb-step-kind {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--sf-info-light);
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sf-info);
+}
+
+.sf-vb-step.is-decision .sf-vb-step-num {
+  border-color: var(--sf-info);
+  color: var(--sf-info);
+}
+
+/* An outcome ends the process: filled, tagged, and shaped like a terminus. */
+.sf-vb-step-end {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--sf-primary);
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sf-text-on-primary);
+}
+
+.sf-vb-step.is-outcome .sf-vb-step-num {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+/* Branches: indented under their decision, one row per branch, the label it
+   carries first and the step it goes to after it. */
+.sf-vb-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+  padding-left: var(--sf-space-sm);
+  border-left: 2px dashed var(--background-modifier-border);
+}
+
+.sf-vb-branch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-vb-branch-label {
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-vb-branch-to {
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-vb-branch-to::before {
+  content: '→';
+  margin-right: 4px;
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Cycle ============================== */
+
+/* A ring drawn in CSS: the track is the circle, the steps are placed around
+   it by their own angle (set per step as `--sf-vb-angle`), and the arrow says
+   which way they run. Geometry is in `em`, so it follows the reader's text. */
+.sf-vb-ring {
+  position: relative;
+  width: min(100%, 22em);
+  aspect-ratio: 1 / 1;
+  margin: var(--sf-space-sm) auto;
+  /* Where the steps sit: inside the track, leaving room for their own box. */
+  --sf-vb-radius: 7.4em;
+  font-size: var(--sf-font-small);
+}
+
+.sf-vb-ring-track {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed var(--background-modifier-border);
+  border-radius: 50%;
+}
+
+.sf-vb-ring-step {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7em;
+  max-width: 42%;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--sf-vb-angle, 0deg))
+    translateY(calc(-1 * var(--sf-vb-radius)))
+    rotate(calc(-1 * var(--sf-vb-angle, 0deg)));
+  text-align: center;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  /* The ring's highlight travels like the list's: the class moves, the geometry
+     does not, and the change is eased rather than snapped. */
+  transition: background-color var(--sf-transition), outline-color var(--sf-transition), opacity var(--sf-transition);
+}
+
+/* A crowded ring shrinks its own labels rather than letting them collide. */
+.sf-vb-ring-step:nth-child(n + 7) {
+  width: 5.6em;
+}
+
+.sf-vb-ring-num {
+  display: block;
+  font-size: var(--sf-font-small);
+  font-weight: 600;
+  color: var(--sf-primary);
+}
+
+.sf-vb-ring-label {
+  display: block;
+  color: var(--text-normal);
+}
+
+.sf-vb-ring-arrow {
+  position: absolute;
+  /* Sits on the ring's own radius, so it stays inside however the ring scales. */
+  top: calc(50% - var(--sf-vb-radius) - 0.5em);
+  left: calc(50% + 0.4em);
+  width: 0;
+  height: 0;
+  border: 0.5em solid transparent;
+  border-left-color: var(--sf-primary);
+}
+
+/* Whatever the ring cannot say in a label — a branch, a detail — is said
+   under it, in words. */
+.sf-vb-cycle-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  margin-top: var(--sf-space-sm);
+  padding-top: var(--sf-space-sm);
+  border-top: 1px dashed var(--background-modifier-border);
+}
+
+.sf-vb-cycle-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sf-vb-cycle-note-from {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Timeline ============================== */
+
+/* The vertical rule the entries hang from, and one marker per entry. */
+.sf-vb-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  margin: 0;
+  padding: 0 0 0 var(--sf-space-md);
+  list-style: none;
+}
+
+.sf-vb-timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--background-modifier-border);
+}
+
+.sf-vb-tl-entry {
+  min-width: 0;
+}
+
+.sf-vb-tl-marker {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  /* A marker is a button, not a caption: the time on the rule is how the reader
+     jumps to the entry it names, so the chrome is stripped back to the cell it
+     sits in and the only thing it keeps is the fact that it is pressable. */
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.sf-vb-tl-marker:hover .sf-vb-tl-when {
+  text-decoration: underline;
+}
+
+/* The dot on the rule, drawn from the marker it belongs to. */
+.sf-vb-tl-marker::before {
+  content: '';
+  position: absolute;
+  left: calc(1px - var(--sf-space-md));
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--sf-primary);
+  box-shadow: 0 0 0 2px var(--background-primary);
+}
+
+.sf-vb-tl-when {
+  font-size: var(--sf-font-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sf-primary);
+}
+
+.sf-vb-tl-label {
+  font-size: var(--sf-font-text);
+  line-height: 1.45;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-vb-tl-detail {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Interactivity ============================== */
+
+/* Three of the five forms are also *operated*: a comparison is revealed cell by
+   cell, a process is stepped, a timeline is scrubbed. Every one of those states
+   is a class on the nodes the passive board already drew — `is-covered`,
+   `is-current` — so nothing here re-lays anything out: no rule below moves a
+   cell in its table, changes the ring's geometry, or shifts a step when the
+   reader steps. */
+
+/* --- the reveal bar (matrix / compare) --- */
+
+/* The toggle is the summary's chip, so the board's controls read as one family
+   wherever the reader meets them. */
+.sf-vb-reveal-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+}
+
+.sf-vb-reveal-toggle {
+  height: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  cursor: pointer;
+}
+
+.sf-vb-reveal-toggle:hover {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+.sf-vb-reveal-count {
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+/* The cell's own button, stripped back to the cell it sits in — same font,
+   same colour, no chrome — so a table of buttons still reads as a table. */
+.sf-vb-reveal {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  color: var(--sf-text);
+  cursor: pointer;
+}
+
+.sf-vb-reveal:focus-visible {
+  outline: 2px solid var(--sf-primary);
+  outline-offset: 1px;
+}
+
+/* The answer: never gone from the cell, only ever out of the way. */
+.sf-vb-reveal-text {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+/* Covered: the answer steps aside and the cell says what to do instead. The
+   hint is a pseudo-element on purpose — a covered cell's own text is the answer
+   the reader has not checked yet, and a button's label would put a second lie
+   in the same cell. The dashed edge says the cell is unfinished, not empty. */
+.sf-vb-cell.is-covered {
+  border-bottom-style: dashed;
+}
+
+.sf-vb-cell.is-covered .sf-vb-reveal {
+  padding: 0 var(--sf-space-xs);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-modifier-hover);
+}
+
+.sf-vb-cell.is-covered .sf-vb-reveal-text {
+  display: none;
+}
+
+.sf-vb-cell.is-covered .sf-vb-reveal::before {
+  content: 'Tap to reveal';
+  font-size: var(--sf-font-small);
+  font-style: italic;
+  color: var(--sf-text-muted);
+}
+
+.sf-vb-cell.is-covered .sf-vb-reveal:hover::before,
+.sf-vb-cell.is-covered .sf-vb-reveal:focus-visible::before {
+  color: var(--text-normal);
+}
+
+/* --- the stepper bar (flow / cycle) --- */
+
+.sf-vb-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: center;
+  padding: var(--sf-space-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+}
+
+.sf-vb-step-prev,
+.sf-vb-step-next {
+  height: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.sf-vb-step-prev:hover:not(:disabled),
+.sf-vb-step-next:hover:not(:disabled) {
+  border-color: var(--sf-primary);
+}
+
+/* An end is an end: the button says so rather than silently doing nothing. */
+.sf-vb-step-prev:disabled,
+.sf-vb-step-next:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sf-vb-step-report {
+  margin-left: auto;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+/* The current step's own words: a ring's labels cannot hold a sentence and a
+   dimmed list is no place to read one, so the bar says it in full. */
+.sf-vb-step-now {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: var(--sf-space-xs);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.sf-vb-step-now .sf-vb-step-label {
+  font-weight: 600;
+}
+
+.sf-vb-step-now .sf-vb-step-detail {
+  color: var(--text-normal);
+}
+
+/* A step or an entry with nothing to add says nothing at all — an empty line
+   under the current step reads as a missing detail rather than no detail. */
+.sf-vb-step-detail.is-empty {
+  display: none;
+}
+
+.sf-vb-tl-detail.is-empty {
+  display: none;
+}
+
+/* Stepped: one step is current and the rest stand back — still readable, no
+   longer competing with the one the reader is on. */
+.sf-vb-steps.is-stepped .sf-vb-step:not(.is-current) {
+  opacity: 0.55;
+}
+
+.sf-vb-ring.is-stepped .sf-vb-ring-step:not(.is-current) {
+  opacity: 0.55;
+}
+
+/* The current step, on the list and on the ring: an accent edge and a wash. The
+   edge is an inset shadow rather than a border, so stepping moves the highlight
+   and nothing else. */
+.sf-vb-step.is-current {
+  background: var(--sf-primary-light);
+  box-shadow: inset 3px 0 0 var(--sf-primary);
+  border-radius: 0 var(--sf-radius-sm) var(--sf-radius-sm) 0;
+}
+
+.sf-vb-ring-step.is-current {
+  background: var(--sf-primary-light);
+  border-radius: var(--sf-radius-sm);
+  /* An outline, not a border: the node is placed by its own transform, and a
+     border would change the box the angle was measured against. */
+  outline: 2px solid var(--sf-primary);
+  outline-offset: -2px;
+}
+
+/* --- the motion of a process (flow / cycle) --- */
+
+/* A process that moves is offered a control of its own, and the control says
+   what it will do next — `Play` while it is still, `Pause` while it runs — so
+   the reader can always stop it. Its running state is shown as well as said: the
+   accent edge and wash are the same ones the summary's own toggle uses for `on`,
+   because they mean the same thing here. */
+.sf-vb-motion-toggle {
+  height: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.sf-vb-motion-toggle:hover:not(:disabled) {
+  border-color: var(--sf-primary);
+}
+
+.sf-vb-motion-toggle.is-playing {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+  color: var(--text-normal);
+}
+
+/* A reader whose system asks for less movement gets a control that says why it
+   is not offered, rather than one that quietly does nothing. */
+.sf-vb-motion-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A pulse has no step to walk: the ring breathes instead, which is how a cycle
+   whose point is the going-round shows it without numbering anything. */
+.sf-vb-ring.is-pulsing .sf-vb-ring-track {
+  animation: sf-vb-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes sf-vb-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+}
+
+/* The preference and the surface agree: the motion is not only switched off
+   before it starts (the code reads the same query), it is off in the stylesheet
+   as well, so a preference that changes mid-session takes effect at once. */
+@media (prefers-reduced-motion: reduce) {
+  .sf-vb-ring.is-pulsing .sf-vb-ring-track {
+    animation: none;
+  }
+
+  .sf-vb-step,
+  .sf-vb-ring-step {
+    transition: none;
+  }
+}
+
+/* --- the scrubber bar (timeline) --- */
+
+.sf-vb-scrub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: center;
+  padding: var(--sf-space-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+}
+
+/* Obsidian styles a bare input like a field; a range is not a field, so the
+   chrome comes off and the thumb takes the accent. */
+.sf-vb-scrub-range {
+  flex: 1 1 8em;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--sf-primary);
+  cursor: pointer;
+}
+
+.sf-vb-scrub-report {
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+.sf-vb-scrub-now {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: var(--sf-space-xs);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.sf-vb-scrub-now .sf-vb-tl-detail {
+  color: var(--text-normal);
+}
+
+/* The entry the scrubber has landed on: the dot fills in, the time stops being
+   muted, and the entry carries the accent edge. */
+.sf-vb-tl-entry.is-current {
+  background: var(--sf-primary-light);
+  box-shadow: inset 3px 0 0 var(--sf-primary);
+  border-radius: 0 var(--sf-radius-sm) var(--sf-radius-sm) 0;
+}
+
+.sf-vb-tl-entry.is-current .sf-vb-tl-marker::before {
+  transform: translateY(-50%) scale(1.35);
+}
+
+.sf-vb-tl-entry.is-current .sf-vb-tl-when {
+  color: var(--text-normal);
+}
+
+/* ============================== Summary ============================== */
+
+.sf-sum {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-sum-head {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.sf-sum-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-sum-count {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+.sf-sum-toggle {
+  align-self: flex-start;
+  height: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  cursor: pointer;
+}
+
+.sf-sum-toggle:hover {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+.sf-sum-toggle.is-on {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+  color: var(--text-normal);
+}
+
+.sf-sum-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sf-sum-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-sum-bullet {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  min-width: 0;
+  padding: 2px 0 2px var(--sf-space-sm);
+}
+
+/* A pearl is recognisable at a glance: its own mark and an accent edge, not
+   just a heavier weight. */
+.sf-sum-bullet.is-pearl {
+  border-left: 3px solid var(--sf-primary);
+  border-radius: 0 var(--sf-radius-sm) var(--sf-radius-sm) 0;
+  background: var(--sf-primary-light);
+}
+
+.sf-sum-mark {
+  flex: 0 0 auto;
+  width: 1em;
+  font-size: var(--sf-font-ui);
+  line-height: 1.6;
+  text-align: center;
+  color: var(--sf-text-muted);
+}
+
+.sf-sum-mark::before {
+  content: '•';
+}
+
+.sf-sum-bullet.is-pearl .sf-sum-mark {
+  color: var(--sf-primary);
+}
+
+.sf-sum-bullet.is-pearl .sf-sum-mark::before {
+  content: '◆';
+}
+
+.sf-sum-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sf-sum-text {
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* Children sit one level in, on their bullet's own rule. */
+.sf-sum-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 0 var(--sf-space-md);
+  border-left: 1px solid var(--background-modifier-border);
+  list-style: none;
+}
+
+.sf-sum-child {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* What the 'Pearls only' toggle hides: the bullets, never their pearls. */
+.sf-sum-hidden {
+  display: none;
+}
+
+.sf-sum-kept {
+  padding-left: var(--sf-space-sm);
+  border-left: 2px solid var(--background-modifier-border);
+  font-size: var(--sf-font-ui);
+  line-height: 1.5;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== The verdict game ============================== */
+
+/* A comparison whose rows carry verdicts is played, not read: the bar asks the
+   question and keeps the score, and every marked row carries three buttons. */
+.sf-vb-guess-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  min-width: 0;
+  padding: var(--sf-space-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+}
+
+.sf-vb-guess-prompt {
+  min-width: 0;
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* The score is the feedback signal, and the only thing that changes when a
+   verdict lands — a state, so nothing about the table moves. */
+.sf-vb-guess-score {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-vb-guess-score.is-solved {
+  border-color: var(--sf-success);
+  background: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+/* The verdict buttons: a small row under the row's own name. */
+.sf-vb-guess {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.sf-vb-guess-btn {
+  height: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: var(--sf-font-small);
+  color: var(--text-normal);
+  white-space: normal;
+  cursor: pointer;
+}
+
+.sf-vb-guess-btn:hover:not(:disabled) {
+  border-color: var(--sf-primary);
+}
+
+/* A call was made: the row answers where the call was made. Right locks the
+   row (the buttons go quiet), wrong is refused in place until the next press. */
+.sf-vb-row.is-guess-right .sf-vb-guess {
+  opacity: 0.6;
+}
+
+.sf-vb-row.is-guess-right .sf-vb-guess-btn:disabled {
+  cursor: default;
+}
+
+.sf-vb-row.is-guess-wrong {
+  background: var(--sf-warning-light);
+  box-shadow: inset 3px 0 0 var(--sf-warning);
+  border-radius: 0 var(--sf-radius-sm) var(--sf-radius-sm) 0;
+}
+
+.sf-vb-row.is-guess-wrong .sf-vb-guess-btn {
+  border-color: var(--sf-warning);
+}
+
+/* A cell in a played table is plain evidence: no button, just the few words. */
+.sf-vb-cell-text {
+  overflow-wrap: anywhere;
+}
+
+/* The end of the game: the card's own edge says the table is finished. */
+.sf-vb-visual.is-solved {
+  border-left: 3px solid var(--sf-success);
+}
+
+/* ============================== Taking a branch ============================== */
+
+/* A decision's branches, as buttons in the stepper's own bar: the reader takes
+   a path through the process, and the steps the path has touched stay marked. */
+.sf-vb-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-xs);
+  min-width: 0;
+}
+
+.sf-vb-choice {
+  height: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 999px;
+  background: var(--background-primary);
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sf-vb-choice:hover {
+  background: var(--sf-primary-light);
+}
+
+.sf-vb-choice:focus-visible {
+  outline: 2px solid var(--sf-primary);
+  outline-offset: 1px;
+}
+
+/* A step the path has touched: walked, but no longer current. */
+.sf-vb-step.is-walked {
+  box-shadow: inset 3px 0 0 var(--background-modifier-border);
+  border-radius: 0 var(--sf-radius-sm) var(--sf-radius-sm) 0;
+}
+
+/* ============================== Narrow hosts ============================== */
+
+/* In a host narrower than any sidebar the one thing worth giving up is the
+   ring's room: the drawing shrinks with the space it is given rather than
+   overflowing it. Everything else already wraps. */
+.sf-vb-visual {
+  container-type: inline-size;
+}
+
+@container (max-width: 260px) {
+  .sf-vb-ring {
+    width: min(100%, 16em);
+    --sf-vb-radius: 5.2em;
+  }
+
+  .sf-vb-ring-step {
+    width: 5.6em;
+  }
+}

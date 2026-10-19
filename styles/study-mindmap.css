@@ -1,0 +1,622 @@
+/*
+ * Spaceforge — Study mind map (ui/study-mindmap.ts)
+ *
+ * The map is drawn from plain nested divs: each branch is a chip with its own
+ * children column under it, every non-root chip carries a connector element,
+ * and one spine per branch ties the connectors together — so the hierarchy is
+ * drawn as edges, not implied by indentation. Four contracts hold the surface
+ * together:
+ *
+ *   - the host is never widened — the tree is inside a scrolling viewport and
+ *     the canvas is sized to the tree, and a fanned-out row wraps at the width
+ *     of the viewport it scrolls in;
+ *   - a label is never cut in silence — it wraps (including a label that is one
+ *     unbroken token), is capped by the width band the host was measured into,
+ *     and carries its full text as a title;
+ *   - a label is text on a chip, never a control painted over it — see the
+ *     button-chrome note below, which is the whole of why labels used to read
+ *     as highlighted text;
+ *   - every node is the same chip — the root is told apart by the accent its
+ *     border and fill carry, the tiers below it by how light their fill is,
+ *     and a state by what is drawn *around* the text, never over it.
+ *
+ * Sizes come from the house type scale only (--sf-font-*), so a reader who
+ * changes their text size moves the map with the rest of the plugin. The label
+ * caps below are the numbers the measured bands are built around: none of them
+ * exceeds the narrowest host that band is chosen for.
+ *
+ * ---------------------------------------------------------------------------
+ * Button chrome — read this before touching any control's look
+ *
+ * Obsidian's own sheet paints every `<button>` that is not `.clickable-icon`:
+ *
+ *     button:not(.clickable-icon) {
+ *       background-color: var(--interactive-normal);
+ *       box-shadow: var(--input-shadow);
+ *     }
+ *
+ * That selector is worth (0,1,1) — one class, one element — so it outranks any
+ * single-class rule of ours, whatever order the sheets load in; `button {}`
+ * (0,0,1) adds a border, a fill, `var(--font-ui-small)`, `nowrap` and
+ * `outline: none` on top. Every control here is a button (the label, the
+ * caret, Fit, the focus strip's Clear), so a bare `.sf-mm-label { background:
+ * transparent; border: none; box-shadow: none }` was dead code in the app: each
+ * label was drawn as a chrome button — a solid slab with an inset highlight
+ * line sitting directly on the text, which is exactly the "highlight over the
+ * text" a reader cannot read past — and the caret was a small chrome pill.
+ *
+ * The cure is not `!important` (that is how a plugin stops being themeable):
+ * the map's own rules for anything that is a `<button>` are written
+ * `.sf-mm-map .sf-mm-x`, worth (0,2,0), which beats Obsidian's chrome rule
+ * outright, still loses to the depth tiers and states below, and can still be
+ * reached by a theme that writes a deeper selector of its own.
+ */
+
+/* ============================== Shell ============================== */
+
+.sf-mm-map {
+  --sf-mm-label-max: 216px;
+  --sf-mm-node-gap: var(--sf-space-xs);
+  --sf-mm-branch-gap: var(--sf-space-md);
+  /* The drawn edge, in one place. The spine a branch's children hang from, the
+     elbow into every child and the rail a row hangs from all read these. The
+     colour is a theme token and never a literal grey: a 2px line of the
+     button-border token all but disappears against a dark
+     --background-primary, which is how a tree of chips read as an indented
+     list. */
+  --sf-mm-link: var(--text-muted, var(--background-modifier-border));
+  --sf-mm-link-width: 2px;
+  /* Spine to the child's left edge, the spine's own width included. */
+  --sf-mm-link-gap: 10px;
+  /* How far the spine stands off the chip it hangs from. */
+  --sf-mm-link-offset: calc(var(--sf-mm-link-gap) / 2);
+  /* How far an elbow reaches from the node it feeds back to the spine. */
+  --sf-mm-link-reach: var(--sf-space-md);
+  /* The chip's own border: the skeleton and the connectors have to agree on it
+     or a line lands a pixel wide of the chip it is drawn into. */
+  --sf-mm-chip-border: 1px;
+  /* The lift a chip takes under the pointer. The house shadow, not the app's
+     `--input-shadow`: a control that is not a form control must not hover like
+     one. */
+  --sf-mm-chip-lift: var(--sf-shadow);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+  font-size: var(--sf-font-ui);
+}
+
+/* The band the host was measured into. 340px is the narrowest sidebar this
+   lives in, so the narrow label cap plus the node's own chrome stays inside it. */
+.sf-mm-map.is-narrow {
+  --sf-mm-label-max: 160px;
+}
+
+.sf-mm-map.is-mid {
+  --sf-mm-label-max: 216px;
+}
+
+.sf-mm-map.is-wide {
+  --sf-mm-label-max: 280px;
+}
+
+/* ============================== Toolbar ============================== */
+/* The title, the live count and the map's own controls: Expand all, Collapse
+   all, Fit. The row wraps, because a 340px sidebar cannot hold title, count and
+   three controls in one line — there the controls take a line of their own
+   instead of squeezing the title to nothing. */
+
+.sf-mm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.sf-mm-title {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The count is live — it moves as branches open and fold — so it is drawn as a
+   badge rather than as more prose in the header. */
+.sf-mm-count {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-mm-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  flex: 0 0 auto;
+}
+
+/* Controls. Prefixed `.sf-mm-map` for the button-chrome reason at the top of
+   this file — a single class would lose to Obsidian's own button paint. */
+.sf-mm-map .sf-mm-btn {
+  font-size: var(--sf-font-ui);
+  line-height: 1.4;
+  padding: 3px 10px;
+  height: auto;
+  min-height: 0;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--sf-text);
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  white-space: normal;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-mm-map .sf-mm-btn:hover:not([disabled]) {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+.sf-mm-map .sf-mm-btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Obsidian's `button` rule sets `outline: none`, so a keyboard reader gets no
+   ring unless the map draws one. */
+.sf-mm-map .sf-mm-btn:focus-visible,
+.sf-mm-map .sf-mm-toggle:focus-visible,
+.sf-mm-map .sf-mm-label:focus-visible {
+  outline: 2px solid var(--sf-primary);
+  outline-offset: 1px;
+}
+
+/* The map's own actions — Expand all, Collapse all, Fit — carry the accent, so
+   they read as one family and apart from the app's default buttons. */
+.sf-mm-map .sf-mm-expand-all,
+.sf-mm-map .sf-mm-collapse-all,
+.sf-mm-map .sf-mm-fit {
+  border-color: var(--sf-primary);
+  color: var(--sf-primary);
+}
+
+.sf-mm-map .sf-mm-expand-all:hover:not([disabled]),
+.sf-mm-map .sf-mm-collapse-all:hover:not([disabled]),
+.sf-mm-map .sf-mm-fit:hover:not([disabled]) {
+  background-color: var(--sf-primary-light);
+}
+
+/* ============================== Viewport ============================== */
+/* The map's own box: the tree scrolls in here, so a tree wider than the host
+   never widens the host. The height cap is what keeps a map mounted in a host
+   with no height of its own from growing without end. */
+.sf-mm-viewport {
+  /* A query container: the row layout measures itself against the box it really
+     scrolls in (100cqw), so a wide host is used to its own width rather than to
+     a guessed one. */
+  container-type: inline-size;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 140px;
+  max-height: min(64vh, 560px);
+  overflow: auto;
+  padding: var(--sf-space-md);
+  outline: none;
+}
+
+.sf-mm-viewport:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--sf-primary-light);
+}
+
+.sf-mm-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* ============================== Nodes ============================== */
+
+.sf-mm-branch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+}
+
+.sf-mm-node {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sf-mm-node-gap);
+  max-width: 100%;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+/* The chip: every node is drawn as one of these, the root included. Hierarchy
+   is the connectors' job, so the boxes are one shape everywhere — the root is
+   told apart by the accent its border and fill carry, below. */
+.sf-mm-node-chip {
+  padding: 6px 10px;
+  border: var(--sf-mm-chip-border) solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+}
+
+/* The tiers, drawn as weight: the root is the accent, a section (depth two) is
+   the heavier neutral box, and everything under it is a lighter box on the
+   map's own surface. The eye can tell a section from its leaves before it reads
+   a word — which is the whole point of a map. */
+.sf-mm-node[data-depth='3'],
+.sf-mm-node[data-depth='4'],
+.sf-mm-node[data-depth='5'] {
+  background: var(--background-primary);
+}
+
+/* Under the pointer the chip lifts, the same way it does everywhere else in the
+   plugin — no fill change, so hovering never erases a state. */
+.sf-mm-node:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  box-shadow: var(--sf-mm-chip-lift);
+}
+
+/* The keyboard cursor: the node the arrow keys are on. The ring is a
+   translucent accent, so it reads on a light theme and on a dark one. */
+.sf-mm-node.is-cursor {
+  border-color: var(--sf-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sf-primary), transparent 55%);
+}
+
+/* The focus lens: the node the reader asked about, and the way down to it. The
+   mark is drawn around the box and at its edge; the label itself is left at
+   full colour, so a selection never costs a word its legibility. */
+.sf-mm-node.is-focused {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+  box-shadow: 0 0 0 1px var(--sf-primary) inset;
+}
+
+.sf-mm-node.is-focused::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: var(--sf-radius-sm) 0 0 var(--sf-radius-sm);
+  background: var(--sf-primary);
+  pointer-events: none;
+}
+
+.sf-mm-node.is-ancestor {
+  border-color: var(--sf-primary);
+}
+
+/* A collapsed branch says so on its own chip: the thing that would tell the
+   reader — the subtree — is off screen, so the node carries the mark. */
+.sf-mm-node.is-collapsed {
+  border-style: dashed;
+}
+
+.sf-mm-node.is-collapsed .sf-mm-label {
+  color: var(--sf-text-muted);
+}
+
+.sf-mm-map.is-focus-mode .sf-mm-node {
+  opacity: 0.4;
+}
+
+.sf-mm-map.is-focus-mode .sf-mm-node.is-ancestor {
+  opacity: 0.75;
+}
+
+/* The cursor is where the next key lands: it is never dimmed away. */
+.sf-mm-map.is-focus-mode .sf-mm-node.is-focused,
+.sf-mm-map.is-focus-mode .sf-mm-node.is-cursor {
+  opacity: 1;
+}
+
+.sf-mm-branch.is-root > .sf-mm-node {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+}
+
+.sf-mm-branch.is-root > .sf-mm-node .sf-mm-label {
+  font-weight: 600;
+}
+
+/* The label is the text of the map: plain text on the chip, and never a
+   control's fill, border or shadow laid over it. It is written one level deeper
+   than Obsidian's `button:not(.clickable-icon)` so the chrome rule at the top
+   of this file cannot repaint it — that rule is what drew a grey slab and an
+   inset highlight line behind every label. It wraps, and a label that is one
+   long token still breaks instead of running out of the node. */
+.sf-mm-map .sf-mm-label {
+  font-size: var(--sf-font-ui);
+  font-weight: inherit;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: var(--sf-mm-label-max);
+  flex: 0 1 auto;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.sf-mm-map .sf-mm-label:hover {
+  color: var(--sf-primary);
+  text-decoration: underline;
+}
+
+/* Depth tiers: the root and its first ring carry the hierarchy's weight, and
+   everything from the fourth level down reads at the same small size. */
+.sf-mm-node[data-depth='1'] .sf-mm-label {
+  font-size: var(--sf-font-text);
+}
+
+.sf-mm-node[data-depth='2'] .sf-mm-label {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+}
+
+.sf-mm-node[data-depth='4'] .sf-mm-label,
+.sf-mm-node[data-depth='5'] .sf-mm-label {
+  font-size: var(--sf-font-small);
+}
+
+/* The caret: a real button, drawn as an icon with no chrome of its own. */
+.sf-mm-map .sf-mm-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--sf-radius-sm);
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  color: var(--sf-text-muted);
+  cursor: pointer;
+}
+
+.sf-mm-map .sf-mm-toggle:hover {
+  color: var(--sf-primary);
+  background-color: var(--background-modifier-hover);
+}
+
+.sf-mm-toggle-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform var(--sf-transition-fast);
+}
+
+/* The icon's own size, from the app's icon scale: 18px of hit target, 14px of
+   caret inside it. */
+.sf-mm-toggle-mark svg {
+  width: var(--icon-xs, 14px);
+  height: var(--icon-xs, 14px);
+}
+
+.sf-mm-node.is-collapsed .sf-mm-toggle-mark {
+  transform: none;
+}
+
+/* ============================== Branches ============================== */
+
+/* The children of one node, hanging from that branch's spine: the container's
+   own left border is the continuous line, and each child's connector meets it.
+   A line the reader can follow is what makes this a map rather than an
+   indented list. */
+.sf-mm-children {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sf-mm-branch-gap);
+  margin-left: var(--sf-mm-link-offset);
+  padding-left: calc(var(--sf-mm-link-gap) - var(--sf-mm-link-width));
+  border-left: var(--sf-mm-link-width) solid var(--sf-mm-link);
+}
+
+.sf-mm-children.is-collapsed {
+  display: none;
+}
+
+/* The spine meets the chip it hangs from: a short foot from the chip's
+   bottom-left corner out to the far side of the spine, so a branch is visibly
+   attached to its own node and not merely indented under it. */
+.sf-mm-children:not(.is-row)::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * (var(--sf-mm-link-offset) + var(--sf-mm-link-width)));
+  top: 0;
+  width: calc(var(--sf-mm-link-offset) + var(--sf-mm-link-width));
+  height: var(--sf-mm-link-width);
+  background: var(--sf-mm-link);
+}
+
+/* One edge per non-root node: an elbow whose upright meets the branch spine and
+   whose foot runs into the chip, level with the chip's own middle however tall
+   its label wrapped. It sits inside the node it feeds, so it is hidden with the
+   subtree it belongs to. */
+.sf-mm-connector {
+  position: absolute;
+  /* The chip draws its own border between this element's positioning box (the
+     chip's padding box) and the edge the spine is measured from: step over it,
+     so the elbow's upright lands exactly on the spine and its foot lands level
+     with the chip's own middle. */
+  right: calc(100% + var(--sf-mm-chip-border));
+  bottom: calc(50% - var(--sf-mm-chip-border));
+  box-sizing: border-box;
+  width: var(--sf-mm-link-gap);
+  height: var(--sf-mm-link-reach);
+  border-left: var(--sf-mm-link-width) solid var(--sf-mm-link);
+  border-bottom: var(--sf-mm-link-width) solid var(--sf-mm-link);
+  border-bottom-left-radius: var(--sf-radius-sm);
+  pointer-events: none;
+}
+
+/* The way down to the reader's pick is drawn in the accent: in a dimmed map the
+   route to the node is the one line that has to stay followable. */
+.sf-mm-map.is-focus-mode .sf-mm-node.is-focused > .sf-mm-connector,
+.sf-mm-map.is-focus-mode .sf-mm-node.is-ancestor > .sf-mm-connector {
+  border-color: var(--sf-primary);
+}
+
+/* The fan: a branch with more than two children, in a host wide enough to
+   afford one (the module adds the class from the measured band). The spine
+   moves to the top as a rail, and the row wraps at the width of the viewport it
+   scrolls in — a wide host is used to its own width, and never widened. */
+.sf-mm-children.is-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sf-mm-link-reach) var(--sf-space-md);
+  margin-left: 0;
+  padding-left: 0;
+  padding-top: var(--sf-mm-link-reach);
+  border-left: none;
+  border-top: var(--sf-mm-link-width) solid var(--sf-mm-link);
+  /* 760px is the widest host the wide band is chosen for, inset: a fallback for
+     an engine that cannot measure the row against its own scroller. */
+  max-width: 760px;
+  max-width: calc(100cqw - var(--sf-space-xl));
+}
+
+/* In a row the elbow becomes a drop from the rail down into the chip. */
+.sf-mm-children.is-row > .sf-mm-branch > .sf-mm-node > .sf-mm-connector {
+  left: 50%;
+  right: auto;
+  bottom: 100%;
+  width: var(--sf-mm-link-width);
+  height: calc(var(--sf-mm-link-reach) + var(--sf-mm-link-width));
+  margin-left: calc(var(--sf-mm-link-width) / -2);
+  border-left: var(--sf-mm-link-width) solid var(--sf-mm-link);
+  border-bottom: none;
+  border-bottom-left-radius: 0;
+}
+
+/* ============================== Focus strip ============================== */
+
+.sf-mm-detail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  max-height: 40%;
+  overflow-y: auto;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.sf-mm-detail-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-mm-detail-label {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  color: var(--text-normal);
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-mm-detail-close {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.sf-mm-detail-path {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* A strip with nothing to say is one line, not three: the map's own count is
+   the toolbar's badge, so an empty breadcrumb is not repeated here. */
+.sf-mm-detail-path:empty {
+  display: none;
+}
+
+.sf-mm-detail-text {
+  font-size: var(--sf-font-ui);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* With nothing selected the strip is a hint, and it reads as one. */
+.sf-mm-map.is-idle .sf-mm-detail-label {
+  font-weight: 500;
+  color: var(--sf-text-muted);
+}
+
+.sf-mm-map.is-idle .sf-mm-detail-text {
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Reduced motion ============================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-mm-map .sf-mm-node,
+  .sf-mm-map .sf-mm-btn,
+  .sf-mm-toggle-mark {
+    transition: none;
+  }
+}

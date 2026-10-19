@@ -1,8 +1,8 @@
 import { Notice, TFile } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { ReviewResponse, ReviewSchedule, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
+import { ReviewRecordResult, ReviewResponseOptions } from '../models/review-flow';
 import { IReviewController } from './interfaces';
-import { ReviewModal } from '../ui/review-modal';
 
 /**
  * Core controller that handles the review process
@@ -118,7 +118,9 @@ export class ReviewControllerCore implements IReviewController {
     updateTodayNotes(preserveCurrentIndex = false): void {
         // Store current note path if we want to preserve the index
         let currentNotePath: string | null = null;
-        if (preserveCurrentIndex && this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length) {
+        if (preserveCurrentIndex
+            && this.currentNoteIndex >= 0
+            && this.currentNoteIndex < this.todayNotes.length) {
             currentNotePath = this.todayNotes[this.currentNoteIndex].path;
         }
 
@@ -212,7 +214,7 @@ export class ReviewControllerCore implements IReviewController {
     }
 
     /**
-     * Start a review for a note
+     * Review a note
      *
      * @param path Path to the note file
      */
@@ -223,11 +225,16 @@ export class ReviewControllerCore implements IReviewController {
             return;
         }
 
-        // Open the file
-        await this.plugin.app.workspace.getLeaf().openFile(file);
+        // The docked bar is the only interface: the note fills the leaf and
+        // the grades sit under it.
+        const flow = this.plugin.reviewFlowController;
+        if (flow) {
+            flow.start(path);
+            return;
+        }
 
-        // Show review modal when file is opened
-        this.showReviewModal(path);
+        // No flow (older vaults mid-upgrade): at least show the note.
+        await this.plugin.app.workspace.getLeaf().openFile(file);
     }
 
     /**
@@ -313,10 +320,10 @@ export class ReviewControllerCore implements IReviewController {
 
         // Update current index
         if (wasCurrentNote) {
-            this.currentNoteIndex = Math.min(this.currentNoteIndex, this.todayNotes.length - 1);
+            this.currentNoteIndex = Math.max(0, Math.min(this.currentNoteIndex, this.todayNotes.length - 1));
         } else if (currentNotePath) {
             const newIndex = this.todayNotes.findIndex(n => n.path === currentNotePath);
-            this.currentNoteIndex = newIndex !== -1 ? newIndex : Math.min(this.currentNoteIndex, this.todayNotes.length - 1);
+            this.currentNoteIndex = Math.max(0, newIndex !== -1 ? newIndex : Math.min(this.currentNoteIndex, this.todayNotes.length - 1));
         }
 
         // Update custom order in storage
@@ -326,7 +333,7 @@ export class ReviewControllerCore implements IReviewController {
         // If the postponed note was the current one, select a new note
         if (wasCurrentNote) {
             // Keep the current index, but make sure it's valid
-            this.currentNoteIndex = Math.min(this.currentNoteIndex, this.todayNotes.length - 1);
+            this.currentNoteIndex = Math.max(0, Math.min(this.currentNoteIndex, this.todayNotes.length - 1));
         } else if (currentNotePath) {
             // If we were viewing a different note, try to keep that selected
             const newIndex = this.todayNotes.findIndex(note => note.path === currentNotePath);
@@ -334,7 +341,7 @@ export class ReviewControllerCore implements IReviewController {
                 this.currentNoteIndex = newIndex;
             } else {
                 // If the current note is no longer in the list, adjust the index
-                this.currentNoteIndex = Math.min(this.currentNoteIndex, this.todayNotes.length - 1);
+                this.currentNoteIndex = Math.max(0, Math.min(this.currentNoteIndex, this.todayNotes.length - 1));
             }
         } else {
             // Adjust current index if necessary to prevent out-of-bounds
@@ -345,13 +352,14 @@ export class ReviewControllerCore implements IReviewController {
     }
 
     /**
-     * Show the review modal for a note
+     * Put a note into the docked review bar.
      *
      * @param path Path to the note file
      */
-    showReviewModal(path: string): void {
-        const modal = new ReviewModal(this.plugin.app, this.plugin, path);
-        modal.open();
+    openDockedReview(path: string): void {
+        const flow = this.plugin.reviewFlowController;
+        if (!flow) return;
+        flow.start(path);
     }
 
     /**
@@ -389,7 +397,7 @@ export class ReviewControllerCore implements IReviewController {
                 if (this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length) {
                     const nextNotePath = this.todayNotes[this.currentNoteIndex].path;
                     await this.plugin.navigationController.openNoteWithoutReview(nextNotePath);
-                    this.showReviewModal(nextNotePath);
+                    this.openDockedReview(nextNotePath);
                 } else {
                     new Notice("All caught up! No more notes due for review.");
                 }
@@ -407,15 +415,19 @@ export class ReviewControllerCore implements IReviewController {
      * @param path Path to the note file
      * @param response User's response during review (SM-2 or FSRS)
      */
-    async processReviewResponse(path: string, response: ReviewResponse | FsrsRating): Promise<void> {
+    async processReviewResponse(path: string, response: ReviewResponse | FsrsRating, options?: ReviewResponseOptions): Promise<ReviewRecordResult> {
+        const navigate = options?.navigate ?? true;
+        const silent = options?.silent ?? false;
         const effectiveDate = this.getEffectiveReviewDate();
         // Record a normal review (not skipped) with the user's quality rating
-        const wasRecorded = this.plugin.dataStorage.reviewScheduleService.recordReview(path, response, false, effectiveDate);
+        const wasRecorded = this.plugin.dataStorage.reviewScheduleService.recordReview(
+            path, response, false, effectiveDate, options?.ratingKind ?? 'auto'
+        );
 
         if (!wasRecorded) {
             // Note was not due, this is just a preview
             new Notice("Note previewed, not recorded");
-            return;
+            return { recorded: false, nextPath: null, nextPathSource: null, sessionComplete: false };
         }
 
 
@@ -467,13 +479,21 @@ export class ReviewControllerCore implements IReviewController {
                 default: responseText = "Unknown SM-2 Rating";
             }
         }
-        new Notice(`Note review recorded: ${responseText}`);
+        if (!silent) {
+            new Notice(`Note review recorded: ${responseText}`);
+        }
 
         // Refresh the sidebar view if available
         void this.plugin.getSidebarView()?.refresh();
 
         // Update today's notes after recording the review (preserve the index since we're in the middle of navigation)
         this.updateTodayNotes(true);
+
+        // Work out where the flow goes next. Navigation itself is decided below:
+        // the docked flow opens notes itself, the modal flow shows the dialog.
+        let nextPath: string | null = null;
+        let nextPathSource: 'session' | 'queue' | null = null;
+        let sessionComplete = false;
 
         // Check if we're in a hierarchical review session
         const activeSession = this.plugin.dataStorage.getActiveSession();
@@ -486,39 +506,58 @@ export class ReviewControllerCore implements IReviewController {
             const nextFilePath = this.plugin.dataStorage.getNextSessionFile();
 
             if (nextFilePath) {
-                // Continue with the session
-                await this.reviewNote(nextFilePath);
+                nextPath = nextFilePath;
+                nextPathSource = 'session';
             } else {
-                // Session complete
+                // Session complete. This is reported whatever interface is in
+                // charge: it is a distinct event, not just "the queue is empty".
+                sessionComplete = true;
                 new Notice("Hierarchical review session complete!");
             }
-        }
-        // If not in a session, automatically go to the next note and show review modal
-        else if (this.todayNotes.length > 0) {
+        } else if (this.todayNotes.length > 0) {
             // Check if we've reviewed all notes (in case we've come full circle)
             const currentPath = this.todayNotes[this.currentNoteIndex].path;
             if (currentPath === path) {
-                new Notice("All caught up! No more notes due for review.");
-                return;
-            }
-
-            // After finding the next note, show the review modal
-            if (this.todayNotes.length > 0 && this.currentNoteIndex < this.todayNotes.length) {
-                const nextNotePath = this.todayNotes[this.currentNoteIndex].path;
-                if (this.plugin.navigationController) {
-                    await this.plugin.navigationController.openNoteWithoutReview(nextNotePath);
-                    this.showReviewModal(nextNotePath);
-                } else {
-                    new Notice("All caught up! No more notes due for review.");
-                }
+                if (navigate) new Notice("All caught up! No more notes due for review.");
             } else {
-                new Notice("All caught up! No more notes due for review.");
+                nextPath = currentPath;
+                nextPathSource = 'queue';
             }
-        } else {
+        } else if (navigate) {
             new Notice("All caught up! No more notes due for review.");
+        }
+
+        if (navigate && nextPath) {
+            await this.navigateForNext({ recorded: true, nextPath, nextPathSource, sessionComplete });
         }
 
         // Save all accumulated plugin data once at the end
         await this.plugin.savePluginData();
+
+        return { recorded: true, nextPath, nextPathSource, sessionComplete };
+    }
+
+    /**
+     * Hand the next note to whichever review surface is in charge.
+     *
+     * A running docked flow keeps the flow going (no dialog, no restart); the
+     * modal interface opens the note and shows its dialog as before.
+     */
+    private async navigateForNext(result: ReviewRecordResult): Promise<void> {
+        const nextPath = result.nextPath;
+        if (!nextPath) return;
+        const flow = this.plugin.reviewFlowController;
+
+        if (flow && flow.isActive()) {
+            await flow.afterExternalReview(result);
+            return;
+        }
+
+        if (flow) {
+            flow.start(nextPath);
+            return;
+        }
+
+        await this.plugin.navigationController.openNoteWithoutReview(nextPath);
     }
 }

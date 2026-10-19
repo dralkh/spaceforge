@@ -11,6 +11,11 @@
   background-color: var(--background-primary);
   border-radius: var(--radius-m, 8px);
   box-shadow: var(--sf-shadow-md); /* Added subtle shadow */
+  /* The pane's own width is what the month has to work with, so the container is
+     a size container too: the rules below give a narrow month's cells back the
+     width their padding was taking. */
+  container-type: inline-size;
+  container-name: sf-calendar;
 }
 
 /* Styles for collapsed sidebar */
@@ -24,18 +29,18 @@
 }
 
 .is-collapsed .calendar-month-title {
-  font-size: 16px; /* Smaller font size */
+  font-size: var(--sf-font-text); /* Smaller font size */
 }
 
 .is-collapsed .calendar-nav-btn {
   padding: 4px 8px; /* Reduced padding */
-  font-size: 13px; /* Smaller font size */
+  font-size: var(--sf-font-ui); /* Smaller font size */
 }
 
 .is-collapsed .calendar-today-btn {
   margin-left: 5px; /* Reduced margin */
   padding: 4px 8px; /* Reduced padding */
-  font-size: 12px; /* Smaller font size */
+  font-size: var(--sf-font-small); /* Smaller font size */
 }
 
 .is-collapsed .calendar-grid {
@@ -44,19 +49,19 @@
 }
 
 .is-collapsed .calendar-weekday {
-  font-size: 10px; /* Further smaller font size */
+  font-size: var(--sf-font-small); /* Further smaller font size */
   padding: 2px 0; /* Further reduced padding */
 }
 
 .is-collapsed .calendar-day {
   min-height: 40px; /* Reduced minimum height */
   padding: 4px; /* Reduced padding */
-  font-size: 12px; /* Smaller font size */
+  font-size: var(--sf-font-small); /* Smaller font size */
   border-radius: 4px; /* Smaller border radius */
 }
 
 .is-collapsed .calendar-day-number {
-  font-size: 13px; /* Smaller font size */
+  font-size: var(--sf-font-ui); /* Smaller font size */
   margin-bottom: 2px; /* Reduced margin */
 }
 
@@ -65,15 +70,12 @@
 }
 
 .is-collapsed .calendar-review-count {
-  width: 20px; /* Smaller size */
-  height: 20px; /* Smaller size */
-  font-size: 10px; /* Smaller font size */
-  top: 4px; /* Adjusted position */
-  right: 4px; /* Adjusted position */
+  width: 1.6em; /* Smaller size */
+  height: 1.6em; /* Smaller size */
 }
 
 .is-collapsed .calendar-time-estimate {
-  font-size: 10px; /* Smaller font size */
+  font-size: var(--sf-font-small); /* Smaller font size */
   padding: 1px 3px; /* Reduced padding */
 }
 
@@ -81,37 +83,33 @@
 @media (max-width: 768px) {
   .calendar-grid {
     gap: 2px;
-    grid-template-columns: repeat(7, 1fr); /* Ensure 7 equal columns on smaller screens */
+    grid-template-columns: repeat(7, minmax(0, 1fr)); /* Seven equal columns that content cannot widen */
   }
 
   .calendar-day {
     min-height: 30px; /* Further adjusted minimum height */
     padding: 3px; /* Reduced padding */
-    font-size: 11px; /* Slightly smaller font */
+    font-size: var(--sf-font-small); /* Slightly smaller font */
     border-radius: 4px; /* Smaller border radius */
     aspect-ratio: auto; /* Allow aspect ratio to adjust */
   }
 
   .calendar-weekday {
-    font-size: 10px; /* Slightly smaller font */
+    font-size: var(--sf-font-small); /* Slightly smaller font */
     padding: 3px 0; /* Reduced padding */
   }
 
   .calendar-day-number {
-    font-size: 12px; /* Adjusted font size */
-    margin-bottom: 3px; /* Adjusted margin */
+    font-size: var(--sf-font-small); /* Adjusted font size */
   }
 
   .calendar-review-count {
-    width: 18px; /* Adjusted size */
-    height: 18px; /* Adjusted size */
-    font-size: 9px; /* Adjusted font size */
-    top: 3px; /* Adjusted position */
-    right: 3px; /* Adjusted position */
+    width: 1.5em; /* Adjusted size */
+    height: 1.5em; /* Adjusted size */
   }
 
   .calendar-time-estimate {
-    font-size: 9px; /* Adjusted font size */
+    font-size: var(--sf-font-small); /* Adjusted font size */
     padding: 1px 3px; /* Adjusted padding */
   }
 }
@@ -128,7 +126,7 @@
   flex: 1;
   text-align: center;
   font-weight: 600;
-  font-size: 18px; /* Slightly larger font */
+  font-size: var(--sf-font-text); /* Slightly larger font */
   color: var(--text-normal);
 }
 
@@ -139,7 +137,7 @@
   background-color: transparent;
   transition: var(--sf-transition);
   color: var(--text-muted);
-  font-size: 15px; /* Slightly larger font */
+  font-size: var(--sf-font-ui); /* Slightly larger font */
 }
 
 .calendar-nav-btn:hover {
@@ -149,7 +147,7 @@
 
 .calendar-today-btn {
   margin-left: 10px;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   cursor: pointer;
   padding: 6px 12px;
   border-radius: 20px; /* More rounded */
@@ -169,7 +167,7 @@
 /* Calendar grid with equal-sized cells */
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr); /* Ensure 7 equal columns */
+  grid-template-columns: repeat(7, minmax(0, 1fr)); /* Seven equal columns that content cannot widen */
   grid-auto-rows: minmax(50px, auto); /* Force equal heights */
   gap: 4px; /* Consistent spacing */
   margin-top: var(--sf-space-md);
@@ -178,7 +176,7 @@
 .calendar-weekday {
   text-align: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   padding: 8px 0;
   color: var(--text-muted);
 }
@@ -189,14 +187,25 @@
   height: auto; /* Changed from fixed height */
   min-height: 50px; /* Minimum height */
   width: 100%; /* Ensure full width */
-  padding: 8px; /* Increased padding */
+  /* A grid track is only as wide as its widest content unless it is told to
+     shrink; this is the other half of minmax(0, 1fr) on the grid. */
+  min-width: 0;
+  padding: 6px 5px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px; /* Slightly more rounded */
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
+  gap: var(--sf-space-xs);
+  /* Whatever the cell cannot hold is dropped by the row's own container query
+     rather than left to hang over the border. */
+  overflow: hidden;
+  /* The cell is the thing that gets narrow in a sidebar, so the cell is the
+     size container: its rows ask it how much room they have. */
+  container-type: inline-size;
+  container-name: sf-cal-day;
   background-color: var(--background-secondary-alt);
   box-sizing: border-box; /* Include borders in size calculation */
 }
@@ -238,9 +247,42 @@
 }
 
 .calendar-day-number {
+  flex: 0 0 auto;
   font-weight: 600;
-  margin-bottom: 6px;
-  font-size: 15px;
+  font-size: var(--sf-font-ui);
+}
+
+/* The cell's rows. The date and the day's counts share the first row: the counts
+   keep to the right while they fit and wrap under the date when they do not, so
+   a badge can never sit on the number. */
+.calendar-day-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.calendar-day-chips {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sf-space-xs);
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* The last row: how long the day takes, and the button that adds an event in a
+   column of its own, pushed to the edge. */
+.calendar-day-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-top: auto;
 }
 
 .calendar-day.today .calendar-day-number {
@@ -277,16 +319,16 @@
 
 /* Improved review count indicator */
 .calendar-review-count {
-  position: absolute;
-  top: 8px; /* Adjusted position */
-  right: 8px; /* Adjusted position */
-  width: 24px;
-  height: 24px;
+  /* In the flow, in the first row's chip group: the count used to be pinned over
+     the top-right corner of the cell, which put it on top of the date. */
+  flex: 0 0 auto;
+  width: 1.9em;
+  height: 1.9em;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   font-weight: 700;
   color: white;
   box-shadow: var(--sf-shadow-sm); /* Using defined shadow variable */
@@ -299,16 +341,40 @@
 
 /* Improved time estimate with fade */
 .calendar-time-estimate {
-  margin-top: auto; /* Push to bottom */
-  align-self: flex-end; /* Align to the right */
-  font-size: 11px; /* Slightly smaller font */
+  /* In the footer row, beside the add button rather than underneath it. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sf-font-small); /* Slightly smaller font */
   font-weight: 500;
   color: var(--text-muted);
   padding: 2px 5px; /* Adjusted padding */
   background-color: var(--background-modifier-hover); /* Using theme variable */
-  border-radius: 4px;
+  border-radius: var(--sf-radius-sm);
   opacity: 1;
   transition: opacity 0.2s ease;
+}
+
+/* The duration's parts. The unit is a span of its own so a cell too narrow for
+   the word can show the short form instead of clipping the measurement away
+   (see the container query at the end of this file). */
+.calendar-time-estimate-value {
+  flex: 0 0 auto;
+}
+
+.calendar-time-estimate-unit {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-time-estimate-unit-short {
+  display: none;
+  flex: 0 0 auto;
 }
 
 .day-reviews-container {
@@ -351,12 +417,12 @@
 .day-reviews-date {
   font-weight: 600;
   color: var(--sf-primary);
-  font-size: 16px;
+  font-size: var(--sf-font-text);
 }
 
 .day-reviews-postpone-all {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   border-radius: var(--sf-radius-sm);
   cursor: pointer;
   background-color: var(--sf-bg-secondary);
@@ -373,7 +439,7 @@
 
 .day-reviews-stats {
   margin-bottom: var(--sf-space-md);
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   color: var(--sf-text-muted);
   padding: var(--sf-space-sm) var(--sf-space-md);
   background-color: var(--sf-bg-secondary);
@@ -446,37 +512,33 @@
 @media (max-width: 768px) {
   .calendar-grid {
     gap: 2px;
-    grid-template-columns: repeat(7, 1fr); /* Ensure 7 equal columns on smaller screens */
+    grid-template-columns: repeat(7, minmax(0, 1fr)); /* Seven equal columns that content cannot widen */
   }
   
   .calendar-day {
     min-height: 30px; /* Further adjusted minimum height */
     padding: 3px; /* Reduced padding */
-    font-size: 11px; /* Slightly smaller font */
+    font-size: var(--sf-font-small); /* Slightly smaller font */
     border-radius: 4px; /* Smaller border radius */
     aspect-ratio: auto; /* Allow aspect ratio to adjust */
   }
   
   .calendar-weekday {
-    font-size: 10px; /* Slightly smaller font */
+    font-size: var(--sf-font-small); /* Slightly smaller font */
     padding: 3px 0; /* Reduced padding */
   }
 
   .calendar-day-number {
-    font-size: 12px; /* Adjusted font size */
-    margin-bottom: 3px; /* Adjusted margin */
+    font-size: var(--sf-font-small); /* Adjusted font size */
   }
 
   .calendar-review-count {
-    width: 18px; /* Adjusted size */
-    height: 18px; /* Adjusted size */
-    font-size: 9px; /* Adjusted font size */
-    top: 3px; /* Adjusted position */
-    right: 3px; /* Adjusted position */
+    width: 1.5em; /* Adjusted size */
+    height: 1.5em; /* Adjusted size */
   }
 
   .calendar-time-estimate {
-    font-size: 9px; /* Adjusted font size */
+    font-size: var(--sf-font-small); /* Adjusted font size */
     padding: 1px 3px; /* Adjusted padding */
   }
 }
@@ -488,12 +550,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  margin-top: 2px;
+  margin-top: 0;
   align-items: center;
+  min-width: 0;
 }
 
 .calendar-event-tab {
-  font-size: 9px;
+  font-size: var(--sf-font-small);
   padding: 1px 3px;
   border-radius: 2px;
   color: white;
@@ -515,7 +578,7 @@
 }
 
 .calendar-events-more {
-  font-size: 8px;
+  font-size: var(--sf-font-small);
   padding: 1px 3px;
   border-radius: 2px;
   background-color: var(--text-muted);
@@ -548,7 +611,7 @@
 
 .upcoming-events-title {
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--sf-font-text);
   color: var(--text-normal);
   display: flex;
   align-items: center;
@@ -556,7 +619,7 @@
 }
 
 .upcoming-events-subtitle {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--text-muted);
   font-weight: 400;
 }
@@ -597,7 +660,7 @@
 }
 
 .upcoming-events-empty-icon {
-  font-size: 24px;
+  font-size: var(--sf-font-title);
   margin-bottom: var(--sf-space-sm);
   opacity: 0.5;
 }
@@ -609,7 +672,7 @@
 }
 
 .upcoming-events-empty-subtext {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--text-faint);
 }
 
@@ -645,7 +708,7 @@
 
 .upcoming-events-day-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   color: var(--text-normal);
 }
 
@@ -703,7 +766,7 @@
 
 .upcoming-events-event-title {
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--sf-font-ui);
   color: var(--text-normal);
   flex: 1;
   min-width: 0;
@@ -713,7 +776,7 @@
 }
 
 .upcoming-events-event-time {
-  font-size: 11px;
+  font-size: var(--sf-font-small);
   color: var(--text-muted);
   font-weight: 400;
   flex-shrink: 0;
@@ -724,7 +787,7 @@
 }
 
 .upcoming-events-event-location {
-  font-size: 11px;
+  font-size: var(--sf-font-small);
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -733,14 +796,14 @@
 }
 
 .upcoming-events-event-description {
-  font-size: 11px;
+  font-size: var(--sf-font-small);
   color: var(--text-faint);
   line-height: 1.3;
   margin-bottom: 2px;
 }
 
 .upcoming-events-event-category {
-  font-size: 10px;
+  font-size: var(--sf-font-small);
   color: var(--text-muted);
   background-color: var(--background-modifier-border);
   padding: 1px 4px;
@@ -820,7 +883,7 @@
   }
   
   .calendar-event-tab {
-    font-size: 8px;
+    font-size: var(--sf-font-small);
     padding: 1px 2px;
   }
   
@@ -829,27 +892,28 @@
   }
   
   .upcoming-events-event-title {
-    font-size: 12px;
+    font-size: var(--sf-font-small);
   }
   
   .upcoming-events-event-time {
-    font-size: 10px;
+    font-size: var(--sf-font-small);
   }
 }
 
 .calendar-day-add-event {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 16px;
-  height: 16px;
+  /* A column of its own in the cell's footer: the button used to be pinned over
+     the top-right corner, where it sat on the time estimate. */
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 1.35em;
+  height: 1.35em;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--sf-font-small);
   cursor: pointer;
   opacity: 0;
   transform: scale(0.8);
@@ -871,19 +935,6 @@
 
 .calendar-day.empty:hover .calendar-day-add-event {
   opacity: 0.7;
-}
-
-/* Adjust positioning when there are other elements */
-.calendar-day.has-reviews .calendar-day-add-event {
-  top: 28px;
-}
-
-.calendar-day.has-events .calendar-day-add-event {
-  top: 28px;
-}
-
-.calendar-day.has-reviews.has-events .calendar-day-add-event {
-  top: 44px;
 }
 
 /* Enhanced Event Modal Styles */
@@ -918,7 +969,7 @@
   justify-content: center;
   background-color: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  font-size: 20px;
+  font-size: var(--sf-font-title);
 }
 
 .event-modal-header-text {
@@ -927,14 +978,14 @@
 
 .event-modal-title {
   margin: 0 0 var(--sf-space-xs) 0;
-  font-size: 24px;
+  font-size: var(--sf-font-title);
   font-weight: 600;
   color: var(--text-on-accent);
 }
 
 .event-modal-subtitle {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   opacity: 0.9;
   color: var(--text-on-accent);
 }
@@ -951,7 +1002,7 @@
 .event-modal-label {
   display: block;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   color: var(--text-normal);
   margin-bottom: var(--sf-space-sm);
 }
@@ -968,7 +1019,7 @@
   padding: var(--sf-space-sm) var(--sf-space-md);
   border: 2px solid var(--background-modifier-border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   background-color: var(--background-primary);
   color: var(--text-normal);
   transition: all 0.2s ease;
@@ -1021,7 +1072,7 @@
   position: absolute;
   left: var(--sf-space-sm);
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: var(--sf-font-text);
   z-index: 1;
   pointer-events: none;
 }
@@ -1045,7 +1096,7 @@
 }
 
 .event-modal-checkbox-label {
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   color: var(--text-normal);
   cursor: pointer;
   user-select: none;
@@ -1066,7 +1117,7 @@
 }
 
 .event-modal-color-label {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -1086,7 +1137,9 @@
   padding: 2px;
 }
 
+/* The colour the user picked arrives as --sf-event-color. */
 .event-modal-color-preview {
+  background-color: var(--sf-event-color, var(--interactive-accent));
   width: 36px;
   height: 36px;
   border-radius: 6px;
@@ -1128,7 +1181,7 @@
   padding: var(--sf-space-sm) var(--sf-space-lg);
   border-radius: 8px;
   border: none;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1324,7 +1377,7 @@
   padding: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   max-width: 280px;
-  font-size: 13px;
+  font-size: var(--sf-font-ui);
   line-height: 1.4;
   pointer-events: none;
   opacity: 0;
@@ -1339,7 +1392,7 @@
 
 .calendar-event-tooltip .tooltip-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   color: var(--text-normal);
   margin-bottom: 6px;
   padding-bottom: 6px;
@@ -1353,7 +1406,7 @@
 .calendar-event-tooltip .tooltip-category {
   margin: 3px 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1368,3 +1421,188 @@
   -webkit-box-orient: vertical;
 }
 
+/* The calendar tooltip follows the cursor; the coordinates arrive as
+   --sf-tip-x / --sf-tip-y rather than as inline styles. */
+.sf-calendar-tooltip {
+  position: fixed;
+  left: var(--sf-tip-x, 0);
+  top: var(--sf-tip-y, 0);
+  z-index: var(--layer-tooltip, 30);
+  pointer-events: none;
+}
+
+/* What the decks owe on a day. The notes count is a filled circle beside it;
+   the deck chip is a small plate, so the two lanes can be told apart at a glance
+   and neither has to be read as a total. Both sit in the date's own row and wrap
+   under it when the cell is too narrow to hold them. */
+.calendar-deck-count {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: var(--sf-font-small);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--sf-info, #2196f3);
+  background-color: var(--sf-info-light, rgba(33, 150, 243, 0.15));
+  border: 1px solid color-mix(in srgb, var(--sf-info, #2196f3), transparent 55%);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The count and its word, so a narrow cell can drop the word and keep the
+   number (see the cell's container query at the end of this file). */
+.calendar-deck-count-value {
+  flex: 0 0 auto;
+}
+
+.calendar-deck-count-unit {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-day:hover .calendar-deck-count {
+  transform: scale(1.05);
+}
+
+.is-collapsed .calendar-deck-count {
+  padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+  .calendar-deck-count {
+    padding: 0 4px;
+  }
+}
+
+/* A day cell is 48px wide in the sidebar: the chips inside it shrink and say so
+   with an ellipsis instead of pushing the whole month off the edge. */
+.calendar-day > * {
+  min-width: 0;
+}
+
+.calendar-event-tab,
+.calendar-deck-count,
+.calendar-review-count,
+.calendar-events-more {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-weekday {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------- a cell that has no room */
+
+/* The day cell measures itself (see `container-type` on .calendar-day). In a
+   sidebar the pane — not the window — decides how wide a cell is, and a cell can
+   end up smaller than the words it holds. What cannot be read is dropped, in
+   that order, rather than clipped into a word nobody can finish; the date is the
+   one thing that always stays. */
+
+/* A narrow month: the cell's padding is the first thing that can go, because it
+   is width the words inside it never get back. */
+@container sf-calendar (max-width: 420px) {
+  .calendar-day {
+    padding: var(--sf-space-xs) 3px;
+  }
+}
+
+@container sf-cal-day (max-width: 64px) {
+  /* "3 cards" becomes "3": the number carries the meaning, the noun can go. The
+     plate keeps to the cell's own width so the number is never the thing that
+     gets clipped. */
+  .calendar-deck-count {
+    padding: 1px 4px;
+  }
+
+  .calendar-deck-count-unit {
+    display: none;
+  }
+
+  /* "20 min" becomes "20m" — the same measurement in the width the cell has. */
+  .calendar-time-estimate {
+    padding: 1px 3px;
+  }
+
+  .calendar-time-estimate-unit {
+    display: none;
+  }
+
+  .calendar-time-estimate-unit-short {
+    display: inline;
+  }
+
+  /* Eight characters of an event title do not fit on one line here, and a tab
+     that reads "St…" says less than the same title wrapped over two lines: a
+     whole word first, and `break-word` only for the word that cannot fit on a
+     line by itself ("Study" still reads as the two lines it fills). */
+  .calendar-event-tab {
+    padding: 1px 2px;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+}
+
+@container sf-cal-day (max-width: 30px) {
+  /* A duration that cannot be read is noise; the day's counts still are not. */
+  .calendar-time-estimate {
+    display: none;
+  }
+}
+
+@container sf-cal-day (max-width: 26px) {
+  /* Nothing here can be read at this size except the date itself; the cell's own
+     tint and border still say the day is holding something. */
+  .calendar-day-chips,
+  .calendar-events-container {
+    display: none;
+  }
+
+  .calendar-day-head {
+    justify-content: center;
+  }
+
+  .calendar-day-number {
+    font-size: var(--sf-font-small);
+  }
+}
+
+/* ------------------------------------------------------------------ stacked */
+
+/* Below the width where seven columns can hold even a date, the month reads as
+   one day per row: every cell takes the pane's whole width, so the date, the
+   counts, the events and the estimate all fit the way they do in a wide cell.
+   The weekday header goes with the columns it labelled — it cannot label one
+   that is no longer there — and the cells padding the month's ends go with it. */
+
+.is-stacked .calendar-weekday {
+  display: none;
+}
+
+.is-stacked .calendar-grid {
+  grid-template-columns: 1fr;
+  gap: var(--sf-space-xs);
+}
+
+.is-stacked .calendar-day {
+  width: 100%;
+  min-height: 0;
+  padding: var(--sf-space-sm);
+}
+
+.is-stacked .calendar-day.empty {
+  display: none;
+}

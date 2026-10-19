@@ -1,0 +1,354 @@
+/* Spaceforge Study — the graph.
+ *
+ * The drawing is SVG; this stylesheet decides what its parts look like. Two
+ * rules hold for everything below. The plot never widens its host: the drawing
+ * has a floor width and the box around it scrolls, so the graph can be dropped
+ * into a 340px sidebar or a full-width pane and ask for no more than it was
+ * given. And a series' colour lives in one custom property per tone
+ * (`--sf-graph-tone`), set on the series and read by its line, its dots and its
+ * legend swatch, so a curve and its legend entry can never disagree.
+ *
+ * Text sizes come from the house scale in `_variables.css` (`--sf-font-*`),
+ * never from a literal: a reader who changes their text size moves all of it,
+ * tick labels included.
+ */
+
+/* ============================== Graph shell ============================== */
+
+.sf-graph {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sf-graph-teach {
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* The box is the drawing's own scroll area. A host too narrow for the plot
+   scrolls here instead of being pushed wider by it, and a little top padding
+   keeps the tooltip's own room inside the clipped region. */
+.sf-graph-box {
+  max-width: 100%;
+  max-height: min(70vh, 460px);
+  padding-top: var(--sf-space-xs);
+  overflow: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-primary);
+}
+
+/* The plot is exactly as wide as the drawing, so the tooltip's own coordinates
+   and the SVG's are the same coordinates. */
+.sf-graph-plot {
+  position: relative;
+  width: max-content;
+  min-width: 0;
+}
+
+.sf-graph-svg {
+  display: block;
+}
+
+/* ============================== Axes ============================== */
+
+/* A grid line is a hint, not a rule: dashed and quiet, one step below the
+   content's own colour. */
+.sf-graph-grid {
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.sf-graph-axis {
+  stroke: var(--sf-text-muted);
+  stroke-width: 1;
+}
+
+.sf-graph-tick {
+  stroke: var(--sf-text-muted);
+  stroke-width: 1;
+}
+
+.sf-graph-tick-label {
+  fill: var(--sf-text-muted);
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-graph-axis-label {
+  fill: var(--sf-text-muted);
+  font-size: var(--sf-font-small);
+  letter-spacing: 0.04em;
+}
+
+/* ============================== Series ============================== */
+
+/* One tone variable per series: the line, the dots and the legend swatch all
+   read it, so a colour is decided in exactly one place. */
+.sf-graph-series.is-primary,
+.sf-graph-legend-item.is-primary {
+  --sf-graph-tone: var(--sf-primary);
+}
+
+.sf-graph-series.is-accent,
+.sf-graph-legend-item.is-accent {
+  --sf-graph-tone: var(--sf-info);
+}
+
+.sf-graph-series.is-muted,
+.sf-graph-legend-item.is-muted {
+  --sf-graph-tone: var(--sf-text-muted);
+}
+
+.sf-graph-line {
+  fill: none;
+  stroke: var(--sf-graph-tone, var(--sf-primary));
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* The curve draws itself in on the mounting draw: the polyline's own length is
+   handed over as a custom property, so the dash that hides it is exactly one
+   curve long. Without motion the dash is still full length — the curve is
+   simply already there. The class itself is added by the code on the mounting
+   draw only; `is-motion` is what decides whether it is animated, and the code
+   adds that only where the host allows motion. */
+.sf-graph-line.is-draw-in {
+  stroke-dasharray: var(--sf-graph-line-length, 1200);
+}
+
+.sf-graph.is-motion .sf-graph-line.is-draw-in {
+  animation: sf-graph-draw-in 620ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes sf-graph-draw-in {
+  from {
+    stroke-dashoffset: var(--sf-graph-line-length, 1200);
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.sf-graph-point {
+  cursor: pointer;
+}
+
+/* The dot is the visible datum; the circle around it is a target big enough
+   for a finger, and invisible. */
+.sf-graph-point-dot {
+  fill: var(--sf-graph-tone, var(--sf-primary));
+  stroke: var(--background-primary);
+  stroke-width: 1.5;
+}
+
+.sf-graph-point-hit {
+  fill: transparent;
+}
+
+/* The point the reader is asking about — hovered or focused — says so with a
+   heavier edge on its dot, not with a colour of its own. */
+.sf-graph-point.is-active .sf-graph-point-dot {
+  stroke: var(--background-primary);
+  stroke-width: 3;
+}
+
+/* ============================== Tooltip ============================== */
+
+/* Positioned from the point's own coordinates, which the code writes as custom
+   properties; it sits above the point, and hangs below it when there is no room
+   above. It never takes the pointer, so hovering it cannot un-hover the point. */
+.sf-graph-tip {
+  position: absolute;
+  z-index: 2;
+  left: var(--sf-graph-tip-x, 0);
+  top: var(--sf-graph-tip-y, 0);
+  transform: translate(-50%, calc(-100% - 10px));
+  max-width: 16em;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-primary);
+  box-shadow: var(--sf-shadow);
+  pointer-events: none;
+}
+
+.sf-graph-tip.is-below {
+  transform: translate(-50%, 10px);
+}
+
+.sf-graph-tip-title {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-graph-tip-value {
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Nothing is being pointed at: the tip is not there at all. */
+.sf-graph-tip.is-hidden {
+  display: none;
+}
+
+/* ============================== Marker ============================== */
+
+/* The reader's own place on the curve: a quiet line down the plot, a dot on the
+   curve where it reads, and the readout that answers wherever it is. */
+.sf-graph-marker {
+  cursor: grab;
+}
+
+.sf-graph-marker-line {
+  stroke: var(--sf-text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.sf-graph-marker-dot {
+  fill: var(--sf-primary);
+  stroke: var(--background-primary);
+  stroke-width: 2;
+}
+
+/* Being dragged, or being reached by keyboard, the marker says so. */
+.sf-graph.is-dragging .sf-graph-marker {
+  cursor: grabbing;
+}
+
+.sf-graph.is-dragging .sf-graph-marker-line {
+  stroke: var(--sf-primary);
+  stroke-dasharray: none;
+}
+
+.sf-graph-marker:focus-visible .sf-graph-marker-line {
+  stroke: var(--sf-primary);
+  stroke-dasharray: none;
+}
+
+/* The readout is placed from the marker's own coordinates, which the code hands
+   over as custom properties; it sits above the dot, hangs below it when there is
+   no room above, and never takes the pointer — a readout that swallowed the
+   pointer would end the drag it was reporting. */
+.sf-graph-marker-readout {
+  position: absolute;
+  z-index: 3;
+  left: var(--sf-graph-marker-x, 0);
+  top: var(--sf-graph-marker-y, 0);
+  transform: translate(-50%, calc(-100% - 12px));
+  max-width: 16em;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-primary);
+  box-shadow: var(--sf-shadow);
+  pointer-events: none;
+}
+
+.sf-graph-marker-readout.is-below {
+  transform: translate(-50%, 12px);
+}
+
+/* Nothing to read (a series with no readings at all): no readout either. */
+.sf-graph-marker-readout.is-hidden {
+  display: none;
+}
+
+.sf-graph-marker-title {
+  font-size: var(--sf-font-small);
+  line-height: 1.35;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-graph-marker-value {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Legend ============================== */
+
+.sf-graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm) var(--sf-space-md);
+  min-width: 0;
+}
+
+.sf-graph-legend-item {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-graph-legend-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--sf-graph-tone, var(--sf-primary));
+}
+
+.sf-graph-legend-label {
+  min-width: 0;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Pearl ============================== */
+
+.sf-graph-pearl {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding-left: var(--sf-space-sm);
+  border-left: 3px solid var(--sf-primary);
+}
+
+.sf-graph-pearl-tag {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-primary);
+}
+
+.sf-graph-pearl-text {
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Movement ============================== */
+
+/* The code only adds `is-motion` where the host allows motion; this is the belt
+   to that brace, for a reader who turns reduced motion on while the graph is
+   already open. */
+@media (prefers-reduced-motion: reduce) {
+  .sf-graph.is-motion .sf-graph-line.is-draw-in {
+    animation: none;
+  }
+}

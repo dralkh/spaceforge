@@ -591,7 +591,7 @@ export class ConsolidatedMCQModal extends Modal {
             // Add a visual progress bar
             const progressBar = noteScoreEl.createDiv('mcq-progress-bar');
             const progressFill = progressBar.createDiv('mcq-progress-fill');
-            progressFill.style.width = `${scorePercent}%`;
+            progressFill.setCssProps({ '--sf-fill': `${scorePercent}%` });
 
             if (noteScore.score >= 0.7) {
                 progressFill.addClass('high-score');

@@ -1,0 +1,18 @@
+/* A window holding the review session itself: the bar at the top, the dock
+   below it, and nothing else — the note stays in the window the reader works
+   in. The strip and the dock bring their own looks; these rules only give the
+   window's content area the column they live in. */
+.sf-review-window-content {
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sf-review-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--background-primary);
+}

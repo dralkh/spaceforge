@@ -7,7 +7,7 @@
   cursor: pointer;
   transition: var(--sf-transition);
   border: none;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   line-height: 1.4;
   display: inline-flex;
   align-items: center;
@@ -78,4 +78,17 @@
 .sf-icon-btn:hover {
   color: var(--sf-primary);
   background-color: var(--sf-primary-light);
+}
+
+/* Obsidian's base stylesheet sets `button { font-size: var(--font-ui-small) }`,
+   and that token follows the *interface* font setting, not the reader's reading
+   size — so every button we own was welded to a fixed size while the text
+   around it grew. These selectors are one class deep, which beats the element
+   rule, and they sit early in the sheet so any tier a component sets for itself
+   still wins. */
+button[class*="sf-"],
+button[class*="review-"],
+button[class*="pomodoro-"],
+button[class*="calendar-"] {
+  font-size: var(--sf-font-ui);
 }

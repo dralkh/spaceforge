@@ -24,7 +24,7 @@
 
 .sf-card-header h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--sf-font-text);
   font-weight: 600;
 }
 
@@ -33,7 +33,7 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 100px;
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   font-weight: 500;
   line-height: 1.5;
   text-align: center;
@@ -115,7 +115,7 @@
   background-color: rgba(56, 161, 105, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: var(--sf-font-ui);
 }
 
 .review-time-medium {
@@ -124,7 +124,7 @@
   background-color: rgba(221, 107, 32, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: var(--sf-font-ui);
 }
 
 .review-time-long {
@@ -133,7 +133,7 @@
   background-color: rgba(229, 62, 62, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: var(--sf-font-ui);
 }
 
 .review-phase-initial {
@@ -142,7 +142,7 @@
   background-color: var(--background-modifier-success-hover);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: var(--sf-font-ui);
 }
 
 .review-phase-spaced {
@@ -151,11 +151,11 @@
   background-color: var(--background-modifier-success-hover);
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 0.9em;
+  font-size: var(--sf-font-ui);
 }
 
 .phase-time {
-  font-size: 10px;
+  font-size: var(--sf-font-small);
   color: var(--sf-text-muted);
   margin-top: 2px;
 }

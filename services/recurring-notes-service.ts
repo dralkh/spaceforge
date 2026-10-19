@@ -17,12 +17,11 @@ export class RecurringNotesService {
      * @param interval Recurrence interval in days
      * @param endDate Optional end date for recurrence (timestamp)
      */
-    async convertToRecurringNote(path: string, interval: number, endDate: number | null = null): Promise<void> {
+    async convertToRecurringNote(path: string, interval: number, endDate: number | null = null): Promise<boolean> {
         const schedule = this.plugin.reviewScheduleService.schedules[path];
-        if (!schedule) {
-            console.warn(`No schedule found for note: ${path}`);
-            return;
-        }
+        // A note that is not in the review schedule cannot be made recurring. The
+        // caller is the one that knows how to say so to the reader.
+        if (!schedule) return false;
 
         // Store the original schedule before making it recurring
         const originalSchedule: ReviewSchedule = {
@@ -43,6 +42,7 @@ export class RecurringNotesService {
         await this.scheduleNextRecurrence(path);
         
         await this.plugin.savePluginData();
+        return true;
     }
 
     /**

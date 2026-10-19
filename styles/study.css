@@ -1,0 +1,2719 @@
+/* Spaceforge - Study (adaptive tutor) */
+
+/* ============================== Shell ============================== */
+
+.sf-study-modal-shell {
+  width: min(1060px, 94vw);
+  max-width: min(1060px, 94vw);
+  height: min(86vh, 900px);
+}
+
+.sf-study-modal-shell .modal-content {
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sf-study-modal {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-study-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ============================== Header ============================== */
+
+.sf-study-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sf-space-md);
+  padding: var(--sf-space-md) var(--sf-space-lg);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  flex-wrap: wrap;
+}
+
+.sf-study-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-study-title-icon {
+  display: inline-flex;
+  color: var(--sf-primary);
+}
+
+.sf-study-title {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-study-subtitle {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  padding-left: var(--sf-space-sm);
+  border-left: 1px solid var(--background-modifier-border);
+  /* One line by design; never a bare overflow that the pane's edge cuts. */
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-study-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  flex-wrap: wrap;
+}
+
+.sf-study-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--sf-text);
+  font-size: var(--sf-font-ui);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sf-study-chip:hover {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+.sf-study-chip-icon {
+  display: inline-flex;
+  opacity: 0.75;
+}
+
+.sf-study-chip-web.is-on {
+  border-color: var(--sf-info);
+  color: var(--sf-info);
+  background: var(--sf-info-light);
+}
+
+.sf-study-chip-mode {
+  cursor: default;
+}
+
+.sf-study-mode-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.2;
+  padding: 0 2px;
+  box-shadow: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sf-study-mode-button:hover {
+  background: transparent;
+  color: var(--sf-primary);
+}
+
+/* ============================== Body layout ============================== */
+
+.sf-study-body {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sf-study-rail-column {
+  border-right: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sf-study-rail-head {
+  padding: var(--sf-space-md) var(--sf-space-md) var(--sf-space-sm);
+  font-size: var(--sf-font-small);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sf-text-muted);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sf-study-rail {
+  overflow-y: auto;
+  padding: var(--sf-space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.sf-study-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ============================== Objective rail ============================== */
+
+.sf-study-obj {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'status main errors'
+    'meters meters meters';
+  gap: 4px var(--sf-space-sm);
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+  background: var(--background-primary);
+}
+
+.sf-study-obj:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.sf-study-obj.is-selected {
+  border-color: var(--sf-primary);
+  box-shadow: 0 0 0 1px var(--sf-primary-light) inset;
+}
+
+.sf-study-obj.is-active {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+}
+
+.sf-study-obj.is-pulsing {
+  animation: sfStudyPulse 1.2s ease-out;
+}
+
+.sf-study-obj-status {
+  grid-area: status;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sf-text-muted);
+  box-shadow: 0 0 0 3px transparent;
+  transition: var(--sf-transition);
+}
+
+.sf-study-obj[data-status='unseen'] .sf-study-obj-status {
+  background: var(--background-modifier-border);
+  border: 1px solid var(--sf-text-muted);
+}
+
+.sf-study-obj[data-status='learning'] .sf-study-obj-status {
+  background: var(--sf-info);
+}
+
+.sf-study-obj[data-status='fragile'] .sf-study-obj-status {
+  background: var(--sf-warning);
+}
+
+.sf-study-obj[data-status='stable'] .sf-study-obj-status {
+  background: var(--sf-primary);
+}
+
+.sf-study-obj[data-status='mastered'] .sf-study-obj-status {
+  background: var(--sf-success);
+  box-shadow: 0 0 0 3px var(--sf-success-light);
+}
+
+.sf-study-obj.is-active .sf-study-obj-status {
+  animation: sfStudyBlink 1.4s ease-in-out infinite;
+}
+
+.sf-study-obj-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.sf-study-obj-title {
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.sf-study-obj-meta {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  margin-top: 2px;
+}
+
+.sf-study-obj-meters {
+  grid-area: meters;
+  display: flex;
+  gap: 4px;
+}
+
+.sf-study-meter {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sf-study-meter-fill {
+  height: 100%;
+  border-radius: 2px;
+  width: var(--sf-fill, 0);
+  background: var(--sf-primary);
+  transition: width 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sf-study-meter[data-dim='U'] .sf-study-meter-fill {
+  background: var(--sf-primary);
+}
+
+.sf-study-meter[data-dim='R'] .sf-study-meter-fill {
+  background: var(--sf-info);
+}
+
+.sf-study-meter[data-dim='T'] .sf-study-meter-fill {
+  background: var(--sf-success);
+}
+
+.sf-study-obj-errors {
+  grid-area: errors;
+  font-size: var(--sf-font-small);
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.sf-study-obj-due {
+  grid-area: errors;
+  font-size: var(--sf-font-small);
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--sf-warning-light);
+  color: var(--sf-warning);
+  margin-left: 26px;
+}
+
+/* Objective detail card */
+
+.sf-study-obj-detail {
+  margin: var(--sf-space-sm);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  box-shadow: var(--sf-shadow);
+  animation: fadeIn 0.2s ease-out;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-obj-detail-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.sf-study-obj-detail-statement {
+  color: var(--sf-text-muted);
+  line-height: 1.45;
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-obj-detail-meta {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-obj-detail-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-obj-detail-meter {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) 32px;
+  gap: var(--sf-space-sm);
+  align-items: center;
+}
+
+.sf-study-obj-detail-meter-label {
+  color: var(--sf-text-muted);
+}
+
+.sf-study-obj-detail-meter-value {
+  text-align: right;
+  color: var(--sf-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-study-obj-detail-errors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-obj-detail-errors span {
+  font-size: var(--sf-font-small);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.sf-study-obj-detail-observations {
+  border-left: 2px solid var(--background-modifier-border);
+  padding-left: var(--sf-space-sm);
+  color: var(--sf-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-obj-detail-review {
+  color: var(--sf-text-muted);
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-obj-detail-actions {
+  display: flex;
+  gap: var(--sf-space-sm);
+}
+
+/* ============================== Stage rail ============================== */
+
+.sf-study-stage-rail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--sf-space-sm) var(--sf-space-lg);
+  border-bottom: 1px solid var(--background-modifier-border);
+  overflow-x: auto;
+  background: var(--background-primary-alt);
+}
+
+.sf-study-stage {
+  position: relative;
+  font-size: var(--sf-font-small);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--sf-text-muted);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-study-stage::after {
+  content: '';
+  width: 10px;
+  height: 1px;
+  background: var(--background-modifier-border);
+  position: absolute;
+  right: -8px;
+  top: 50%;
+}
+
+.sf-study-stage:last-child::after {
+  display: none;
+}
+
+.sf-study-stage.is-done {
+  color: var(--sf-success);
+}
+
+.sf-study-stage.is-current {
+  color: var(--text-on-accent);
+  background: var(--sf-primary);
+  border-color: var(--sf-primary);
+  animation: sfStudyStagePulse 2.4s ease-in-out infinite;
+}
+
+/* ============================== Stream ============================== */
+
+.sf-study-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sf-space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  scroll-behavior: smooth;
+  min-height: 0;
+}
+
+.sf-study-turn {
+  border-radius: var(--sf-radius-md);
+  padding: var(--sf-space-md);
+  max-width: 78%;
+  animation: fadeIn 0.35s ease-out;
+}
+
+.sf-study-turn-role {
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sf-text-muted);
+  margin-bottom: 6px;
+}
+
+.sf-study-turn-body {
+  line-height: 1.55;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.sf-study-turn-body p:first-child {
+  margin-top: 0;
+}
+
+.sf-study-turn-body p:last-child {
+  margin-bottom: 0;
+}
+
+.sf-study-turn-tutor {
+  align-self: flex-start;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--sf-primary);
+}
+
+.sf-study-turn-user {
+  align-self: flex-end;
+  background: var(--sf-primary-light);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sf-study-turn-system {
+  align-self: center;
+  background: transparent;
+  border: 1px dashed var(--background-modifier-border);
+  color: var(--sf-text-muted);
+  font-size: var(--sf-font-ui);
+  max-width: 90%;
+}
+
+.sf-study-turn-system .sf-study-turn-role {
+  margin-bottom: 2px;
+}
+
+/* Anchors pulled from the note */
+
+.sf-study-anchors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-top: var(--sf-space-sm);
+  padding-top: var(--sf-space-sm);
+  border-top: 1px dashed var(--background-modifier-border);
+}
+
+.sf-study-anchors-label {
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-text-muted);
+}
+
+.sf-study-anchor {
+  font-size: var(--sf-font-small);
+  font-style: italic;
+  color: var(--sf-text-muted);
+  padding: 2px 8px;
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+/* Feedback */
+
+.sf-study-feedback {
+  align-self: flex-start;
+  max-width: 78%;
+  border-radius: var(--sf-radius-md);
+  padding: var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  animation: fadeIn 0.35s ease-out;
+}
+
+.sf-study-feedback.is-correct {
+  border-left: 3px solid var(--sf-success);
+  background: var(--sf-success-light);
+}
+
+.sf-study-feedback.is-wrong {
+  border-left: 3px solid var(--sf-warning);
+  background: var(--sf-warning-light);
+}
+
+.sf-study-feedback-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: var(--sf-font-ui);
+  margin-bottom: 6px;
+}
+
+.sf-study-feedback.is-correct .sf-study-feedback-head {
+  color: var(--sf-success);
+}
+
+.sf-study-feedback.is-wrong .sf-study-feedback-head {
+  color: var(--sf-warning);
+}
+
+.sf-study-feedback-icon {
+  display: inline-flex;
+}
+
+/* Question card */
+
+.sf-study-question {
+  align-self: flex-start;
+  width: min(100%, 720px);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--sf-primary);
+  background: var(--background-primary);
+  padding: var(--sf-space-md);
+  box-shadow: var(--sf-shadow);
+  animation: fadeIn 0.35s ease-out;
+}
+
+.sf-study-question-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--sf-primary);
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-study-question-icon {
+  display: inline-flex;
+}
+
+.sf-study-question-difficulty {
+  margin-left: auto;
+  color: var(--sf-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.sf-study-question-text {
+  font-size: var(--sf-font-text);
+  line-height: 1.55;
+}
+
+.sf-study-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--sf-space-md);
+}
+
+.sf-study-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sf-space-sm);
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+  white-space: normal;
+  height: auto;
+  line-height: 1.4;
+}
+
+.sf-study-choice:hover {
+  border-color: var(--sf-primary);
+  transform: translateX(2px);
+}
+
+.sf-study-choice-letter {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-choice.is-picked {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+}
+
+.sf-study-choice.is-locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.sf-study-choice.is-picked.is-locked {
+  opacity: 1;
+}
+
+/* Flags: inconsistencies and safety-critical warnings */
+
+.sf-study-flag {
+  align-self: flex-start;
+  display: flex;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid;
+  max-width: 78%;
+  animation: fadeIn 0.35s ease-out;
+}
+
+.sf-study-flag-warn {
+  border-color: var(--sf-warning);
+  background: var(--sf-warning-light);
+}
+
+.sf-study-flag-danger {
+  border-color: var(--sf-danger);
+  background: var(--sf-danger-light);
+}
+
+.sf-study-flag-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.sf-study-flag-warn .sf-study-flag-icon {
+  color: var(--sf-warning);
+}
+
+.sf-study-flag-danger .sf-study-flag-icon {
+  color: var(--sf-danger);
+}
+
+.sf-study-flag-title {
+  font-weight: 600;
+  font-size: var(--sf-font-ui);
+  margin-bottom: 2px;
+}
+
+.sf-study-flag-text {
+  font-size: var(--sf-font-ui);
+  line-height: 1.5;
+}
+
+.sf-study-details {
+  margin-top: 6px;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-details pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+  background: var(--background-primary);
+  padding: var(--sf-space-sm);
+  border-radius: var(--sf-radius-sm);
+  font-size: var(--sf-font-small);
+}
+
+/* Research stream */
+
+.sf-study-research {
+  align-self: flex-start;
+  max-width: 78%;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px dashed var(--sf-info);
+  background: var(--sf-info-light);
+  font-size: var(--sf-font-ui);
+  animation: fadeIn 0.35s ease-out;
+}
+
+.sf-study-research.is-live {
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background-size: 200% 100%;
+  animation: fadeIn 0.35s ease-out, shimmer 1.6s linear infinite;
+}
+
+.sf-study-research-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--sf-info);
+}
+
+.sf-study-research-icon {
+  display: inline-flex;
+}
+
+.sf-study-research-queries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  color: var(--sf-text-muted);
+}
+
+.sf-study-research-results {
+  color: var(--sf-text-muted);
+  margin-top: 2px;
+}
+
+/* Sources */
+
+.sf-study-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: var(--sf-space-sm);
+}
+
+.sf-study-sources-label {
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-text-muted);
+}
+
+.sf-study-source {
+  font-size: var(--sf-font-small);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sf-info);
+  background: transparent;
+  color: var(--sf-info);
+  cursor: pointer;
+  height: auto;
+  box-shadow: none;
+}
+
+.sf-study-source:hover {
+  background: var(--sf-info-light);
+}
+
+/* ============================== Status strip ============================== */
+
+.sf-study-status {
+  display: none;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-sm) var(--sf-space-lg);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--sf-text-muted);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-status.is-active {
+  display: flex;
+}
+
+.sf-study-pulse {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.sf-study-pulse span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sf-primary);
+  animation: sfStudyDots 1.1s ease-in-out infinite;
+}
+
+.sf-study-pulse span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.sf-study-pulse span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.sf-study-status-label {
+  color: var(--text-normal);
+}
+
+.sf-study-status-timer {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Composer ============================== */
+
+.sf-study-composer {
+  padding: var(--sf-space-md) var(--sf-space-lg);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.sf-study-input-row {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: stretch;
+}
+
+.sf-study-input {
+  flex: 1;
+  resize: vertical;
+  min-height: 62px;
+  max-height: 200px;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+}
+
+.sf-study-input:focus {
+  outline: none;
+  border-color: var(--sf-primary);
+  box-shadow: 0 0 0 2px var(--sf-primary-light);
+}
+
+.sf-study-input:disabled {
+  opacity: 0.6;
+}
+
+.sf-study-send {
+  align-self: flex-end;
+  height: 34px;
+}
+
+.sf-study-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--sf-space-sm);
+}
+
+.sf-study-quick-btn {
+  font-size: var(--sf-font-ui);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--sf-text-muted);
+  cursor: pointer;
+  height: auto;
+  box-shadow: none;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-study-quick-btn:hover {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+.sf-study-quick-end {
+  margin-left: auto;
+}
+
+/* ============================== Digest ============================== */
+
+.sf-study-digest {
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  padding: var(--sf-space-sm) var(--sf-space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-study-digest-empty {
+  color: var(--sf-text-muted);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-digest-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-md);
+}
+
+.sf-study-digest-bar {
+  flex: 0 0 140px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sf-study-digest-fill {
+  height: 100%;
+  width: var(--sf-fill, 0);
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--sf-info), var(--sf-success));
+  transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sf-study-digest-text {
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+}
+
+.sf-study-digest-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sf-space-md);
+  flex-wrap: wrap;
+}
+
+.sf-study-digest-errors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-digest-label {
+  color: var(--sf-text-muted);
+}
+
+.sf-study-digest-error {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--sf-danger-light);
+  color: var(--sf-danger);
+}
+
+.sf-study-digest-ok,
+.sf-study-digest-meta {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-digest-meta {
+  margin-left: auto;
+}
+
+.sf-study-busy .sf-study-digest-actions .sf-btn {
+  opacity: 0.6;
+}
+
+/* ============================== Briefing & report ============================== */
+
+.sf-study-briefing {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sf-space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+}
+
+.sf-study-intro {
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  background: var(--sf-info-light);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sf-study-intro-text {
+  line-height: 1.6;
+  color: var(--text-normal);
+}
+
+.sf-study-topic {
+  font-size: var(--sf-font-text);
+  line-height: 1.55;
+  color: var(--text-normal);
+}
+
+.sf-study-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+}
+
+.sf-study-stat {
+  flex: 1 1 92px;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sf-study-stat-icon {
+  display: inline-flex;
+  color: var(--sf-primary);
+  opacity: 0.8;
+}
+
+.sf-study-stat-value {
+  font-size: var(--sf-font-title);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-study-stat-label {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-banner {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-banner-warn {
+  border: 1px solid var(--sf-warning);
+  background: var(--sf-warning-light);
+}
+
+.sf-study-banner-icon {
+  display: inline-flex;
+  color: var(--sf-warning);
+}
+
+.sf-study-due,
+.sf-study-recall,
+.sf-study-memory {
+  border-left: 3px solid var(--sf-primary);
+  padding-left: var(--sf-space-md);
+}
+
+.sf-study-due-title,
+.sf-study-recall-title,
+.sf-study-memory-title,
+.sf-study-section-title {
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-text-muted);
+  margin-bottom: 6px;
+}
+
+.sf-study-due-list,
+.sf-study-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sf-study-due-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-due-badge {
+  font-size: var(--sf-font-ui);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--sf-warning-light);
+  color: var(--sf-warning);
+}
+
+.sf-study-recall-text {
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+}
+
+.sf-study-memory-item {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-brief-objectives {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  padding: var(--sf-space-sm);
+}
+
+.sf-study-brief-objective {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: var(--sf-space-sm);
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: var(--sf-radius-sm);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-brief-objective:nth-child(odd) {
+  background: var(--background-secondary);
+}
+
+.sf-study-brief-objective-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-study-brief-objective-meta {
+  color: var(--sf-text-muted);
+  font-size: var(--sf-font-ui);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Domain lens */
+
+.sf-study-domain-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-md);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.sf-study-domain-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-study-domain-icon {
+  display: inline-flex;
+  color: var(--sf-primary);
+  flex: 0 0 auto;
+}
+
+.sf-study-domain-name {
+  font-weight: 600;
+}
+
+.sf-study-domain-note {
+  color: var(--sf-text-muted);
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+}
+
+.sf-study-domain-edit {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.sf-study-domain-editor {
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--sf-primary);
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.sf-study-domain-editor-blurb,
+.sf-study-report-note {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  line-height: 1.5;
+}
+
+.sf-study-domain-school {
+  min-height: 62px;
+  width: 100%;
+  font-family: inherit;
+}
+
+.sf-study-domain-editor-actions {
+  display: flex;
+  gap: var(--sf-space-sm);
+  justify-content: flex-end;
+}
+
+/* Mode grid */
+
+.sf-study-mode-grid {
+  display: grid;
+  /* Five modes, five columns wherever there is room: one row, not two. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: var(--sf-space-xs, 6px);
+}
+
+.sf-study-mode {
+  /* Icon beside its name, blurb underneath: a card two lines tall, not three. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 1px;
+  align-items: center;
+  text-align: left;
+  padding: 6px var(--sf-space-sm);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  height: auto;
+  white-space: normal;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-study-mode:hover {
+  border-color: var(--sf-primary);
+}
+
+.sf-study-mode.is-selected {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-secondary));
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
+.sf-study-mode-icon {
+  display: inline-flex;
+  color: var(--sf-primary);
+}
+
+.sf-study-mode-label {
+  font-weight: 600;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-mode-blurb {
+  grid-column: 1 / -1;
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  line-height: 1.4;
+}
+
+/* Toggle */
+
+.sf-study-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-md);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.sf-study-toggle-text {
+  min-width: 0;
+}
+
+.sf-study-toggle-title {
+  font-weight: 600;
+}
+
+.sf-study-toggle-blurb {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  line-height: 1.45;
+}
+
+.sf-study-switch {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-modifier-border);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-study-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--background-primary);
+  box-shadow: var(--sf-shadow);
+  transition: transform var(--sf-transition);
+}
+
+.sf-study-switch.is-on {
+  background: var(--sf-info);
+  border-color: var(--sf-info);
+}
+
+.sf-study-switch.is-on .sf-study-switch-knob {
+  transform: translateX(18px);
+}
+
+.sf-study-switch.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sf-study-provider {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-provider-icon {
+  display: inline-flex;
+}
+
+/* Report */
+
+.sf-study-score {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-lg);
+  padding: var(--sf-space-md);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.sf-study-score-ring {
+  flex: 0 0 auto;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(closest-side, var(--background-secondary) 74%, transparent 75% 100%),
+    conic-gradient(var(--sf-study-ring-color, var(--sf-primary)) calc(var(--sf-study-score, 0) * 1%), var(--background-modifier-border) 0);
+}
+
+.sf-study-score-ring[data-score='high'] {
+  --sf-study-ring-color: var(--sf-success);
+}
+
+.sf-study-score-ring[data-score='mid'] {
+  --sf-study-ring-color: var(--sf-warning);
+}
+
+.sf-study-score-ring[data-score='low'] {
+  --sf-study-ring-color: var(--sf-danger);
+}
+
+.sf-study-score-value {
+  font-size: var(--sf-font-title);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-study-score-text {
+  min-width: 0;
+}
+
+.sf-study-score-title {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+}
+
+.sf-study-score-sub {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-report-summary {
+  margin-top: var(--sf-space-sm);
+  line-height: 1.55;
+}
+
+.sf-study-report-section {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: var(--sf-space-md);
+}
+
+.sf-study-report-item {
+  padding: 5px 0 5px var(--sf-space-sm);
+  border-left: 2px solid var(--background-modifier-border);
+  margin-bottom: 4px;
+  font-size: var(--sf-font-text);
+  line-height: 1.45;
+}
+
+.sf-study-report-solid {
+  border-left-color: var(--sf-success);
+}
+
+.sf-study-report-fragile {
+  border-left-color: var(--sf-warning);
+}
+
+.sf-study-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: var(--sf-space-sm);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-review-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: var(--sf-space-sm);
+  align-items: center;
+}
+
+.sf-study-review-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sf-text-muted);
+}
+
+.sf-study-review-status[data-status='mastered'] {
+  background: var(--sf-success);
+}
+
+.sf-study-review-status[data-status='stable'] {
+  background: var(--sf-primary);
+}
+
+.sf-study-review-status[data-status='fragile'] {
+  background: var(--sf-warning);
+}
+
+.sf-study-review-status[data-status='learning'] {
+  background: var(--sf-info);
+}
+
+.sf-study-review-days {
+  color: var(--sf-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions footer */
+
+.sf-study-actions {
+  display: flex;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-md) var(--sf-space-lg);
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  flex-wrap: wrap;
+}
+
+/* Loading & failure */
+
+.sf-study-loading,
+.sf-study-failure {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sf-space-md);
+  color: var(--sf-text-muted);
+  padding: var(--sf-space-xl);
+  text-align: center;
+}
+
+.sf-study-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--background-modifier-border);
+  border-top-color: var(--sf-primary);
+  animation: sfStudySpin 0.9s linear infinite;
+}
+
+.sf-study-loading-text {
+  font-size: var(--sf-font-ui);
+}
+
+.sf-study-failure-icon {
+  display: inline-flex;
+  color: var(--sf-warning);
+}
+
+.sf-study-failure-text {
+  max-width: 420px;
+  line-height: 1.5;
+}
+
+/* ============================== Sidebar integration ============================== */
+
+.review-note-study {
+  position: relative;
+}
+
+.review-note-study.has-work::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sf-warning);
+  box-shadow: 0 0 0 1px var(--background-primary);
+}
+
+.review-note-study.has-plan:not(.has-work)::after {
+  background: var(--sf-success);
+}
+
+.review-all-study-button {
+  border-color: var(--sf-primary);
+}
+
+/* ============================== Animations ============================== */
+
+@keyframes sfStudySpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sfStudyDots {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes sfStudyPulse {
+  0% { box-shadow: 0 0 0 0 var(--sf-primary-light); }
+  50% { box-shadow: 0 0 0 4px var(--sf-primary-light); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes sfStudyBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes sfStudyStagePulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--sf-primary-light); }
+  50% { box-shadow: 0 0 0 3px var(--sf-primary-light); }
+}
+
+/* ============================== Responsive ============================== */
+
+@media (max-width: 860px) {
+  .sf-study-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+
+  .sf-study-rail-column {
+    border-right: none;
+    border-bottom: 1px solid var(--background-modifier-border);
+    max-height: 170px;
+  }
+
+  .sf-study-turn,
+  .sf-study-feedback,
+  .sf-study-question,
+  .sf-study-flag,
+  .sf-study-research {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .sf-study-digest-progress {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .sf-study-digest-bar {
+    flex: 0 0 6px;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-study-pulse span,
+  .sf-study-stage.is-current,
+  .sf-study-obj.is-active .sf-study-obj-status,
+  .sf-study-spinner,
+  .sf-study-research.is-live {
+    animation: none;
+  }
+}
+
+
+/* ============================== Embedded panel ============================== */
+/* The Study panel mounted inside a host (the review dialog), rather than in its
+   own window. It owns its scrolling so the host can grow around it. */
+
+.sf-study-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--sf-radius-md);
+}
+
+.sf-study-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-study-panel.is-compact .sf-study-briefing {
+  padding: var(--sf-space-md);
+}
+
+.sf-study-panel.is-compact .sf-study-stream {
+  padding: var(--sf-space-md);
+}
+
+/* Charting status line: visible progress without a blocking screen. */
+
+.sf-study-chartline {
+  display: none;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: 6px var(--sf-space-md);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-study-chartline.is-active,
+.sf-study-chartline.has-error {
+  display: flex;
+}
+
+.sf-study-chartline-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.sf-study-chartline.is-active .sf-study-chartline-icon svg {
+  animation: sfStudySpin 1.4s linear infinite;
+}
+
+.sf-study-chartline.has-error .sf-study-chartline-icon {
+  color: var(--sf-warning);
+}
+
+.sf-study-chartline-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-study-chartline-bar {
+  flex: 0 0 90px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sf-study-chartline-fill {
+  height: 100%;
+  width: var(--sf-fill, 0);
+  border-radius: 2px;
+  background: var(--sf-primary);
+  transition: width 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sf-study-chartline-retry {
+  margin-left: auto;
+  font-size: var(--sf-font-ui);
+}
+
+/* ============================== Figures ============================== */
+
+.sf-study-figures {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  padding: var(--sf-space-sm) var(--sf-space-md) var(--sf-space-md);
+  background: var(--background-secondary);
+}
+
+.sf-study-figure-strip {
+  display: flex;
+  gap: var(--sf-space-sm);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.sf-study-figure-strip:not(.is-expanded) .sf-study-figure:nth-child(n+7):not(.sf-study-figure-more) {
+  display: none;
+}
+
+.sf-study-figure-strip .sf-study-figure-more {
+  align-self: stretch;
+  min-width: 62px;
+  background: var(--background-primary-alt);
+}
+
+.sf-study-figure {
+  flex: 0 0 auto;
+  width: 92px;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-study-figure:hover {
+  border-color: var(--sf-primary);
+  transform: translateY(-1px);
+}
+
+.sf-study-figure-img {
+  display: block;
+  width: 100%;
+  height: 64px;
+  object-fit: cover;
+  background: var(--background-modifier-border);
+}
+
+.sf-study-figure-placeholder {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sf-text-muted);
+  background: var(--background-modifier-border);
+}
+
+.sf-study-figure-name {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  padding: 3px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-study-figure-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sf-text-muted);
+}
+
+.sf-study-figure-more-count {
+  font-size: var(--sf-font-ui);
+}
+
+/* Lightbox */
+
+.sf-study-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-modal, 100);
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sf-space-lg);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.sf-study-lightbox-frame {
+  background: var(--background-primary);
+  border-radius: var(--sf-radius-lg);
+  box-shadow: var(--sf-shadow-lg);
+  max-width: min(1100px, 94vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sf-study-lightbox-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sf-study-lightbox-title {
+  font-size: var(--sf-font-ui);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-study-lightbox-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  color: var(--sf-text-muted);
+  height: auto;
+}
+
+.sf-study-lightbox-img {
+  max-width: 100%;
+  max-height: 76vh;
+  object-fit: contain;
+  background: var(--background-secondary);
+}
+
+.sf-study-lightbox-missing {
+  padding: var(--sf-space-xl);
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Review-dialog integration ============================== */
+/* Collapsed by default: the dialog looks exactly as it always did until study
+   mode is asked for. The grid trick animates height without magic numbers. */
+
+.sf-review-study-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  flex-wrap: wrap;
+}
+
+.sf-review-study-status {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-review-study-collapse {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  color: var(--sf-text-muted);
+  cursor: pointer;
+  height: auto;
+  padding: 2px 6px;
+  box-shadow: none;
+}
+
+.review-button-study.is-active {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+}
+
+.sf-review-study-host {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.sf-review-study-host.is-open {
+  grid-template-rows: 1fr;
+  margin-top: var(--sf-space-md);
+}
+
+.sf-review-study-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sf-review-study-host.is-open .sf-review-study-inner {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  height: min(66vh, 720px);
+}
+
+/* The dialog grows when study mode is open, so the panel has room to work. */
+
+.modal.sf-review-study-expanded {
+  width: min(1120px, 95vw);
+  max-width: min(1120px, 95vw);
+}
+
+/* ============================== Sidebar chart status ============================== */
+
+.review-chart-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-hidden.review-chart-status {
+  display: none;
+}
+
+.review-chart-status-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.review-chart-status-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.review-chart-status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-chart-status-button {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: var(--sf-font-ui);
+  height: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--sf-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.review-chart-status-button:hover {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-review-study-host {
+    transition: none;
+  }
+
+  .sf-study-chartline.is-active .sf-study-chartline-icon svg {
+    animation: none;
+  }
+}
+
+/* The objectives as a list in the briefing, before a session starts. */
+
+.sf-study-briefing-objectives {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-study-objective-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+}
+
+.sf-study-objective-list .sf-study-obj.is-static {
+  cursor: default;
+}
+
+.sf-study-objective-list .sf-study-obj.is-static:hover {
+  background: var(--background-secondary);
+}
+
+.sf-study-panel.is-compact .sf-study-objective-list {
+  max-height: 220px;
+}
+
+/* ========================= The dock: study + questions under the bar ========================= */
+/* A sitting happens under the note, not over it: the same place the grades live, so
+   nothing the learner is being asked about is ever hidden behind a window. */
+
+.sf-dock {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  /* the reader's own reading size is the base: nothing inside this
+     container should ever be smaller than what they chose */
+  font-size: var(--sf-font-text);
+}
+
+.sf-dock.sf-hidden {
+  display: none;
+}
+
+.sf-dock-status {
+  flex: 0 0 auto;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+}
+
+.sf-dock-status.is-empty {
+  display: none;
+}
+
+.sf-dock-scorecard-hint {
+  color: var(--text-muted);
+}
+
+.sf-dock-host {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.sf-dock-host.is-open {
+  grid-template-rows: 1fr;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.sf-dock-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  /* The row above is chrome; what sits under it is reading material, so it
+     takes the size the reader chose for text, not the UI's small print. */
+  font-size: var(--sf-font-text);
+}
+
+/* The docked panels get a measure, not the whole window: a line of 17px text
+   stretched to 1470px is unreadable however large the panel is.
+   The study panel mounts *as* the dock body (it adds its own class to the host),
+   so it is styled by both. */
+.sf-dock-body.sf-study-panel {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.sf-dock-body > .sf-mcq-runner {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* The height is the reader's to set: --sf-dock-height carries a dragged size,
+   and the default (a bit over half the window, capped) is the fallback. The
+   variable lives here rather than on the base rule because this is the rule that
+   decided the height in the first place — a second rule could not win against it. */
+.sf-dock-host.is-open .sf-dock-inner {
+  height: var(--sf-dock-height, min(58vh, 640px));
+}
+
+/* Drag the top edge to give the sitting more or less room. */
+.sf-dock-grip {
+  flex: 0 0 auto;
+  height: 8px;
+  cursor: ns-resize;
+  /* The dock's height is set by dragging this edge. A control that exists only
+     while hovered is a control nobody finds, so the handle is drawn: a short
+     centred bar at the top of the dock, directly under the grade row. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.sf-dock-grip::before {
+  content: '';
+  width: 44px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  transition: background var(--sf-transition-fast);
+}
+
+.sf-dock-grip:hover::before {
+  background: var(--sf-primary);
+}
+
+.sf-dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sf-dock-empty {
+  padding: var(--sf-space-md);
+  color: var(--sf-text-muted);
+}
+
+
+
+.sf-dock-grade-suggested {
+  box-shadow: inset 0 0 0 1px var(--sf-primary);
+}
+
+/* ------------------------------ the MCQ score card ------------------------------ */
+
+.sf-dock-scorecard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sf-space-sm) var(--sf-space-md);
+  padding: var(--sf-space-md);
+}
+
+.sf-dock-scorecard-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sf-space-sm);
+  flex: 1 1 320px;
+}
+
+.sf-dock-scorecard-icon {
+  display: inline-flex;
+  align-self: center;
+  color: var(--sf-success, var(--text-accent));
+}
+
+.sf-dock-scorecard-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sf-dock-scorecard-score {
+  font-size: var(--sf-font-display);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-dock-scorecard-detail {
+  color: var(--sf-text-muted);
+}
+
+.sf-dock-scorecard-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  flex: 1 1 160px;
+}
+
+.sf-dock-scorecard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--background-modifier-border);
+}
+
+.sf-dock-scorecard-dot.is-correct {
+  background: var(--sf-success, var(--color-green));
+}
+
+.sf-dock-scorecard-dot.is-wrong {
+  background: var(--sf-danger, var(--color-red));
+}
+
+.sf-dock-scorecard-restart {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-dock-host {
+    transition: none;
+  }
+}
+
+/* The dock under a note is a band the reader sizes; in a window or the sidebar
+   it is the pane itself and takes the room its host gives it. */
+.sf-host-window .sf-dock,
+.sf-host-sidebar .sf-dock {
+  flex: 1 1 auto;
+  min-height: 0;
+  border-top: none;
+}
+
+/* Same selector shape as the rule that pins the height under a note
+   (`.sf-dock-host.is-open .sf-dock-inner`), or its `min(58vh, 640px)` — and the
+   dragged size — would win here and leave the host's own height unused. */
+.sf-host-window .sf-dock-host.is-open .sf-dock-inner,
+.sf-host-sidebar .sf-dock-host.is-open .sf-dock-inner {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* A narrow column plus an odd number of study modes leaves one button alone in
+   the last row of the grid: it takes the whole row instead of half of it. */
+.sf-host-sidebar .sf-study-mode-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+/* A drag handle is for a band inside a note; away from one there is nothing to
+   drag — the host decides, so the control goes. */
+.sf-host-window .sf-dock-grip,
+.sf-host-sidebar .sf-dock-grip {
+  display: none;
+}
+
+/* ------------------------------------------------ the study material section */
+/* The map, the boards and the summary: one row of tabs and a host that the
+   renderers own. Kept to the same metrics as the rows around it. */
+.sf-study-material {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: var(--sf-space-sm);
+    padding-top: var(--sf-space-sm);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.sf-study-material-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sf-study-material-state {
+    flex: 1 1 100%;
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+}
+
+/* The briefing already carries the loud stale notice; this one is the pack's
+   own footnote and must not shout beside it. */
+.sf-study-material-state.is-stale { color: var(--text-muted); }
+.sf-study-material-state.is-error { color: var(--text-error); }
+
+.sf-study-material-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.sf-study-material-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 2.3em;
+    padding: 4px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    font-size: var(--sf-font-ui);
+}
+
+.sf-study-material-tab.is-selected {
+    border-color: var(--interactive-accent);
+}
+
+.sf-study-material-tab.is-disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.sf-study-material-tab-icon { display: inline-flex; }
+
+.sf-study-material-host {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.sf-study-material-empty {
+    padding: 4px 0;
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+}
+
+/* ================= The briefing: a launch screen, read in order ================= */
+/* The briefing read like a settings page wearing a start button: counters first,
+   the warning under them, the objectives below the fold, and three peer-sized
+   buttons in a footer. It is now one section per question the reader is asking,
+   in the order they ask it (see ui/study-briefing.ts), with one rhythm between
+   the sections and the house divider where a section ends. */
+
+.sf-brief-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-brief-gap, var(--sf-space-sm));
+}
+
+/* Sections part on the house divider; the first one starts flush. */
+.sf-brief-section + .sf-brief-section {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 6px;
+}
+
+/* The blocking notice is a banner row — icon beside the sentence — not a column. */
+.sf-brief-warning {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+/* The intro box (a note with nothing charted yet) carries its own padding. */
+.sf-brief-intro {
+  --sf-brief-gap: 0;
+}
+
+/* The launch header: the title, the one button, and the ways around it hold
+   their own width instead of stretching across the panel. */
+.sf-brief-launch {
+  align-items: flex-start;
+}
+
+.sf-brief-title {
+  font-size: var(--sf-font-title);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-normal);
+}
+
+.sf-brief-scope {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The only filled button in the briefing: larger than anything beside it. */
+.sf-brief-primary {
+  align-self: flex-start;
+  padding: var(--sf-space-sm) var(--sf-space-lg);
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  height: auto;
+  white-space: normal;
+}
+
+.sf-brief-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sf-space-md);
+}
+
+/* A secondary action reads as a link, so it never competes with the primary. */
+.sf-brief-link {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  white-space: normal;
+  color: var(--sf-secondary);
+  font-size: var(--sf-font-ui);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sf-brief-link:hover {
+  color: var(--sf-primary);
+}
+
+.sf-brief-link:disabled {
+  color: var(--sf-text-muted);
+  text-decoration: none;
+  cursor: not-allowed;
+}
+
+/* The launch row: the primary action with the three material buttons beside
+   it. The row wraps at narrow widths rather than shrinking the primary action
+   down to a peer — the row is what moves, never the hierarchy. */
+.sf-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  max-width: 100%;
+}
+
+/* The material buttons are secondary on purpose: quiet surfaces beside the one
+   filled action, each opening its view under this row. Element + class so the
+   house `.sf-btn` base cannot out-specify the surface. The `-button` suffix is
+   not decoration: `.sf-brief-material` is the material section's own class. */
+button.sf-brief-material-button {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  padding: 6px var(--sf-space-md);
+  min-height: 32px;
+  font-size: var(--sf-font-ui);
+  gap: var(--sf-space-xs);
+}
+
+button.sf-brief-material-button:hover:not(:disabled) {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+/* The button whose surface is on screen keeps its light on. */
+button.sf-brief-material-button.is-active {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+button.sf-brief-material-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sf-brief-material-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sf-brief-material-label {
+  white-space: normal;
+}
+
+/* What a material button opens: inside the launch section, directly under the
+   row, never a window. The surface holds its own scrolling; the viewer only
+   gives it the width of the briefing. */
+.sf-brief-material-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+.sf-brief-material-note {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+.sf-brief-material-surface {
+  min-width: 0;
+}
+
+/* Objectives: one line of titles that opens the whole list. */
+.sf-brief-objectives {
+  --sf-brief-gap: 6px;
+}
+
+.sf-brief-objectives .sf-study-section-title {
+  margin-bottom: 0;
+}
+
+.sf-brief-objectives-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  text-align: left;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  white-space: normal;
+  cursor: pointer;
+  color: var(--text-normal);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-brief-objectives-summary:hover .sf-brief-objectives-titles {
+  color: var(--sf-secondary);
+}
+
+.sf-brief-objectives-caret {
+  display: inline-flex;
+  color: var(--sf-text-muted);
+  transition: transform var(--sf-transition-fast);
+}
+
+.sf-brief-objectives-summary.is-open .sf-brief-objectives-caret {
+  transform: rotate(180deg);
+}
+
+.sf-brief-objectives-titles {
+  font-weight: 600;
+}
+
+.sf-brief-objectives-more {
+  color: var(--sf-text-muted);
+  white-space: nowrap;
+}
+
+/* Progress: numbers only once there are numbers, an honest line before that. */
+.sf-brief-progress {
+  --sf-brief-gap: var(--sf-space-sm);
+}
+
+.sf-brief-progress-empty {
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+}
+
+/* What the last session left behind. */
+.sf-brief-context {
+  --sf-brief-gap: var(--sf-space-sm);
+}
+
+/* Session options: the mode grid and the lookup toggle are one decision area. */
+.sf-brief-options {
+  --sf-brief-gap: var(--sf-space-sm);
+}
+
+.sf-brief-options-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+}
+
+.sf-brief-options-context > .sf-brief-lookup,
+.sf-brief-options-context > .sf-brief-domain {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.sf-brief-lookup {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: 6px var(--sf-space-sm);
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+/* The subject lens is a row in this section, so it keeps a row's padding. */
+.sf-brief-domain {
+  padding: 6px var(--sf-space-sm);
+}
+
+/* The subject drop-down fills the editor it sits in. */
+.sf-study-domain-select {
+  width: 100%;
+}
+
+/* The figure rail is already a box; the section only holds it. */
+.sf-brief-figures {
+  --sf-brief-gap: 0;
+}
+
+/* The slot the panel mounts the study material section into. */
+.sf-brief-material {
+  --sf-brief-gap: 0;
+}
+
+/* Who is teaching: a fact at the end, on one line. */
+.sf-brief-provider {
+  flex-direction: row;
+  align-items: center;
+}
+
+.sf-study-provider-text {
+  min-width: 0;
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------- the briefing's one action */
+/* `sf-btn-primary` is worn by exactly one control in the briefing. Without a
+   rule it was a grey button beside grey buttons, which is how a primary action
+   stops being one. */
+/* Two classes (and the element) so the house `.sf-btn` rule cannot out-specify
+   the fill: a primary action that loses its colour to a base rule is not one. */
+button.sf-brief-primary,
+button.sf-btn-primary,
+.sf-brief-primary,
+.sf-btn-primary {
+    padding: 8px 16px;
+    border: 1px solid var(--interactive-accent);
+    border-radius: var(--radius-s);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-size: var(--sf-font-text);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+button.sf-brief-primary:hover,
+button.sf-btn-primary:hover,
+.sf-brief-primary:hover,
+.sf-btn-primary:hover {
+    background: var(--interactive-accent-hover);
+    border-color: var(--interactive-accent-hover);
+}
+
+button.sf-brief-primary:disabled,
+button.sf-btn-primary:disabled,
+.sf-brief-primary:disabled,
+.sf-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: default;
+}

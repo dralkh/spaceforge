@@ -1,6 +1,8 @@
 import { Menu, Notice, TFile, TFolder, TAbstractFile } from "obsidian";
+import { isDeckPath } from '../models/anki';
 import SpaceforgePlugin from "../main";
 import { LinkAnalyzer } from "../utils/link-analyzer";
+import { ConfirmationModal } from "./confirmation-modal";
 
 /**
  * Handles context menu integration
@@ -64,6 +66,9 @@ export class ContextMenuHandler {
                 .onClick(async () => {
                     this.plugin.reviewScheduleService.scheduleNoteForReview(file.path);
                     await this.plugin.savePluginData();
+                    // Chart it now, in the background, so the Study panel is
+                    // ready before the learner asks for it.
+                    this.plugin.studyChartQueue?.enqueue(file.path);
                 });
         });
 
@@ -82,6 +87,49 @@ export class ContextMenuHandler {
                         await this.plugin.savePluginData();
                     });
             });
+        }
+
+        // Adaptive study: chart, study, or start over on the mastery state.
+        if (this.plugin.settings?.studyEnabled !== false && this.plugin.studyController) {
+            const badge = this.plugin.studyController.studyBadge(file.path);
+            menu.addItem((item) => {
+                item.setTitle(badge.hasPlan ? "Study this note" : "Study this note (chart it first)")
+                    .setIcon("graduation-cap")
+                    .onClick(() => this.plugin.studyController.openStudy(file.path));
+            });
+
+            if (badge.hasPlan) {
+                menu.addItem((item) => {
+                    item.setTitle("Chart again for Study")
+                        .setIcon("git-compare")
+                        .onClick(() => {
+                            void this.plugin.studyController.chartNote(file.path, true);
+                        });
+                });
+
+                if (badge.due > 0) {
+                    menu.addItem((item) => {
+                        item.setTitle(`Study ${badge.due} objective${badge.due === 1 ? '' : 's'} due`)
+                            .setIcon("alarm-clock")
+                            .onClick(() => this.plugin.studyController.openStudy(file.path));
+                    });
+                }
+
+                menu.addItem((item) => {
+                    item.setTitle("Reset Study progress")
+                        .setIcon("rotate-ccw")
+                        .onClick(() => {
+                            new ConfirmationModal(
+                                this.plugin.app,
+                                'Reset study progress',
+                                `Forget everything the tutor has recorded about your mastery of "${file.basename}"? The objectives stay; the progress does not.`,
+                                () => {
+                                    void this.plugin.studyController.resetProgress(file.path);
+                                }
+                            ).open();
+                        });
+                });
+            }
         }
 
         // New item: Add current note's folder to review schedule
@@ -131,12 +179,19 @@ export class ContextMenuHandler {
      */
     async addFolderToReview(folder: TFolder): Promise<void> {
 
+        if (isDeckPath(folder.path)) {
+            new Notice('This is the deck folder. Decks are studied from the deck list, not added to the note schedule.');
+            return;
+        }
+
         // Show immediate notification
         new Notice(`Analyzing folder structure for "${folder.name}"...`);
 
         try {
             // Get all markdown files in the folder
             const allFiles = this.plugin.app.vault.getMarkdownFiles().filter(file => {
+                // Deck files belong to the deck lane, never to the note schedule.
+                if (isDeckPath(file.path)) return false;
                 if (this.plugin.settings.includeSubfolders) {
                     // Add trailing slash to ensure we're matching folder path correctly
                     const folderPath = folder.path === "/" ? "/" : `${folder.path}/`;
@@ -149,7 +204,7 @@ export class ContextMenuHandler {
             });
 
             if (allFiles.length === 0) {
-                new Notice("No Markdown files found in folder.");
+                new Notice('No notes found in that folder.');
                 return;
             }
 

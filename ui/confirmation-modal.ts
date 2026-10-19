@@ -24,7 +24,9 @@ export class ConfirmationModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
-        contentEl.createEl('h2', { text: this.title });
+        // Modal.titleEl is Obsidian's own place for a dialog's heading; drawing an
+        // <h2> here would style differently from every other modal in the app.
+        this.titleEl.setText(this.title);
         contentEl.createEl('p', { text: this.message });
 
         const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });

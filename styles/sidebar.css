@@ -17,7 +17,7 @@
 }
 
 .review-upcoming-section h3 {
-    font-size: 16px;
+    font-size: var(--sf-font-text);
     margin-bottom: var(--sf-space-sm);
     color: var(--sf-text);
     font-weight: 600;
@@ -66,7 +66,7 @@
 
 .review-upcoming-day-count {
     color: var(--sf-text-muted);
-    font-size: 12px;
+    font-size: var(--sf-font-small);
     background-color: var(--sf-bg-primary);
     padding: 1px 6px;
     border-radius: 100px;
@@ -113,7 +113,7 @@
 
 .review-header h2 {
   margin: 0 0 var(--sf-space-sm) 0;
-  font-size: 20px;
+  font-size: var(--sf-font-title);
   color: var(--text-normal); /* Use Obsidian text color */
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -121,7 +121,7 @@
 
 .review-stats {
   margin-top: var(--sf-space-xs);
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   color: var(--text-muted); /* Using theme variable */
   display: flex;
   gap: var(--sf-space-md);
@@ -173,9 +173,10 @@
 /* Container for all primary action buttons */
 .review-buttons-container {
   display: flex;
-  flex-direction: column;
-  gap: 4px; /* Use a smaller fixed gap for tighter spacing */
-  margin-bottom: var(--sf-space-md); /* Space below the entire button group */
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--sf-space-md);
 }
 
 /* Force ALL direct children to have zero margins to let gap control spacing */
@@ -183,42 +184,6 @@
   margin: 0; /* Override any potential conflicting margins */
 }
 
-
-.review-all-button.review-all-button,
-.review-all-mcq-button.review-all-mcq-button {
-  width: 100%;
-  padding: var(--sf-space-sm) var(--sf-space-md);
-  margin: 0; /* Ensure no margin */
-  border-radius: var(--sf-radius-md);
-  cursor: pointer;
-  font-weight: 500;
-  text-align: center;
-  background-color: var(--interactive-accent); /* Using theme variable */
-  color: var(--text-on-accent); /* Using theme variable */
-  border: none;
-  transition: var(--sf-transition);
-  box-shadow: var(--sf-shadow-sm); /* Using defined shadow variable */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.review-all-mcq-button {
-  background-color: var(--text-accent); /* Using theme variable */
-}
-
-.review-all-button:hover,
-.review-all-mcq-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 5px rgba(66, 153, 225, 0.4);
-  filter: brightness(1.05);
-}
-
-.review-all-button:active,
-.review-all-mcq-button:active {
-  transform: translateY(0);
-}
 
 .review-view-toggle {
   display: flex;
@@ -242,6 +207,45 @@
 .review-view-btn.active {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
+}
+
+/* The review tab is a mount point, not a rendering: the flow controller moves
+   the session's own grading bar and dock into it. So this rule only has to take
+   the sidebar's width and stack the two surfaces — the dock keeps its own
+   scrolling, and nothing here may clip it. */
+.sf-sidebar-review {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  /* The tab *is* the sidebar's body while it is on screen: a definite height is
+     what lets the bar take what it needs and the dock take the rest, instead of
+     a content-sized column with a thousand empty pixels under it. */
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+/* While the review tab is showing, the sidebar is a column: its own heading
+   first, then the session filling everything that is left — otherwise a
+   full-height tab starts below the heading and pushes the dock off the bottom. */
+.spaceforge-container:has(> .sf-sidebar-review:not(.sf-hidden)) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.spaceforge-container:has(> .sf-sidebar-review:not(.sf-hidden)) > .sf-sidebar-review {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* Hidden while another tab is on screen, the way the rest of the plugin hides
+   its surfaces; `display: none` wins over the flex layout above. */
+.sf-sidebar-review.sf-hidden {
+  display: none;
 }
 
 .review-bulk-actions {
@@ -329,9 +333,11 @@
   margin-right: var(--sf-space-sm); /* Add some space before the time estimate */
 }
 
-.review-date-header h3 {
+/* The divider heading is a div, not an <h3>: heading elements carry the app's
+   heading styling into a sidebar row, and the docs prefer classed elements. */
+.review-date-heading {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--sf-font-ui);
   color: var(--text-normal);
   font-weight: 600;
   white-space: normal; /* Allow header text to wrap */
@@ -340,13 +346,13 @@
   min-width: 0; /* Allow h3 to shrink below its content size if needed */
 }
 
-.review-date-section-overdue .review-date-header h3 {
+.review-date-section-overdue .review-date-heading {
   color: var(--sf-overdue-accent);
 }
 
 .review-date-postpone-all {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   border-radius: 6px; /* Rounder buttons */
   flex-shrink: 0; /* Prevent button from shrinking */
   cursor: pointer;
@@ -362,7 +368,7 @@
 }
 
 .review-date-time {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--text-muted); /* Using theme variable */
   font-style: italic;
   padding: 3px 8px;
@@ -429,7 +435,7 @@
 }
 
 .review-note-phase {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   padding: 2px 6px;
   border-radius: 3px;
   display: inline-block;
@@ -438,7 +444,7 @@
 }
 
 .review-note-time {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--sf-text-muted);
 }
 
@@ -459,7 +465,7 @@
 .review-note-postpone,
 .review-note-remove {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   border-radius: var(--radius-s, 4px);
   cursor: pointer;
   border: 1px solid var(--background-modifier-border);
@@ -491,14 +497,14 @@
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
   padding: 6px 12px; /* Increased padding */
-  font-size: 13px; /* Slightly larger font */
+  font-size: var(--sf-font-ui); /* Slightly larger font */
 }
 
 .review-note-postpone {
   background-color: var(--background-modifier-border);
   color: var(--text-normal);
   padding: 6px 12px; /* Increased padding */
-  font-size: 13px; /* Slightly larger font */
+  font-size: var(--sf-font-ui); /* Slightly larger font */
 }
 
 .review-note-remove {
@@ -506,7 +512,7 @@
   color: white;
   border-color: var(--text-error);
   padding: 6px 12px; /* Increased padding */
-  font-size: 13px; /* Slightly larger font */
+  font-size: var(--sf-font-ui); /* Slightly larger font */
 }
 
 .review-note-button:hover,
@@ -574,7 +580,7 @@
 
 .review-all-caught-up::before {
   content: "🎉";
-  font-size: 24px;
+  font-size: var(--sf-font-title);
   display: block;
   margin-bottom: var(--sf-space-sm);
 }
@@ -611,12 +617,12 @@
 .review-session-name {
   font-weight: 500;
   margin-bottom: 5px;
-  font-size: 16px;
+  font-size: var(--sf-font-text);
   color: var(--sf-primary);
 }
 
 .review-session-progress {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--sf-text-muted);
   margin-bottom: 5px;
 }
@@ -632,6 +638,8 @@
 
 .review-session-progress-bar {
   height: 100%;
+  /* The bar's fill is set by the sidebar as --sf-session-progress. */
+  width: var(--sf-session-progress, 0);
   background-color: var(--sf-primary);
   position: relative;
   overflow: hidden;
@@ -733,7 +741,7 @@
 }
 
 .pomodoro-timer-display {
-  font-size: 22px; /* Further reduced font size for compact row */
+  font-size: var(--sf-font-title); /* Further reduced font size for compact row */
   font-weight: 600;
   font-family: monospace; /* Monospaced font for alignment */
   color: var(--text-normal);
@@ -845,7 +853,7 @@
   gap: var(--sf-space-sm);
 }
 .pomodoro-quick-setting label {
-  font-size: 13px;
+  font-size: var(--sf-font-ui);
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -888,7 +896,7 @@
 }
 
 .recurrence-badge {
-  font-size: 11px;
+  font-size: var(--sf-font-small);
   padding: 2px 6px;
   border-radius: 100px;
   background-color: var(--sf-recurring-accent);
@@ -902,7 +910,7 @@
 
 .recurrence-badge::before {
   content: "↻";
-  font-size: 10px;
+  font-size: var(--sf-font-small);
 }
 
 .review-note-button.review-note-recurrence {
@@ -914,4 +922,142 @@
 .review-note-button.review-note-recurrence:hover {
   background-color: var(--sf-recurring-accent-hover);
   border-color: var(--sf-recurring-accent-hover);
+}
+
+/* Previous / next note, under the Pomodoro: the two moves a reader makes most
+   often while working through a day's notes, next to the timer that paces them. */
+.sf-note-nav {
+  display: flex;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-xs) var(--sf-space-sm) var(--sf-space-sm);
+}
+
+.sf-note-nav-button {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sf-space-xs);
+  min-height: 28px;
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  cursor: pointer;
+}
+
+.sf-note-nav-button:hover {
+  background-color: var(--background-modifier-active-hover);
+  border-color: var(--sf-primary);
+}
+
+.sf-note-nav-button .svg-icon {
+  width: 1em;
+  height: 1em;
+}
+
+/* The caught-up line's one action: the decks are waiting, and a sentence that
+   only said so made the reader go and find them. The card keeps its own centred
+   shape — the button simply follows the sentence, inside it. */
+.review-all-caught-up.is-cards-waiting::before {
+  content: "";
+  margin-bottom: 0;
+}
+
+.review-caught-up-action {
+  display: block;
+  margin: var(--sf-space-sm) auto 0;
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  border: 1px solid var(--sf-primary);
+  border-radius: var(--sf-radius-sm);
+  background: transparent;
+  color: var(--sf-primary);
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.review-caught-up-action:hover {
+  background: color-mix(in srgb, var(--sf-primary), transparent 90%);
+}
+
+/* ======================================================================== *
+ * Cards: the reader's own way in — make a card, or bring cards in
+ *
+ * Two labelled rows at the foot of the list, in the panel's own language: a
+ * deck row studies what exists, these two are how more of it comes to exist.
+ * ======================================================================== */
+
+.sf-cards-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  margin-top: var(--sf-space-md);
+}
+
+.sf-cards-heading {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--sf-text);
+}
+
+.sf-cards-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  min-height: 28px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.sf-cards-row:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-hover);
+}
+
+.sf-cards-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.sf-cards-row-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.sf-cards-row-icon svg {
+  width: var(--sf-font-ui);
+  height: var(--sf-font-ui);
+}
+
+.sf-cards-row-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--sf-font-ui);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The run's position, worn by the row the bar is on. One session, one map: the
+   reader can see at a glance which note the dock is standing on. */
+.review-note-item.is-run-current {
+  box-shadow: inset 3px 0 0 var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
+}
+
+/* The same marker on the deck row a step stands on: one class, one meaning —
+   the accent edge and the hover wash the note row wears, carried by the edge
+   the deck row already has (see .sf-deck-row in deck-list.css). */
+.sf-deck-row.is-run-current {
+  background-color: var(--background-modifier-hover);
+  border-left-color: var(--interactive-accent);
 }

@@ -1,6 +1,7 @@
 import { Modal, Notice, setIcon, TFile, Setting } from 'obsidian'; // Ensure TFile is imported, Added Setting
 import SpaceforgePlugin from '../main';
 import { MCQSet, MCQAnswer, MCQSession } from '../models/mcq';
+import { scoreSession, suggestedRating } from '../models/mcq-scoring';
 
 /**
  * Modal for displaying and answering MCQs
@@ -351,12 +352,11 @@ export class MCQModal extends Modal {
             let ratingDetails = '';
 
             if (reviewSchedule?.schedulingAlgorithm === 'fsrs') {
-                let fsrsRating = 1; // Default to Again
-                if (scorePercentage === 1.0) fsrsRating = 4; // Easy - only if perfect
-                else if (scorePercentage >= 0.75) fsrsRating = 3; // Good
-                else if (scorePercentage >= 0.50) fsrsRating = 2; // Hard
-                // else fsrsRating remains 1 (Again) for scores < 0.50
-                ratingText = `FSRS Rating: ${getFsrsRatingText(fsrsRating)} (${fsrsRating}/4)`;
+                // The rating this window shows has to be the rating the sitting
+                // actually applies; suggesting one grade and recording another
+                // is how a learner stops trusting the number.
+                const suggestion = suggestedRating(scorePercentage, 'fsrs');
+                ratingText = `FSRS Rating: ${suggestion.label} (${suggestion.rating}/4)`;
                 if (reviewSchedule.fsrsData) {
                     const fsrs = reviewSchedule.fsrsData;
                     ratingDetails += `Stability: ${fsrs.stability.toFixed(2)}, Difficulty: ${fsrs.difficulty.toFixed(2)}, Interval: ${fsrs.scheduled_days}d, State: ${mapFsrsStateToString(fsrs.state)}, Reps: ${fsrs.reps}, Lapses: ${fsrs.lapses}`;
@@ -367,14 +367,8 @@ export class MCQModal extends Modal {
                     }
                 }
             } else if (reviewSchedule?.schedulingAlgorithm === 'sm2') {
-                let sm2Rating = 0;
-                if (scorePercentage >= 0.90) sm2Rating = 5; // Perfect Recall
-                else if (scorePercentage >= 0.80) sm2Rating = 4; // Correct With Hesitation
-                else if (scorePercentage >= 0.60) sm2Rating = 3; // Correct With Difficulty
-                else if (scorePercentage >= 0.40) sm2Rating = 2; // Incorrect But Familiar
-                else if (scorePercentage >= 0.20) sm2Rating = 1; // Incorrect Response
-                // else sm2Rating = 0; // Complete Blackout (default)
-                ratingText = `SM-2 Rating: ${getSm2RatingText(sm2Rating)} (${sm2Rating}/5)`;
+                const suggestion = suggestedRating(scorePercentage, 'sm2');
+                ratingText = `SM-2 Rating: ${suggestion.label} (${suggestion.rating}/5)`;
                 if (reviewSchedule) {
                     ratingDetails += `Ease: ${(reviewSchedule.ease / 100).toFixed(2)}, Interval: ${reviewSchedule.interval}d, Next Due: ${new Date(reviewSchedule.nextReviewDate).toLocaleDateString()}`;
                     if (reviewSchedule.repetitionCount !== undefined) ratingDetails += `, Reps: ${reviewSchedule.repetitionCount}`;
@@ -450,36 +444,17 @@ export class MCQModal extends Modal {
     }
 
     calculateScore(): void {
-        let totalScore = 0;
-        this.session.answers.forEach(answer => {
-            let questionScore = 0;
-
-            if (this.plugin.settings.mcqDeductFullMarkOnFirstFailure) {
-                // With this setting, you only get points if you're correct on the first try.
-                if (answer.attempts === 1 && answer.correct) {
-                    questionScore = 1.0;
-                } else {
-                    questionScore = 0; // 0 for multiple attempts or for a single incorrect attempt.
-                }
-            } else {
-                // Original scoring logic
-                if (answer.correct && answer.selectedAnswerIndex !== -1) {
-                    if (answer.attempts === 1) {
-                        questionScore = 1.0;
-                    } else if (answer.attempts === 2) {
-                        questionScore = 0.5;
-                    }
-                }
+        // The scoring rules live in models/mcq-scoring so this modal and the
+        // docked runner score an identical session identically.
+        this.session.score = scoreSession(
+            this.session.answers,
+            this.mcqSet.questions.length,
+            {
+                mcqDeductFullMarkOnFirstFailure: this.plugin.settings.mcqDeductFullMarkOnFirstFailure,
+                mcqTimeDeductionSeconds: this.plugin.settings.mcqTimeDeductionSeconds,
+                mcqTimeDeductionAmount: this.plugin.settings.mcqTimeDeductionAmount,
             }
-
-            // Apply time deduction only if points were scored.
-            if (questionScore > 0 && answer.timeToAnswer > this.plugin.settings.mcqTimeDeductionSeconds) {
-                questionScore -= this.plugin.settings.mcqTimeDeductionAmount;
-                questionScore = Math.max(0, questionScore);
-            }
-            totalScore += questionScore;
-        });
-        this.session.score = this.mcqSet.questions.length > 0 ? totalScore / this.mcqSet.questions.length : 0;
+        );
     }
 
     // onClose is now handled by the keyboard shortcut registration cleanup
@@ -492,30 +467,6 @@ function mapFsrsStateToString(state: number): string {
         case 1: return "Learning";
         case 2: return "Review";
         case 3: return "Relearning";
-        default: return "Unknown";
-    }
-}
-
-// Helper function to map FSRS rating number to text
-function getFsrsRatingText(rating: number): string {
-    switch (rating) {
-        case 1: return "Again";
-        case 2: return "Hard";
-        case 3: return "Good";
-        case 4: return "Easy";
-        default: return "Unknown";
-    }
-}
-
-// Helper function to map SM-2 rating number to text
-function getSm2RatingText(rating: number): string {
-    switch (rating) {
-        case 0: return "Complete blackout";
-        case 1: return "Incorrect response";
-        case 2: return "Incorrect but familiar";
-        case 3: return "Correct with difficulty";
-        case 4: return "Correct with hesitation";
-        case 5: return "Perfect recall";
         default: return "Unknown";
     }
 }

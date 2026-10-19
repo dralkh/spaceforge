@@ -1,0 +1,42 @@
+/* Recover review data: the list of copies of the data file the plugin found. */
+
+.sf-recovery-current {
+    color: var(--text-muted);
+}
+
+.sf-recovery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    margin-top: 1em;
+}
+
+.sf-recovery-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1em;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+}
+
+.sf-recovery-text {
+    min-width: 0;
+}
+
+.sf-recovery-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.sf-recovery-meta {
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+}
+
+/* The restore button is the only thing in its row's setting: no divider, no padding. */
+.sf-recovery-row .setting-item {
+    border: none;
+    padding: 0;
+}

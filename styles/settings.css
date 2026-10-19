@@ -33,12 +33,12 @@
 .sf-settings-section-header h3 {
   margin: 0;
   flex-grow: 1;
-  font-size: 18px;
+  font-size: var(--sf-font-text);
 }
 
 .sf-settings-collapse-indicator {
   margin-left: var(--sf-space-sm);
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   transition: var(--sf-transition);
 }
 
@@ -51,14 +51,14 @@
 .sf-settings-subsection {
   margin: var(--sf-space-lg) 0 var(--sf-space-md) 0;
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--sf-font-text);
   color: var(--sf-text);
   border-bottom: 1px solid var(--background-modifier-border);
   padding-bottom: 6px;
 }
 
 .sf-setting-explain {
-  font-size: 12px;
+  font-size: var(--sf-font-small);
   color: var(--sf-text-muted);
   margin-top: -8px;
   margin-bottom: var(--sf-space-md);
@@ -170,7 +170,7 @@
 }
 
 .setting-item-info {
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
 }
 
 .setting-item-control {
@@ -181,7 +181,7 @@
 .prompt-textarea {
   width: 100%;
   font-family: monospace;
-  font-size: 13px;
+  font-size: var(--sf-font-ui);
   min-height: 100px;
   background-color: var(--sf-bg-primary);
   border: 1px solid var(--background-modifier-border);
@@ -195,4 +195,38 @@
   border-color: var(--sf-primary);
   box-shadow: 0 0 0 2px var(--sf-primary-light);
   outline: none;
+}
+
+/* ------------------------------------------------------- detection matrix
+   What a check found, one label-and-value line each: the shape a reader can
+   scan, under the provider they actually chose. */
+.sf-detect-matrix {
+    margin: 0.35em 0 0.25em 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1em;
+    font-size: var(--font-ui-smaller, 0.85em);
+}
+
+.sf-detect-row {
+    display: flex;
+    gap: 0.6em;
+    align-items: baseline;
+    min-width: 0;
+}
+
+.sf-detect-label {
+    flex: 0 0 5.6em;
+    color: var(--text-muted);
+}
+
+.sf-detect-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
 }

@@ -56,6 +56,49 @@
   --sf-transition-bounce: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/*
+ * The theme depends on tokens Obsidian declares on `body`, not on `:root`.
+ * A custom property is computed where it is *declared*, and inherits that
+ * computed value — so `--sf-text: var(--text-normal, #333333)` written on
+ * `:root` resolved to the fallback before the theme was ever in scope, and
+ * every rule that read `--sf-text` painted dark grey on dark. Re-declaring the
+ * theme-dependent tokens on `body`, where the palette actually exists, is what
+ * makes them the theme's own colours.
+ */
+body {
+  --sf-primary: var(--interactive-accent, #5e81ac);
+  --sf-secondary: var(--text-accent, #7ba1df);
+  --sf-text: var(--text-normal, #333333);
+  --sf-text-muted: var(--text-muted, #888888);
+  --sf-text-on-primary: var(--text-on-accent, white);
+  --sf-bg-primary: var(--background-primary, white);
+  --sf-bg-secondary: var(--background-secondary, #f5f5f5);
+  --sf-bg-modifier: var(--background-modifier-hover);
+
+  /*
+   * One type scale for every surface. Each token reads one of the app's own
+   * font variables, so a reader who changes their text size moves the whole
+   * plugin together, and the same content is the same size wherever it is
+   * hosted (the note, the sidebar, a window, a modal). A literal px in a rule
+   * is a size the reader cannot change; a token here is the only way to size
+   * text in this plugin. Declared on `body` for the same reason the colours
+   * are: Obsidian defines its font variables there, and a token declared on
+   * `:root` would freeze its fallback before the theme is in scope.
+   */
+  /* One scale, and it is the reader's own reading size. The interface tokens
+     (`--font-ui-*`) move with a *different* Obsidian setting, so a plugin built
+     on them looks broken the moment someone raises their reading size: the
+     paragraphs grow, the labels stay put, and a single bar shows three sizes
+     that belong to nobody. Everything here is a ratio of `--font-text-size`,
+     which is the number the reader actually chose. Ratios keep the default
+     (15px pane) looking exactly as before: 15 / 13 / 12 / 20 / 28. */
+  --sf-font-text: var(--font-text-size, 1em);                    /* reading material */
+  --sf-font-ui: calc(var(--font-text-size, 1em) * 0.867);        /* controls, chips, metadata */
+  --sf-font-small: max(12px, calc(var(--font-text-size, 1em) * 0.8)); /* hints, badges; floored at 12 */
+  --sf-font-title: calc(var(--font-text-size, 1em) * 1.333);     /* dialog titles, timers */
+  --sf-font-display: calc(var(--font-text-size, 1em) * 1.867);   /* score percentages */
+}
+
 /* Dark mode adjustments */
 .theme-dark {
   --sf-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);

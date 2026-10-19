@@ -38,9 +38,10 @@ export class ReviewHistoryService {
      */
     addHistoryItem(item: ReviewHistoryItem): void {
         this.history.push(item);
-        // Limit history size (keeping this logic here for now)
+        // Trim in place: rebinding would leave every other holder of this array
+        // (the schedule service, pluginState) pointing at the old one.
         if (this.history.length > 1000) {
-            this.history = this.history.slice(-1000);
+            this.history.splice(0, this.history.length - 1000);
         }
     }
 }

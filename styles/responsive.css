@@ -11,11 +11,11 @@
   }
   
   .mcq-header-container h2 {
-    font-size: 1.5rem;
+    font-size: var(--sf-font-title);
   }
   
   .mcq-question-text {
-    font-size: 1.1em;
+    font-size: var(--sf-font-text);
   }
   
   .mcq-choice-btn {
@@ -23,7 +23,7 @@
   }
   
   .mcq-score-text {
-    font-size: 1.6em;
+    font-size: var(--sf-font-display);
   }
   
   .review-note-item {
@@ -78,7 +78,7 @@
 /* Mobile devices */
 @media (max-width: 480px) {
   .mcq-header-container h2 {
-    font-size: 1.3rem;
+    font-size: var(--sf-font-title);
   }
   
   .mcq-refresh-btn {
@@ -102,13 +102,12 @@
   }
   
   .calendar-weekday {
-    font-size: 10px;
+    font-size: var(--sf-font-small);
   }
   
   .calendar-review-count {
-    width: 16px;
-    height: 16px;
-    font-size: 9px;
+    width: 1.4em;
+    height: 1.4em;
   }
   
   .review-date-header {
@@ -121,7 +120,7 @@
   }
   
   .sf-settings-section-header h3 {
-    font-size: 16px;
+    font-size: var(--sf-font-text);
   }
   
   .sf-settings-section-content {
@@ -142,7 +141,9 @@
   }
   
   .calendar-day {
-    height: 40px;
+    /* A minimum, not a fixed height: a cell whose rows wrap needs the room, and
+       a fixed one clipped whatever the day had to say. */
+    min-height: 40px;
   }
   
   .mcq-progress {
@@ -170,6 +171,7 @@
   }
   
   .calendar-day {
-    height: 90px;
+    /* Roomier cells on a large screen, still able to grow with their content. */
+    min-height: 90px;
   }
 }

@@ -1,4 +1,4 @@
-import { FSRS, FSRSParameters, Card as FsrsLibCard, State as FsrsState, Rating as TsFsrsRating, createEmptyCard as createFsrsLibEmptyCard, ReviewLog as FsrsReviewLog } from 'ts-fsrs';
+import { FSRS, FSRSParameters, Card as FsrsLibCard, State as FsrsState, Rating as TsFsrsRating, createEmptyCard as createFsrsLibEmptyCard, ReviewLog as FsrsReviewLog, default_w } from 'ts-fsrs';
 import { SpaceforgeSettings } from '../models/settings';
 import { ReviewSchedule, FsrsRating } from '../models/review-schedule';
 
@@ -16,15 +16,17 @@ export class FsrsScheduleService {
         // Ensure all required FSRSParameters are present, even if with defaults from ts-fsrs if not in our settings
         // For now, we assume our settings structure matches FSRSParameters for the fields we care about.
         // The 'w' parameter (weights) is crucial and should come from settings.
-        // If 'w' is not in params, FSRS will use its internal defaults.
-        const defaultWeights = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61];
+        // If 'w' is missing, fall back to the library's own default set so the
+        // model always matches the version of ts-fsrs that is installed.
         const mappedParams = {
             request_retention: params.request_retention ?? 0.9,
             maximum_interval: params.maximum_interval ?? 36500,
-            w: params.w && params.w.length > 0 ? params.w : defaultWeights,
+            w: params.w && params.w.length > 0 ? params.w : default_w,
             enable_fuzz: params.enable_fuzz ?? true,
-            learning_steps: params.learning_steps && params.learning_steps.length > 0 ? params.learning_steps : [1, 10],
-            enable_short_term: params.enable_short_term ?? false, // Added enable_short_term
+            // Short-term steps are what keep a lapsed card in the same day, the way
+            // Anki does. The library owns the step values (1m/5m/10m learning, 5m
+            // relearning); ts-fsrs 4.7 exposes no parameter for them.
+            enable_short_term: params.enable_short_term ?? true,
         };
         return mappedParams as FSRSParameters; // Cast to FSRSParameters
     }

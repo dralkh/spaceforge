@@ -1,0 +1,470 @@
+/* Spaceforge Study — the lab.
+ *
+ * A lab is a set of controls and the answers they produce, and every answer is
+ * *drawn*: one bar across its own scale with the normal band shaded on it, or a
+ * gauge whose needle swings to the value, with the band's verdict carried as the
+ * drawing's own tone. Three rules hold for everything below. The controls are
+ * the only interactive surface, so they take the full width they are given and
+ * never push it wider; an answer that could not be computed must *look* like a
+ * statement rather than a number, which is what the dashed, quiet `.is-unknown`
+ * state is for, with its drawing blanked; and every position the code decides
+ * (`--sf-lab-fill`, the band's own start and width, the needle's angle) is
+ * handed to this stylesheet as a custom property, because a background painted
+ * in TS is a background no theme can change.
+ *
+ * Movement is opt-in and the class that turns it on is added by the code
+ * (`is-motion`), which is false under `prefers-reduced-motion: reduce` and where
+ * `matchMedia` does not exist at all; the media block at the end of this file is
+ * the belt to that brace, for a reader who changes the setting while the lab is
+ * open.
+ *
+ * Text sizes come from the house scale in `_variables.css` (`--sf-font-*`),
+ * never from a literal: a reader who changes their text size moves all of it.
+ */
+
+/* ============================== Lab shell ============================== */
+
+.sf-lab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sf-lab-teach {
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Parameters ============================== */
+
+.sf-lab-params {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  min-width: 0;
+}
+
+.sf-lab-param {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* The name on the left, the value it is at on the right: the reader's eye
+   needs both at once, and the value is what changes as the control moves. */
+.sf-lab-param-head {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.sf-lab-param-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-lab-param-readout {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-primary);
+}
+
+/* The control is the lab: full width, and themed rather than left to the app's
+   own default, so a range in this surface reads as one of ours. */
+.sf-lab-range {
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--sf-primary);
+  cursor: pointer;
+}
+
+/* ============================== Answers ============================== */
+
+.sf-lab-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-lab-output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+}
+
+.sf-lab-output-label {
+  font-size: var(--sf-font-small);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The drawing is the answer: it takes its own band of the row, over its own
+   track, with the scale's ends under it. */
+.sf-lab-draw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  min-width: 0;
+}
+
+/* ------------------------------- the bar ------------------------------- */
+
+/* The track is the whole scale, so a fill that stops halfway means halfway. */
+.sf-lab-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sf-lab-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--sf-lab-fill, 0%);
+  border-radius: 999px;
+  background: var(--sf-primary);
+}
+
+/* The normal band, tinted over whatever it covers: it has to stay visible on
+   the bare track *and* over the fill, because it is what the value is judged
+   against. */
+.sf-lab-bar-band {
+  position: absolute;
+  inset: 0 auto 0 0;
+  left: var(--sf-lab-band-start, 0%);
+  width: var(--sf-lab-band-width, 0%);
+  background: var(--sf-success);
+  opacity: 0.28;
+}
+
+/* ------------------------------ the gauge ------------------------------ */
+
+/* A gauge is an instrument, not a poster: it scales with the host up to its own
+   drawn size and stays centred. */
+.sf-lab-gauge-svg {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.sf-lab-gauge-track {
+  fill: none;
+  stroke: var(--background-modifier-border);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.sf-lab-gauge-band {
+  fill: none;
+  stroke: var(--sf-success);
+  stroke-opacity: 0.5;
+  stroke-width: 8;
+  stroke-linecap: butt;
+}
+
+/* The needle turns about the pivot the code hands it. `transform-box: view-box`
+   is what makes the origin a point in the drawing's own units; the angle itself
+   is a custom property so the stylesheet — and only the stylesheet — decides
+   that a change of value is a movement rather than a jump. The same angle is
+   written as the group's `transform` attribute by the code, so a host that
+   declines to animate still draws the needle in the right place. */
+.sf-lab-gauge-needle {
+  transform-box: view-box;
+  transform-origin: var(--sf-lab-needle-origin, 120px 120px);
+  transform: rotate(var(--sf-lab-needle-angle, -90deg));
+}
+
+.sf-lab-gauge-spoke {
+  stroke: var(--sf-primary);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.sf-lab-gauge-hub {
+  fill: var(--sf-primary);
+}
+
+/* The two ends of the scale: a needle without them is an angle with no meaning. */
+.sf-lab-gauge-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+.sf-lab-gauge-min,
+.sf-lab-gauge-max {
+  min-width: 0;
+}
+
+/* ------------------------- the number and the verdict ------------------------- */
+
+.sf-lab-output-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+/* The number stays, but it is the drawing's own caption now: read once, at
+   reading size, under the thing that changed. */
+.sf-lab-output-value {
+  min-width: 0;
+  font-size: var(--sf-font-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* A printed answer *is* the answer, so it is set at reading size. */
+.sf-lab-output[data-render="value"] .sf-lab-output-value {
+  font-size: var(--sf-font-text);
+}
+
+/* The band's word for where the value sits, drawn as the drawing's own tone:
+   quiet while the value is inside, loud while it is not. */
+.sf-lab-verdict {
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  font-size: var(--sf-font-small);
+  overflow-wrap: anywhere;
+}
+
+.sf-lab-output.is-in-band .sf-lab-verdict {
+  border-color: var(--sf-success);
+  background: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+.sf-lab-output.is-out-of-band .sf-lab-verdict {
+  border-color: var(--sf-warning);
+  background: var(--sf-warning-light);
+  color: var(--sf-warning);
+}
+
+.sf-lab-verdict.is-hidden {
+  display: none;
+}
+
+/* Out of band, the drawing itself says so before any word does. */
+.sf-lab-output.is-out-of-band {
+  border-color: var(--sf-warning);
+}
+
+.sf-lab-output.is-out-of-band .sf-lab-bar-fill {
+  background: var(--sf-warning);
+}
+
+.sf-lab-output.is-out-of-band .sf-lab-gauge-spoke {
+  stroke: var(--sf-warning);
+}
+
+.sf-lab-output.is-out-of-band .sf-lab-gauge-hub {
+  fill: var(--sf-warning);
+}
+
+.sf-lab-output-note {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* No answer: the row says so in words, at speaking volume, and stops looking
+   like a number — a dashed edge, a dimmed drawing and no verdict to give. */
+.sf-lab-output.is-unknown {
+  border-style: dashed;
+}
+
+.sf-lab-output.is-unknown .sf-lab-output-value {
+  font-size: var(--sf-font-ui);
+  font-style: italic;
+  color: var(--sf-text-muted);
+}
+
+.sf-lab-output.is-unknown .sf-lab-draw {
+  opacity: 0.35;
+}
+
+/* ============================== The mission ============================== */
+
+/* The goal and the score: a bar across the top of the lab, so the task is the
+   first thing read and the count is visible wherever the reader is working. */
+.sf-lab-mission {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--sf-primary);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-secondary);
+}
+
+.sf-lab-mission-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* The score is the feedback signal: quiet while the reader is off, success-lit
+   the moment they are not. It is a state, so nothing about the layout moves. */
+.sf-lab-mission-score {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-lab-mission-score.is-solved {
+  border-color: var(--sf-success);
+  background: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+/* Solved: the whole mission reads green, and the edge says so first. */
+.sf-lab.is-solved .sf-lab-mission {
+  border-color: var(--sf-success);
+  border-left-color: var(--sf-success);
+}
+
+/* ============================== Presets and Reset ============================== */
+
+.sf-lab-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+/* A preset is a named state, so it reads as a chip; its label can be a phrase
+   ("compensated metabolic acidosis"), so it wraps instead of running on. */
+.sf-lab-preset,
+.sf-lab-reset {
+  height: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sf-lab-preset:hover,
+.sf-lab-reset:hover {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary-light);
+}
+
+.sf-lab-reset {
+  color: var(--sf-text-muted);
+}
+
+.sf-lab-preset:focus-visible,
+.sf-lab-reset:focus-visible {
+  outline: 2px solid var(--sf-primary);
+  outline-offset: 1px;
+}
+
+/* ============================== Pearl ============================== */
+
+.sf-lab-pearl {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding-left: var(--sf-space-sm);
+  border-left: 3px solid var(--sf-primary);
+}
+
+.sf-lab-pearl-tag {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-primary);
+}
+
+.sf-lab-pearl-text {
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Movement ============================== */
+
+/* Only where the host allows motion (the code adds `is-motion`): moving a
+   control makes the fill travel and the needle swing, rather than teleport. */
+.sf-lab.is-motion .sf-lab-bar-fill {
+  transition: width var(--sf-transition);
+}
+
+.sf-lab.is-motion .sf-lab-gauge-needle {
+  transition: transform var(--sf-transition);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-lab.is-motion .sf-lab-bar-fill {
+    transition: none;
+  }
+
+  .sf-lab.is-motion .sf-lab-gauge-needle {
+    transition: none;
+  }
+}

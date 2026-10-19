@@ -173,3 +173,24 @@ export class DateUtils {
             date1.getDate() === date2.getDate();
     }
 }
+
+/**
+ * The day Anki counts a deck's review dates from.
+ *
+ * Anki stores a review card's due date as a *day number*, counted from the
+ * moment the collection was created (`col.crt`, in seconds) — not from the
+ * deck's own id, which is a different timestamp and can be years away from it.
+ * A package imported from Anki carries its `crt` in the deck's extra data, so
+ * that is preferred; a deck written by hand has only its id, which is the
+ * moment its document was made and therefore the right anchor for it.
+ */
+export function deckDayBase(deckId: string, createdAtSeconds?: number | null): number {
+    if (typeof createdAtSeconds === 'number' && Number.isFinite(createdAtSeconds) && createdAtSeconds > 0) {
+        // Seconds since the epoch, unless something already handed us milliseconds.
+        const ms = createdAtSeconds > 1e12 ? createdAtSeconds : createdAtSeconds * 1000;
+        return DateUtils.startOfUTCDay(new Date(ms));
+    }
+    const fromId = Number(deckId);
+    const ms = Number.isFinite(fromId) && fromId > 0 ? fromId : Date.now();
+    return DateUtils.startOfUTCDay(new Date(ms));
+}

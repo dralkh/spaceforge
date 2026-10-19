@@ -3,7 +3,11 @@ import { Notice, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { ReviewSchedule } from "../models/review-schedule";
 import { CalendarEvent } from "../models/calendar-event";
-import { DateUtils } from "../utils/dates";
+import { DateUtils, deckDayBase } from "../utils/dates";
+import { AnkiCardQueue } from "../models/anki";
+
+/** One day, in the only unit Anki's day numbers are counted in. */
+const DAY_MS = 86_400_000;
 import { EstimationUtils } from "../utils/estimation";
 import { UpcomingEvents } from "./upcoming-events";
 import { EventModal } from "./event-modal";
@@ -17,12 +21,26 @@ interface DateReviews {
     totalTime: number;
 }
 
+/** What the decks owe on one day: how many cards, and from which decks. */
+interface DateDeckCards {
+    timestamp: number;
+    cards: number;
+    decks: string[];
+}
+
 /**
  * Interface for grouped events by date
  */
 interface DateEvents {
     timestamp: number;
     events: CalendarEvent[];
+}
+
+/** "1 hr 30 min" as its numbers and its last unit: ["1 hr 30", "min"]. */
+function splitDuration(text: string): [string, string] {
+    const parts = text.split(' ');
+    const unit = parts.length > 1 ? (parts.pop() as string) : '';
+    return [parts.join(' '), unit];
 }
 
 /**
@@ -48,6 +66,16 @@ export class CalendarView {
      * Reviews grouped by date
      */
     reviewsByDate: Map<string, DateReviews> = new Map();
+
+    /**
+     * Deck cards grouped by date, beside the notes: the two lanes are kept
+     * apart everywhere, so the calendar says which is which rather than adding
+     * them into one number the reader cannot take apart again.
+     */
+    deckCardsByDate: Map<string, DateDeckCards> = new Map();
+
+    /** Deck files are read once per version; the calendar redraws often. */
+    private deckDueCache = new Map<string, { modified: number; due: Map<string, DateDeckCards> }>();
 
     /**
      * Events grouped by date
@@ -86,6 +114,7 @@ export class CalendarView {
         this.updateCalendarHeader(); // Updates month title
 
         await this.loadReviewsData(); // Preloads review data for the current view
+        await this.loadDeckCardsData(); // And what the decks owe, day by day
         await this.loadEventsData(); // Preloads event data for the current view
 
         if (this.calendarGridEl) {
@@ -195,6 +224,98 @@ export class CalendarView {
     }
 
     /**
+     * Load what the decks owe, grouped by day.
+     *
+     * A deck's cards keep Anki's own due conventions: a review card is due on a
+     * day counted from the deck's creation, while a card in learning is due at
+     * an exact moment. New cards are available now, so they belong to today —
+     * which is what an Anki deck list would tell the reader too.
+     */
+    async loadDeckCardsData(): Promise<void> {
+        this.deckCardsByDate = new Map();
+        const store = this.plugin.deckStore;
+        if (!store) return;
+
+        let summaries;
+        try {
+            summaries = await store.listDecks();
+        } catch (error) {
+            console.error('spaceforge: could not list decks for the calendar', error);
+            return;
+        }
+
+        const todayStart = DateUtils.startOfUTCDay(new Date());
+        for (const summary of summaries) {
+            const cached = this.deckDueCache.get(summary.path);
+            if (cached && cached.modified === summary.modified) {
+                this.mergeDeckDays(cached.due);
+                continue;
+            }
+
+            let bundle;
+            try {
+                bundle = await store.readDeck(summary.path);
+            } catch (error) {
+                console.error(`spaceforge: could not read ${summary.path} for the calendar`, error);
+                continue;
+            }
+
+            // The deck's own `crt` when it came from Anki, its id otherwise.
+            const created = bundle.extra?.crt;
+            const deckBase = deckDayBase(bundle.deck.id, typeof created === 'number' ? created : null);
+            const due = new Map<string, DateDeckCards>();
+            for (const card of bundle.cards) {
+                if (
+                    card.queue === AnkiCardQueue.Suspended ||
+                    card.queue === AnkiCardQueue.SchedBuried ||
+                    card.queue === AnkiCardQueue.UserBuried
+                ) {
+                    continue;
+                }
+
+                const dueAt = card.queue === AnkiCardQueue.New
+                    ? Date.now()
+                    : card.queue === AnkiCardQueue.Learning
+                        ? card.due
+                        : deckBase + card.due * DAY_MS;
+                const dayStart = DateUtils.startOfUTCDay(new Date(dueAt));
+                const key = dayStart.toString();
+                const entry = due.get(key) ?? { timestamp: dayStart, cards: 0, decks: [] };
+                entry.cards += 1;
+                if (!entry.decks.includes(bundle.deck.name)) entry.decks.push(bundle.deck.name);
+                due.set(key, entry);
+            }
+
+            this.deckDueCache.set(summary.path, { modified: summary.modified, due });
+            this.mergeDeckDays(due);
+        }
+
+        // Cards that were due before today are still owed, so they are shown on
+        // today's cell, where the reader can act on them.
+        const todayKey = todayStart.toString();
+        const owed = [...this.deckCardsByDate.entries()].filter(([, entry]) => entry.timestamp < todayStart);
+        if (owed.length > 0) {
+            const today = this.deckCardsByDate.get(todayKey) ?? { timestamp: todayStart, cards: 0, decks: [] };
+            for (const [, entry] of owed) {
+                today.cards += entry.cards;
+                for (const name of entry.decks) if (!today.decks.includes(name)) today.decks.push(name);
+                this.deckCardsByDate.delete(entry.timestamp.toString());
+            }
+            this.deckCardsByDate.set(todayKey, today);
+        }
+    }
+
+    /** Fold one deck's days into the calendar's own map. */
+    private mergeDeckDays(due: Map<string, DateDeckCards>): void {
+        for (const [key, entry] of due) {
+            const existing = this.deckCardsByDate.get(key) ?? { timestamp: entry.timestamp, cards: 0, decks: [] };
+            existing.cards += entry.cards;
+            for (const name of entry.decks) if (!existing.decks.includes(name)) existing.decks.push(name);
+            this.deckCardsByDate.set(key, existing);
+        }
+    }
+
+    /**
      * Load and organize event data by date
      */
     loadEventsData(): void {
@@ -278,8 +399,16 @@ export class CalendarView {
                 const dateKey = cellDayStart.toString(); // Use the same key format for lookup
                 dayCell.dataset.dateKey = dateKey;
 
-                const dayNumber = dayCell.createDiv("calendar-day-number");
+                // The cell's own rows: the date with the day's counts beside it,
+                // the events under them, then the time and the button that adds an
+                // event. Every row is in the flow, so a cell too narrow for a row
+                // wraps it (see the cell's own container query) instead of letting
+                // the counts and the button land on top of the date and the time.
+                const head = dayCell.createDiv({ cls: 'calendar-day-head' });
+                const dayNumber = head.createDiv({ cls: 'calendar-day-number' });
                 dayNumber.setText(dayOfMonth.toString());
+                const chips = head.createDiv({ cls: 'calendar-day-chips' });
+                const foot = dayCell.createDiv({ cls: 'calendar-day-foot' });
 
                 if (this.isToday(year, month, dayOfMonth)) {
                     dayCell.addClass("today");
@@ -292,11 +421,11 @@ export class CalendarView {
                 if (dateReviews && dateReviews.notes.length > 0) {
                     dayCell.addClass("has-reviews");
 
-                    const reviewCount = dayCell.createDiv("calendar-review-count");
+                    const reviewCount = chips.createDiv("calendar-review-count");
                     reviewCount.setText(dateReviews.notes.length.toString());
 
-                    const timeEstimate = dayCell.createDiv("calendar-time-estimate");
-                    timeEstimate.setText(EstimationUtils.formatTime(dateReviews.totalTime));
+                    const timeEstimate = foot.createDiv("calendar-time-estimate");
+                    this.renderTimeEstimate(timeEstimate, dateReviews.totalTime);
 
                     // Assign the handler (instead of addEventListener) so repeated
                     // calendar renders replace it rather than stacking duplicate
@@ -322,11 +451,29 @@ export class CalendarView {
                     else dayCell.addClass("light-load");
                 }
 
+                // Render what the decks owe that day, beside the notes
+                const deckDay = this.deckCardsByDate.get(dateKey);
+                if (deckDay && deckDay.cards > 0) {
+                    dayCell.addClass('has-deck-cards');
+                    const deckCount = chips.createDiv('calendar-deck-count');
+                    // The number and its word are separate spans: a cell too
+                    // narrow for the word drops it and keeps the count.
+                    deckCount.createSpan({ cls: 'calendar-deck-count-value', text: String(deckDay.cards) });
+                    deckCount.createSpan({
+                        cls: 'calendar-deck-count-unit',
+                        text: ` card${deckDay.cards === 1 ? '' : 's'}`,
+                    });
+                    deckCount.setAttribute('title', `Cards due in ${deckDay.decks.join(', ')}`);
+                }
+
                 // Render events as small tabs
                 if (dateEvents && dateEvents.events.length > 0) {
                     dayCell.addClass("has-events");
 
                     const eventsContainer = dayCell.createDiv("calendar-events-container");
+                    // The events read between the date and the time, and the footer
+                    // was made before them: this is where they belong.
+                    dayCell.insertBefore(eventsContainer, foot);
 
                     // Show up to 3 event tabs
                     const eventsToShow = dateEvents.events.slice(0, 3);
@@ -336,7 +483,9 @@ export class CalendarView {
 
                         // Set color based on event category or custom color using CSS custom property
                         const eventColor = this.plugin.calendarEventService?.getEventColor(event) || '#95A5A6';
-                        eventTab.style.setProperty('--event-color', eventColor);
+                        // The colour is data, so it rides in as the custom property
+                        // the stylesheet reads; nothing here writes styling.
+                        eventTab.setCssProps({ '--event-color': eventColor });
 
                         // Add hover handler for tooltip
                         eventTab.addEventListener("mouseenter", (_e) => {
@@ -368,7 +517,9 @@ export class CalendarView {
                 }
 
                 // Add hover plus button for creating events
-                const addEventBtn = dayCell.createDiv("calendar-day-add-event");
+                // The button that adds an event keeps a column of its own in the
+                // cell's footer; it used to float over the time estimate.
+                const addEventBtn = foot.createDiv("calendar-day-add-event");
                 setIcon(addEventBtn, "plus");
                 addEventBtn.addEventListener("click", (e) => {
                     e.stopPropagation(); // Prevent day cell click
@@ -422,8 +573,8 @@ export class CalendarView {
      * @param event Event to show details for
      */
     showEventDetails(event: CalendarEvent): void {
-        // For now, just show a notice with event details
-        // TODO: Create a proper modal for event details
+        // The full editor is ui/event-modal.ts; this is the quick look from the
+        // calendar grid, where a modal would interrupt clicking through a month.
         const eventDate = new Date(event.date);
         const dateStr = eventDate.toLocaleDateString(undefined, {
             weekday: 'long',
@@ -571,7 +722,7 @@ export class CalendarView {
         this.hideEventTooltip();
 
         // Create tooltip element
-        this.tooltipEl = document.body.createDiv();
+        this.tooltipEl = document.body.createDiv({ cls: 'sf-calendar-tooltip' });
         this.tooltipEl.className = "calendar-event-tooltip";
 
         // Format event details
@@ -629,8 +780,9 @@ export class CalendarView {
             top = rect.top - this.tooltipEl.offsetHeight - 8;
         }
 
-        this.tooltipEl.style.left = `${left}px`;
-        this.tooltipEl.style.top = `${top}px`;
+        // Where the tooltip sits is data (it follows the cursor); the stylesheet
+        // decides what to do with the coordinates.
+        this.tooltipEl.setCssProps({ '--sf-tip-x': `${left}px`, '--sf-tip-y': `${top}px` });
 
         // Add fade-in animation using CSS class
         this.tooltipEl.classList.remove('visible');
@@ -640,5 +792,24 @@ export class CalendarView {
                 this.tooltipEl.classList.add('visible');
             }
         });
+    }
+
+    /**
+     * A day's duration as the cell spells it: the numbers, then the unit.
+     *
+     * The unit's short form is a span of its own because "20 min" is wider than
+     * a day cell in a sidebar: the cell's container query drops the word and
+     * shows "20m", so the estimate is shortened rather than clipped away. The
+     * whole string still rides in the title.
+     */
+    private renderTimeEstimate(el: HTMLElement, seconds: number): void {
+        const text = EstimationUtils.formatTime(seconds);
+        const [value, unit] = splitDuration(text);
+        el.createSpan({ cls: 'calendar-time-estimate-value', text: value });
+        if (unit !== '') {
+            el.createSpan({ cls: 'calendar-time-estimate-unit', text: ` ${unit}` });
+            el.createSpan({ cls: 'calendar-time-estimate-unit-short', text: unit.slice(0, 1) });
+        }
+        el.setAttribute('title', text);
     }
 }

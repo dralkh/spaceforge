@@ -1,4 +1,5 @@
-import { ReviewResponse, ReviewSchedule } from '../models/review-schedule';
+import { FsrsRating, ReviewResponse, ReviewSchedule } from '../models/review-schedule';
+import { ReviewRecordResult, ReviewResponseOptions } from '../models/review-flow';
 
 /**
  * Interface for the core review controller
@@ -24,19 +25,20 @@ export interface IReviewController {
     reviewNote(path: string): Promise<void>;
 
     /**
-     * Show the review modal for a note
-     * 
+     * Put a note into the docked review bar.
+     *
      * @param path Path to the note file
      */
-    showReviewModal(path: string): void;
+    openDockedReview(path: string): void;
 
     /**
      * Process a review response
      * 
      * @param path Path to the note file
      * @param response User's response during review
+     * @param options Navigation and notice behaviour for the calling flow
      */
-    processReviewResponse(path: string, response: ReviewResponse): Promise<void>;
+    processReviewResponse(path: string, response: ReviewResponse | FsrsRating, options?: ReviewResponseOptions): Promise<ReviewRecordResult>;
 
     /**
      * Skip the review of a note and reschedule for tomorrow with penalty

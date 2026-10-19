@@ -1,0 +1,340 @@
+/* ==========================================================================
+ * Spaceforge Study — the sequence.
+ *
+ * Two surfaces in one sheet, because they are two ways of teaching one order:
+ * the deck of cards the reader deals with — dragged with the pointer, or
+ * picked up with Space and moved with the arrows — and the one-card stepper
+ * for the ordered mode whose Previous / Next pair stops at both ends.
+ *
+ * Three rules hold for every rule below. A card wraps its text rather than
+ * cutting it. A verdict is drawn as well as said: a coloured edge and a glyph
+ * on the card, the count in the report line, so the mark is readable both
+ * ways. And motion is optional: the drop animation is off for a reader whose
+ * system asks for reduced motion.
+ * ========================================================================== */
+
+.sf-vsq {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sf-vsq-teach {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* While a card is being dragged the pointer is moving a card, not selecting
+   text, so nothing in the surface may highlight. */
+.sf-vsq.is-dragging {
+  user-select: none;
+}
+
+/* ------------------------------------------------------------ the controls */
+/* Check / Shuffle again / Previous / Next: one look for every control this
+   surface offers, so the row reads as a row of the same kind of thing. */
+
+.sf-vsq-check,
+.sf-vsq-again,
+.sf-vsq-prev,
+.sf-vsq-next {
+  height: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--sf-text-muted);
+  white-space: normal;
+  cursor: pointer;
+}
+
+.sf-vsq-check:hover,
+.sf-vsq-again:hover,
+.sf-vsq-prev:hover:not(:disabled),
+.sf-vsq-next:hover:not(:disabled) {
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+.sf-vsq-check:disabled,
+.sf-vsq-again:disabled,
+.sf-vsq-prev:disabled,
+.sf-vsq-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sf-vsq-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-xs);
+  align-items: center;
+}
+
+/* How a card is picked up, in one line: the pointer, or Space and the arrows. */
+.sf-vsq-hint {
+  font-size: var(--sf-font-small);
+  line-height: 1.4;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------------------- the deck */
+
+.sf-vsq-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  min-width: 0;
+}
+
+/* One drop position. A stable home for whatever card the reader has dealt
+   into it, so a card never has to be re-parented to move. */
+.sf-vsq-slot {
+  min-width: 0;
+}
+
+/* One step, as a card with no number on it: the card is the step, and only
+   Check has anything to say about where it belongs. */
+.sf-vsq-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sf-space-sm);
+  row-gap: 2px;
+  min-width: 0;
+  padding: var(--sf-space-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-left-width: 3px;
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+  transition: border-color var(--sf-transition-fast), background var(--sf-transition-fast),
+    box-shadow var(--sf-transition-fast);
+}
+
+/* Only a card that can be dragged offers a hand: the stepper's card is read. */
+.sf-vsq-board .sf-vsq-card {
+  cursor: grab;
+  touch-action: none;
+}
+
+.sf-vsq-board .sf-vsq-card:focus-visible {
+  border-color: var(--sf-primary);
+}
+
+/* Picked up — by the pointer, or by Space. The card says so itself. */
+.sf-vsq-card.is-lifted {
+  border-color: var(--sf-primary);
+  box-shadow: var(--sf-shadow);
+}
+
+/* While a drag is running, the card left in the deck reads as vacated — the
+   ghost in the reader's hand is the card now — and the cursor says the deck
+   is being arranged rather than read. */
+.sf-vsq.is-dragging .sf-vsq-card {
+  cursor: grabbing;
+}
+
+.sf-vsq.is-dragging .sf-vsq-card.is-lifted {
+  opacity: 0.4;
+  box-shadow: none;
+}
+
+.sf-vsq-card-label {
+  grid-column: 1;
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  line-height: 1.4;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-vsq-card-detail {
+  grid-column: 1;
+  min-width: 0;
+  font-size: var(--sf-font-small);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The verdict, drawn: a glyph for the eye, and the words it stands for on the
+   element itself for a reader who cannot see it. */
+.sf-vsq-card-glyph {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 16px;
+  height: 16px;
+}
+
+.sf-vsq-glyph {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sf-vsq-glyph-check {
+  stroke: var(--sf-success);
+}
+
+.sf-vsq-glyph-cross {
+  stroke: var(--sf-warning);
+}
+
+/* Marked with an edge and a wash — never by muting the step's own text. */
+.sf-vsq-card.is-right {
+  border-left-color: var(--sf-success);
+  background: var(--sf-success-light);
+}
+
+.sf-vsq-card.is-wrong {
+  border-left-color: var(--sf-warning);
+  background: var(--sf-warning-light);
+}
+
+/* The card in the reader's hand, following the pointer. Its position is data
+   the module writes as custom properties; the sheet decides what it means. */
+.sf-vsq-ghost {
+  position: fixed;
+  left: var(--sf-vsq-ghost-x, -1000px);
+  top: var(--sf-vsq-ghost-y, -1000px);
+  transform: translate(-50%, -50%) rotate(-1.5deg);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 160px;
+  max-width: 320px;
+  padding: var(--sf-space-sm);
+  border: 1px solid var(--sf-primary);
+  border-left-width: 3px;
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+  box-shadow: var(--sf-shadow-lg);
+  opacity: 0.95;
+  pointer-events: none;
+  transition: left 60ms linear, top 60ms linear;
+  z-index: 30;
+}
+
+/* Where a card in the air will land. */
+.sf-vsq-indicator {
+  height: 3px;
+  margin: 1px 0;
+  border-radius: 999px;
+  background: var(--sf-primary);
+}
+
+/* The deck takes a breath when the order changes: every card that moved
+   slides from where it was, so a drop is legible rather than instantaneous.
+   The shift arrives as a custom property; the animation consumes it. */
+.sf-vsq-card.is-settling {
+  animation: sf-vsq-settle 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes sf-vsq-settle {
+  from {
+    transform: translateY(var(--sf-vsq-shift, 0));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sf-vsq-report {
+  min-height: 1.4em;
+  font-size: var(--sf-font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+.sf-vsq-report.is-complete {
+  font-weight: 600;
+  color: var(--sf-success);
+}
+
+/* -------------------------------------------------------------- the stepper */
+/* One step at a time, in the same card, with the reader's place said under
+   it. Never the whole list: that numbered list was the complaint. */
+
+.sf-vsq-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-vsq-stepper .sf-vsq-card {
+  background: var(--background-secondary);
+}
+
+.sf-vsq-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-xs);
+  align-items: center;
+}
+
+.sf-vsq-position {
+  margin-left: auto;
+  margin-right: auto;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sf-text-muted);
+}
+
+.sf-vsq-hidden {
+  display: none;
+}
+
+/* --------------------------------------------------------------- the pearl */
+
+.sf-vsq-pearl {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding-left: var(--sf-space-sm);
+  border-left: 3px solid var(--sf-primary);
+}
+
+.sf-vsq-pearl-tag {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-primary);
+}
+
+.sf-vsq-pearl-text {
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* A reader who asked for less motion gets the same change of order without a
+   frame of animation: the transition and the settle both stand down. The
+   module skips writing the shift at all under the same query. */
+@media (prefers-reduced-motion: reduce) {
+  .sf-vsq-card,
+  .sf-vsq-ghost {
+    transition: none;
+  }
+
+  .sf-vsq-card.is-settling {
+    animation: none;
+  }
+}

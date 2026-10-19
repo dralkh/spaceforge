@@ -125,7 +125,7 @@ export class BatchReviewModal extends Modal {
             const note = this.notes[i];
             const file = this.plugin.app.vault.getAbstractFileByPath(note.path);
             const fileName = file instanceof TFile ? file.basename : note.path;
-            progressFill.style.width = `${((i + 1) / this.notes.length) * 100}%`;
+            progressFill.setCssProps({ '--sf-fill': `${((i + 1) / this.notes.length) * 100}%` });
             statusEl.setText(`Processing ${i + 1}/${this.notes.length}: ${fileName}`);
             await sleep(10);
 

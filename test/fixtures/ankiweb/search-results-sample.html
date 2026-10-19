@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<!--
+  A hand-built sample of AnkiWeb's shared-decks listing markup, for the parser
+  tests in test/ankiweb.test.ts. It is NOT a byte-for-byte capture.
+
+  Why it is constructed: as of 2026-10-17 the live search page
+  (https://ankiweb.net/shared/decks?search=...) is a client-rendered SvelteKit
+  app. The HTML that curl/Obsidian's requestUrl receive carries no results at
+  all — that real, unmodified page is the sibling fixture search-biolog.html.
+  This file mirrors the DOM the app renders once it has data, taken from the
+  site's own client bundle (the SharedList chunk): a table whose first cell is
+  "<td class=\"decktitle\"><a href=\"/shared/info/<deck id>\">Title</a></td>",
+  followed by the vote bar with its total count, the modified date, and the
+  note/audio/image counts.
+
+  Deck ids and titles are real (seen on the live site on 2026-10-17, e.g. via
+  https://ankiweb.net/svc/shared/item-info and the deck pages). The vote
+  counts are real for the Kaishi row (318 thumbs up / 12 down = 330) and
+  illustrative for the other two.
+-->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Shared Decks - AnkiWeb</title>
+    </head>
+    <body>
+        <h1 class="mb-4">Shared Decks</h1>
+        <table class="w-100">
+            <thead>
+                <tr>
+                    <td><button class="btn btn-link">Title</button></td>
+                    <td class="d-none d-md-table-cell"><button class="btn btn-link">Ratings</button></td>
+                    <td class="center"><button class="btn btn-link">Modified</button></td>
+                    <td class="right"><button class="btn btn-link">Notes</button></td>
+                    <td class="d-none d-md-table-cell right"><button class="btn btn-link">Audio</button></td>
+                    <td class="d-none d-md-table-cell right"><button class="btn btn-link">Images</button></td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="decktitle"><a href="/shared/info/1196762551">Kaishi 1.5k - Basic Japanese Vocabulary</a></td>
+                    <td class="d-none d-md-table-cell"><div class="likebar dislike"><div class="likebar like" style="width:24px"></div></div> 330</td>
+                    <td class="center">2026-09-15</td>
+                    <td class="right">1501</td>
+                    <td class="d-none d-md-table-cell right">2972</td>
+                    <td class="d-none d-md-table-cell right">1382</td>
+                </tr>
+                <tr>
+                    <td class="decktitle"><a href="/shared/info/521792878">Best of Anki Shared Spanish Merged Deck (40000+ cards)</a></td>
+                    <td class="d-none d-md-table-cell"><div class="likebar dislike"><div class="likebar like" style="width:20px"></div></div> 275</td>
+                    <td class="center">2023-08-01</td>
+                    <td class="right">42421</td>
+                    <td class="d-none d-md-table-cell right">0</td>
+                    <td class="d-none d-md-table-cell right">0</td>
+                </tr>
+                <tr>
+                    <td class="decktitle"><a href="/shared/info/2109889812">Ultimate Geography v5.3</a></td>
+                    <td class="d-none d-md-table-cell"><div class="likebar dislike"><div class="likebar like" style="width:25px"></div></div> 512</td>
+                    <td class="center">2024-05-12</td>
+                    <td class="right">3141</td>
+                    <td class="d-none d-md-table-cell right">0</td>
+                    <td class="d-none d-md-table-cell right">128</td>
+                </tr>
+            </tbody>
+        </table>
+    </body>
+</html>

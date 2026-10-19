@@ -1,3 +1,5 @@
+import { DeckSessionPlacement, ReviewInterfaceMode, ReviewSessionHost, ReviewSessionPlacement } from './review-flow';
+
 /**
  * MCQ difficulty levels
  */
@@ -21,6 +23,30 @@ export enum MCQQuestionAmountMode {
     Fixed = 'fixed',
     /** Number of questions is based on the note's word count */
     WordsPerQuestion = 'wordsPerQuestion'
+}
+
+/**
+ * Where the Study tutor looks things up when ground-truthing a mechanism.
+ */
+export enum StudySearchProvider {
+    /** No lookups; the tutor must flag claims as unverified. */
+    None = 'none',
+    Tavily = 'tavily',
+    Brave = 'brave',
+    /** Self-hosted SearXNG instance exposing its JSON API. */
+    Searxng = 'searxng',
+    /** Any endpoint accepting {query, max_results} and returning a results array. */
+    Custom = 'custom'
+}
+
+/**
+ * Where the tutor starts the learner. 'auto' lets the first few answers decide.
+ */
+export enum StudyExpertise {
+    Auto = 'auto',
+    Beginner = 'beginner',
+    Intermediate = 'intermediate',
+    Advanced = 'advanced'
 }
 
 /**
@@ -88,7 +114,7 @@ export interface SpaceforgeSettings {
      * View type for the sidebar (list or calendar)
      * Default: 'list'
      */
-    sidebarViewType: 'list' | 'calendar';
+    sidebarViewType: 'list' | 'calendar' | 'review';
     
     /**
      * Use fixed schedule for initial reviews before switching to full SM-2 algorithm
@@ -127,7 +153,7 @@ export interface SpaceforgeSettings {
     
     /**
      * Model to use for generating MCQs
-     * Default: 'anthropic/claude-3-opus'
+     * Default: 'openai/gpt-6.1-sol'
      */
     openRouterModel: string;
     
@@ -186,10 +212,11 @@ export interface SpaceforgeSettings {
     mcqDeductFullMarkOnFirstFailure: boolean;
 
     /**
-     * API Provider for MCQ generation
-     * Default: 'openrouter'
+     * API Provider for MCQ generation. Every company in the registry, and every
+     * local CLI under its own id (`cli:claude`).
+     * Default: 'ollama'
      */
-    mcqApiProvider: ApiProvider;
+    mcqApiProvider: ProviderId;
 
     /**
      * OpenAI API Key
@@ -199,7 +226,7 @@ export interface SpaceforgeSettings {
 
     /**
      * OpenAI Model
-     * Default: 'gpt-3.5-turbo'
+     * Default: 'gpt-6.1-sol'
      */
     openaiModel: string;
 
@@ -223,7 +250,7 @@ export interface SpaceforgeSettings {
 
     /**
      * Gemini Model
-     * Default: 'gemini-pro'
+     * Default: 'gemini-4-argon'
      */
     geminiModel: string;
 
@@ -235,7 +262,7 @@ export interface SpaceforgeSettings {
 
     /**
      * Claude Model
-     * Default: 'claude-3-sonnet-20240229'
+     * Default: 'claude-opus-5-5'
      */
     claudeModel: string;
 
@@ -268,6 +295,36 @@ export interface SpaceforgeSettings {
      * Default: ''
      */
     openaiCompatibleModel: string;
+
+    /**
+     * The old single "local CLI" choice. Each CLI is a provider row of its own
+     * now (`cli:<agent>`), so neither field is read any more; they are kept so a
+     * vault saved before that still loads, and `migrateSettings` moves the choice
+     * onto the CLI's own row.
+     */
+    cliAgent: string;
+    cliModel: string;
+    /**
+     * Extra folders to search for CLI binaries, before every usual location.
+     * The search already knows version managers and npm/bun/pnpm globals; this is
+     * for the install that is somewhere else entirely.
+     */
+    cliExtraPath: string;
+
+    /**
+     * Keys, endpoints and models for the providers added after the original
+     * six, keyed by provider id (`ApiProvider`). One store rather than three
+     * fields per company: a new provider is a row in api/provider-registry.ts
+     * and nothing else, and a provider's model can be left empty, in which case
+     * the newest model that provider ships (its registry `latestModel`) is used.
+     *
+     * The original six keep their own fields so no existing vault needs a
+     * migration; `providerKey`/`providerModel`/`providerBaseUrl` in the registry
+     * read whichever of the two shapes a provider uses.
+     */
+    providerKeys: Record<string, string>;
+    providerModels: Record<string, string>;
+    providerUrls: Record<string, string>;
     
     /**
      * System prompt for basic difficulty MCQs
@@ -311,14 +368,88 @@ export interface SpaceforgeSettings {
     // --- Algorithm Settings ---
     defaultSchedulingAlgorithm: 'sm2' | 'fsrs';
 
+    // --- Review flow settings ---
+    /**
+     * How the review controls are presented.
+     *
+     * 'strip': the note opens in a normal tab and the grades live in a bar
+     * docked underneath it, advancing to the next due note on each grade.
+     * 'modal': the original dialog shown on top of the note.
+     *
+     * Default: 'strip'
+     */
+    reviewInterface: ReviewInterfaceMode;
+
+    /**
+     * Where a review session appears: in a split beside the note, or in its own
+     * window (which can go on a second monitor, and leaves the pane you were
+     * working in alone).
+     * Default: 'split'
+     */
+    reviewSessionPlacement: ReviewSessionPlacement;
+    /** Where the session's own surfaces live; see ReviewSessionHost. */
+    reviewSessionHost: ReviewSessionHost;
+
+    /**
+     * Where a card sitting opens.
+     *
+     * A card sitting is a short, self-contained thing — the reader is answering
+     * cards, not working inside a note — so it opens as a modal over the app by
+     * default; the pane and a window of its own stay available for readers who
+     * want the note beside their cards. Default: 'modal'.
+     */
+    deckSessionPlacement: DeckSessionPlacement;
+
+    /**
+     * How long one card takes, for the sidebar's estimates.
+     *
+     * A note carries its own estimate, measured from the note itself; a card
+     * does not, so a plain number the reader sets is honest where a guess dressed
+     * up as arithmetic would not be. Default: 1 minute.
+     */
+    deckMinutesPerCard: number;
+
+    /**
+     * Internal bookkeeping: set once the corrected FSRS short-term default has
+     * been applied to an existing vault, so a later explicit "off" is respected.
+     */
+    fsrsShortTermMigrated?: boolean;
+
+    /**
+     * Set once the upgrade that turned background charting off by default has
+     * run. Without it, a vault whose data.json says `studyAutoChart: true`
+     * (which is every vault saved by 1.0.x — the old default was written out
+     * on every save) would keep pre-charting for good.
+     */
+    studyChartDefaultMigrated?: boolean;
+
+    /**
+     * Show the resulting interval on each grade button.
+     * Default: true
+     */
+    reviewStripIntervalPreviews: boolean;
+
+    /**
+     * Grade with the plain number keys while a review session is running.
+     * Digits are still ignored while the caret is in text, where Alt+number works.
+     * Default: true
+     */
+    reviewStripGradeKeys: boolean;
+
+    /**
+     * Lapses after which a note asks what should happen to it (reset, rest,
+     * remove or carry on). 0 disables the prompt.
+     * Default: 8
+     */
+    leechThreshold: number;
+
     // --- FSRS Specific Settings ---
     fsrsParameters: {
         request_retention?: number;
         maximum_interval?: number;
-        w?: number[]; // FSRS weights (array of numbers)
+        w?: number[]; // FSRS-5 weights (19 numbers, the set ts-fsrs ships)
         enable_fuzz?: boolean;
-        learning_steps?: number[]; // In minutes
-        enable_short_term?: boolean; // Added for FSRSParameters requirement
+        enable_short_term?: boolean;
     };
 
     // --- Navigation Command Settings ---
@@ -365,7 +496,165 @@ export interface SpaceforgeSettings {
      * Default: 7
      */
     defaultRecurrenceInterval: number;
+
+    // --- Study (adaptive tutor) Settings ---
+
+    /**
+     * Enable the Study feature
+     * Default: true
+     */
+    studyEnabled: boolean;
+
+    /**
+     * Show the Study button on sidebar note rows
+     * Default: true
+     */
+    studyShowInSidebar: boolean;
+
+    /**
+     * Chart notes ahead of time, in the background, as they are added to review.
+     *
+     * Off by default: nobody's model calls should be spent on notes they may
+     * never open, and a vault-wide charting pass is real money and real quota.
+     * With it off, the note in front of you is charted the moment you open its
+     * Study panel (and its questions are written when you ask for them) — the
+     * same result, paid for one note at a time, on demand.
+     * Default: false
+     */
+    studyAutoChart: boolean;
+
+    /**
+     * After a note's plan is ready, draw its study material (mind map, visual
+     * boards, condensed summary) in the background, with no button pressed.
+     *
+     * Off by default, and deliberately so: it is the same model call the Study
+     * panel's own Make it button makes, just moved to the moment the chart
+     * finished. With it off, material exists only when the reader asked for it.
+     * Default: false
+     */
+    studyAutoMaterials: boolean;
+
+    /**
+     * After a note's plan is ready, write its question set in the background,
+     * so a review or the questions tab finds it waiting.
+     *
+     * Off by default: questions cost a model call each and a vault that did not
+     * ask for them should not be quietly spending anything. Default: false
+     */
+    studyAutoMcq: boolean;
+
+    /**
+     * Sections charted per note per background pass
+     * Default: 3
+     */
+    studyChartSectionsPerRun: number;
+
+    /**
+     * Default state of the in-session web lookup toggle
+     * Default: true (lookups still require a configured search provider)
+     */
+    studyWebSearchDefault: boolean;
+
+    /**
+     * Search backend used by the Study tutor
+     * Default: none
+     */
+    studySearchProvider: StudySearchProvider;
+
+    /**
+     * API key for the configured search backend
+     * Default: ''
+     */
+    studySearchApiKey: string;
+
+    /**
+     * Endpoint for SearXNG or a custom search backend
+     * Default: ''
+     */
+    studySearchEndpoint: string;
+
+    /**
+     * How many sources to pull per lookup
+     * Default: 4
+     */
+    studySearchMaxResults: number;
+
+    /**
+     * Where the tutor starts the learner
+     * Default: auto
+     */
+    studyExpertise: StudyExpertise;
+
+    /**
+     * Language the tutor speaks. Empty means "match the note".
+     * Default: ''
+     */
+    studyLanguage: string;
+
+    /**
+     * Upper bound on objectives produced when charting a note
+     * Default: 12
+     */
+    studyMaxObjectives: number;
+
+    /**
+     * Maximum tutor turns in a single session before it wraps up
+     * Default: 24
+     */
+    studyTurnLimit: number;
+
+    /**
+     * Sampling temperature for Study turns
+     * Default: 0.4
+     */
+    studyTemperature: number;
+
+    /**
+     * Max output tokens per Study turn. Thinking models need headroom: they
+     * spend part of the budget on reasoning before they answer.
+     * Default: 2000
+     */
+    studyMaxTokens: number;
+
+    /**
+     * Context window hint passed to local backends (Ollama num_ctx)
+     * Default: 8192
+     */
+    studyContextWindow: number;
+
+    /**
+     * Rate the note's review schedule from the Study session result
+     *
+     * Off by default: a finished sitting shows what it scored and leaves the
+     * grade to the learner, docked under the note, rather than deciding for
+     * them the moment the last turn lands.
+     */
+    studyAutoRateNote: boolean;
+
+    /**
+     * How a finished MCQ sitting becomes a grade.
+     *
+     * 'ask' shows the grade buttons with the score-derived grade suggested;
+     * 'score' applies the score-derived grade as soon as the sitting ends.
+     * Default: 'ask'
+     */
+    mcqGradingMode: McqGradingMode;
+
+    /**
+     * Height in px of the docked review workspace (the study/MCQ area under the
+     * review bar). 0 = size to content.
+     * Default: 0
+     */
+    reviewDockHeight: number;
 }
+
+/**
+ * How a completed MCQ sitting is graded.
+ *
+ * The score is always shown; the question is only whether it is *applied*
+ * without being asked.
+ */
+export type McqGradingMode = 'ask' | 'score';
 
 /**
  * API Providers for MCQ generation
@@ -377,14 +666,125 @@ export enum ApiProvider {
     Gemini = 'gemini',
     Claude = 'claude',
     Together = 'together',
-    OpenAICompatible = 'openai-compatible'
+    /** xAI's own API (Grok). */
+    Xai = 'xai',
+    Mistral = 'mistral',
+    Deepseek = 'deepseek',
+    Groq = 'groq',
+    Fireworks = 'fireworks',
+    Cohere = 'cohere',
+    Minimax = 'minimax',
+    /** Xiaomi's MiMo API. */
+    Mimo = 'mimo',
+    /** Z.AI (GLM). The coding plan is the same key on its own endpoint. */
+    Zai = 'zai',
+    Moonshot = 'moonshot',
+    /** OpenCode's gateway (Zen and Go) — and its local server on the same row. */
+    OpenCode = 'opencode',
+    NanoGpt = 'nanogpt',
+    /** A local LM Studio server. */
+    LmStudio = 'lmstudio',
+    /** A local Hermes agent gateway. */
+    HermesAgent = 'hermes',
+    /** Azure OpenAI deployments, addressed by resource + deployment. */
+    AzureOpenai = 'azure-openai',
+    OpenAICompatible = 'openai-compatible',
+    /**
+     * Kept only so a vault that had the old single "local CLI" choice still
+     * loads; `migrateSettings` moves it onto the row of the CLI it named.
+     */
+    Cli = 'cli'
 }
+
+/**
+ * What `mcqApiProvider` holds: a company from the enum, or one local CLI agent
+ * under its own row (`cli:claude`, `cli:codex`, …). Each CLI is its own
+ * provider — there is no second choice of *which* agent to run.
+ */
+export type ProviderId = ApiProvider | `cli:${string}`;
 
 /**
  * Default settings for the plugin
  */
+/** The weight set that shipped before FSRS-5 defaults replaced it. */
+const LEGACY_DEFAULT_WEIGHTS = [
+    0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61
+];
+
+/**
+ * One-time corrections for settings that shipped with a different meaning.
+ *
+ * `enable_short_term: false` was the old default, which made a lapse land a day
+ * out instead of in the same session. Anyone who never touched the toggle (it had
+ * no effect on the numbers either way, as the library ignored the step list) gets
+ * the corrected default once; after that the flag records the migration so a
+ * deliberate "off" sticks.
+ */
+export function migrateSettings(settings: SpaceforgeSettings): boolean {
+    // Every correction runs in one pass, and the caller saves once if anything
+    // changed. They used to return early, which meant an upgrading vault needed
+    // two launches before the second correction applied.
+    let changed = false;
+
+    // Reviews happen in the docked bar now. A vault that had the dialog
+    // selected is moved over, so nobody is left on a setting that no longer
+    // does anything.
+    if (settings.reviewInterface !== 'strip') {
+        settings.reviewInterface = 'strip';
+        changed = true;
+    }
+
+    // The local CLIs were one provider with a second choice inside it. Each CLI
+    // is now its own row, so the choice moves onto that row and the model the CLI
+    // was given travels with it.
+    if (settings.mcqApiProvider === ApiProvider.Cli) {
+        const agent = settings.cliAgent || DEFAULT_SETTINGS.cliAgent;
+        settings.mcqApiProvider = `cli:${agent}`;
+        if (settings.cliModel) {
+            settings.providerModels = { ...(settings.providerModels ?? {}), [`cli:${agent}`]: settings.cliModel };
+            settings.cliModel = '';
+        }
+        changed = true;
+    }
+
+    // Background charting used to default to on, so every vault saved by 1.0.x
+    // carries `true` whether or not anyone chose it. Turn it off once — the new
+    // default — and let the marker keep any later choice: flip it back on and it
+    // stays on, because this block does not run again.
+    if (!settings.studyChartDefaultMigrated) {
+        settings.studyAutoChart = false;
+        settings.studyChartDefaultMigrated = true;
+        changed = true;
+    }
+
+    if (!settings.fsrsShortTermMigrated) {
+        const params = { ...(settings.fsrsParameters ?? {}) } as Record<string, unknown>;
+        params.enable_short_term = DEFAULT_SETTINGS.fsrsParameters.enable_short_term;
+
+        // The 17 weights that used to ship are not a complete model: ts-fsrs pads
+        // them out with its own values and warns. A vault still on the stock set is
+        // moved to the real FSRS-5 defaults; anything the user edited is left alone.
+        const weights = params.w as number[] | undefined;
+        const isLegacyDefault = Array.isArray(weights)
+            && weights.length === LEGACY_DEFAULT_WEIGHTS.length
+            && weights.every((value, index) => value === LEGACY_DEFAULT_WEIGHTS[index]);
+        if (!weights || weights.length === 0 || isLegacyDefault) {
+            params.w = [...DEFAULT_SETTINGS.fsrsParameters.w!];
+        }
+
+        // The step list was never read by the scheduler (ts-fsrs 4.7 owns its steps).
+        delete params.learning_steps;
+
+        settings.fsrsParameters = params as SpaceforgeSettings['fsrsParameters'];
+        settings.fsrsShortTermMigrated = true;
+        changed = true;
+    }
+
+    return changed;
+}
+
 export const DEFAULT_SETTINGS: SpaceforgeSettings = {
-    showNavigationNotifications: true,
+    showNavigationNotifications: false,
     baseEase: 250, // 2.5 in SM-2 format (recommended default from the original algorithm)
     loadBalance: false, // Disable load balancing by default for pure SM-2 compliance
     maximumInterval: 365, // Cap at 1 year (extension to original SM-2)
@@ -395,6 +795,7 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     includeSubfolders: true,
     readingSpeed: 100, // Default WPM set to 100
     sidebarViewType: 'calendar',
+    reviewSessionHost: 'note',
     useInitialSchedule: true,
     initialScheduleCustomIntervals: [0, 3, 7, 14, 30],
     
@@ -402,20 +803,29 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     enableMCQ: true,
     mcqApiProvider: ApiProvider.Ollama, // Default API provider set to Ollama
     openRouterApiKey: '',
-    openRouterModel: 'openai/gpt-4.1-mini',
+    openRouterModel: 'openai/gpt-6.1-sol',
     openaiApiKey: '',
-    openaiModel: 'gpt-3.5-turbo',
+    openaiModel: 'gpt-6.1-sol',
     ollamaApiUrl: '',
     ollamaModel: '',
     geminiApiKey: '',
-    geminiModel: 'gemini-pro',
+    geminiModel: 'gemini-4-argon',
     claudeApiKey: '',
-    claudeModel: 'claude-3-sonnet-20240229',
+    claudeModel: 'claude-opus-5-5',
     togetherApiKey: '',
-    togetherModel: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
+    togetherModel: 'Qwen/Qwen3.8-2.4T-A95B',
     openaiCompatibleApiUrl: '',
     openaiCompatibleApiKey: '',
     openaiCompatibleModel: '',
+    cliAgent: 'claude',
+    cliModel: '',
+    cliExtraPath: '',
+    // The providers added after the original six keep their key, endpoint and
+    // model here, keyed by provider id. Empty means "whatever that provider
+    // ships newest" for the model, and "not configured" for the rest.
+    providerKeys: {},
+    providerModels: {},
+    providerUrls: {},
     mcqPromptType: 'detailed',
     mcqQuestionsPerNote: 4,
     mcqChoicesPerQuestion: 5,
@@ -443,16 +853,28 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
 
     // Algorithm Defaults
     defaultSchedulingAlgorithm: 'fsrs',
+
+    // Review flow defaults
+    reviewInterface: 'strip',
+    reviewSessionPlacement: 'split',
+    deckSessionPlacement: 'modal',
+    deckMinutesPerCard: 1,
+    reviewStripIntervalPreviews: true,
+    reviewStripGradeKeys: true,
+    leechThreshold: 8,
     fsrsParameters: {
         request_retention: 0.9,
         maximum_interval: 36500,
         enable_fuzz: true,
-        // Default FSRS weights from FSRS-4.5-Anki
+        // FSRS-5 default weights: exactly the 19 the library ships. A shorter
+        // array makes ts-fsrs pad it (and warn), which is a different model.
         w: [
-            0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61
+            0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192,
+            1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621
         ],
-        learning_steps: [1, 10], // 1 minute, 10 minutes
-        enable_short_term: false, // Default for enable_short_term
+        // Anki-style short-term scheduling: a failure lands on a relearning step
+        // today (minutes) instead of being pushed out to tomorrow.
+        enable_short_term: true,
     },
 
     // Navigation Command Defaults
@@ -472,4 +894,29 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     // Recurring Notes Defaults
     enableRecurringNotes: false,
     defaultRecurrenceInterval: 7,
+
+    // Study (adaptive tutor) Defaults
+    studyEnabled: true,
+    studyShowInSidebar: true,
+    studyAutoChart: false,
+    // The auto-pilot's two steps: after a chart lands, the material and then
+    // the questions. Off for everyone; a saved data.json carries the choice.
+    studyAutoMaterials: false,
+    studyAutoMcq: false,
+    studyChartSectionsPerRun: 3,
+    studyWebSearchDefault: true,
+    studySearchProvider: StudySearchProvider.None,
+    studySearchApiKey: '',
+    studySearchEndpoint: '',
+    studySearchMaxResults: 4,
+    studyExpertise: StudyExpertise.Auto,
+    studyLanguage: '',
+    studyMaxObjectives: 24,
+    studyTurnLimit: 24,
+    studyTemperature: 0.4,
+    studyMaxTokens: 2000,
+    studyContextWindow: 8192,
+    studyAutoRateNote: false,
+    mcqGradingMode: 'ask',
+    reviewDockHeight: 0,
 };

@@ -1,5 +1,8 @@
 import { Notice, TFile } from 'obsidian';
-import { ReviewSchedule, ReviewResponse, toSM2Quality, FsrsRating } from '../models/review-schedule'; // Added FsrsRating
+import { isDeckPath } from '../models/anki';
+import { ReviewSchedule, ReviewResponse, RatingKind, ScheduleRepairReport, ScheduleRepairSnapshot, toSM2Quality, FsrsRating } from '../models/review-schedule';
+import { lapseInfoFromSchedule, LeechAction, UndoRecord } from '../models/review-flow';
+import { State as FsrsState } from 'ts-fsrs';
 import SpaceforgePlugin from '../main';
 import { DateUtils } from '../utils/dates';
 import { FsrsScheduleService } from './fsrs-schedule-service'; // Added FsrsScheduleService
@@ -36,6 +39,13 @@ export class ReviewScheduleService {
      * This will be a reference to the history array in DataStorage
      */
     history: ReviewHistoryItem[];
+
+    /**
+     * When true, recordReview() computes the schedule but writes nothing that
+     * outlives the call (no history entry, no UI event). Used by previewReview()
+     * so grade buttons can show the resulting interval without side effects.
+     */
+    private suppressSideEffects = false;
 
     /**
      * Initialize Review Schedule Service
@@ -76,7 +86,13 @@ export class ReviewScheduleService {
         // Check if file exists and is a markdown file
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
         if (!file || !(file instanceof TFile) || file.extension !== "md") {
-            new Notice("Only Markdown files can be added to review.");
+            new Notice('Only notes can be added to review.');
+            return;
+        }
+
+        // A deck file is a deck, not a note: its cards have their own schedule.
+        if (isDeckPath(path)) {
+            new Notice('That is a deck file. Decks are studied from the deck list, card by card.');
             return;
         }
 
@@ -171,7 +187,13 @@ export class ReviewScheduleService {
      * @param currentReviewDate Optional timestamp for the current review date (simulated or actual)
      * @returns true if the review was recorded, false if it was just a preview
      */
-    recordReview(path: string, response: ReviewResponse | FsrsRating, isSkipped = false, currentReviewDate?: number): boolean {
+    recordReview(
+        path: string,
+        response: ReviewResponse | FsrsRating,
+        isSkipped = false,
+        currentReviewDate?: number,
+        ratingKind: RatingKind = 'auto'
+    ): boolean {
         const schedule = this.schedules[path];
         if (!schedule) return false;
 
@@ -209,15 +231,17 @@ export class ReviewScheduleService {
         schedule.lastReviewDate = effectiveUTCDayStart;
 
         // Log to history
-        this.history.push({
-            path,
-            timestamp: effectiveReviewDate,
-            response: historyResponseValue,
-            interval: schedule.interval ?? schedule.fsrsData?.scheduled_days ?? 0,
-            ease: schedule.ease ?? (schedule.fsrsData?.difficulty ? Math.round(schedule.fsrsData.difficulty * 10) : this.plugin.settings.baseEase),
-            isSkipped: isSkipped
-        });
-        if (this.history.length > 1000) this.history.splice(0, this.history.length - 1000);
+        if (!this.suppressSideEffects) {
+            this.history.push({
+                path,
+                timestamp: effectiveReviewDate,
+                response: historyResponseValue,
+                interval: schedule.interval ?? schedule.fsrsData?.scheduled_days ?? 0,
+                ease: schedule.ease ?? (schedule.fsrsData?.difficulty ? Math.round(schedule.fsrsData.difficulty * 10) : this.plugin.settings.baseEase),
+                isSkipped: isSkipped
+            });
+            if (this.history.length > 1000) this.history.splice(0, this.history.length - 1000);
+        }
 
         if (schedule.schedulingAlgorithm === 'fsrs') {
             if (!schedule.fsrsData) { // Should not happen if card is properly initialized
@@ -226,30 +250,7 @@ export class ReviewScheduleService {
                 schedule.fsrsData = this.fsrsService.createNewFsrsCardData(reviewDateObj);
             }
 
-            // --- START FIX: Determine correct FsrsRating ---
-            let actualFsrsRating: FsrsRating;
-            // Check if the response is one of the legacy ReviewResponse values from MCQ modal
-            if (response === ReviewResponse.PerfectRecall) { // Value 5
-                actualFsrsRating = FsrsRating.Easy; // Map to 4
-            } else if (response === ReviewResponse.CorrectWithHesitation) { // Value 4
-                actualFsrsRating = FsrsRating.Good; // Map to 3
-            } else if (response === ReviewResponse.CorrectWithDifficulty) { // Value 3
-                actualFsrsRating = FsrsRating.Hard; // Map to 2
-            } else if (response === ReviewResponse.IncorrectResponse) { // Value 1 (legacy)
-                actualFsrsRating = FsrsRating.Again; // Map to 1
-            } else if (Object.values(FsrsRating).includes(response as FsrsRating)) {
-                // If it's already a valid FsrsRating (1, 2, 3, 4), use it directly
-                actualFsrsRating = response as FsrsRating;
-            } else {
-                // Fallback for unexpected values (e.g., SM-2 specific 0, 2, potentially)
-                // Map based on general difficulty
-                const quality = toSM2Quality(response as ReviewResponse);
-                if (quality >= 4) actualFsrsRating = FsrsRating.Easy; // 4, 5 -> Easy
-                else if (quality === 3) actualFsrsRating = FsrsRating.Good; // 3 -> Good
-                else if (quality === 2) actualFsrsRating = FsrsRating.Hard; // 2 -> Hard
-                else actualFsrsRating = FsrsRating.Again; // 0, 1 -> Again
-            }
-            // --- END FIX ---
+            const actualFsrsRating = this.toFsrsRating(response, ratingKind);
 
             const { updatedData, nextReviewDate: newNextReviewDateFsrs } = this.fsrsService.recordReview(
                 schedule.fsrsData,
@@ -292,19 +293,30 @@ export class ReviewScheduleService {
                 // This needs to be robust. Let's use `schedule.repetitionCount` for initial steps as it's clearer.
                 // For initial phase, repetitionCount tracks progression through initial steps.
 
-                if (schedule.repetitionCount < initialIntervals.length) {
-                    schedule.interval = initialIntervals[schedule.repetitionCount];
+                const step = schedule.repetitionCount ?? 0;
+                const passed = qualityRating >= (ReviewResponse.CorrectWithDifficulty as number);
+                const easy = qualityRating >= (ReviewResponse.PerfectRecall as number);
+
+                if (easy) {
+                    // Easy graduates a learning item on the spot, the way Anki does;
+                    // SM-2's first interval after a fresh start is one day.
+                    schedule.scheduleCategory = 'graduated';
+                    schedule.interval = 1;
+                    schedule.repetitionCount = 1;
+                } else if (step < initialIntervals.length) {
+                    // Good moves on to the next step, Hard repeats the current one, and
+                    // a failure drops back to the first step - which here is "today",
+                    // so a failed note is drilled again before the session ends.
+                    schedule.interval = passed ? initialIntervals[step] : initialIntervals[0];
                 } else { // Graduated from initial steps
                     schedule.scheduleCategory = 'graduated';
-                    // For the first SM-2 calculation after graduation, treat as if n=0 for interval calc.
-                    // daysLate should be 0 as we are just graduating.
-                    const daysLateForGraduation = 0;
+                    // For the first SM-2 calculation after graduation, treat as if n=0
+                    // for the interval calculation.
                     const { interval, ease, repetitionCount: newRepCount } = this.calculateSM2Schedule(
                         schedule.interval, // previous interval (last of initial steps)
                         schedule.ease,
                         qualityRating,
                         0, // Reset repetition count for SM-2 calculation after graduation
-                        daysLateForGraduation,
                         isSkipped
                     );
                     schedule.interval = interval;
@@ -319,24 +331,24 @@ export class ReviewScheduleService {
                 newEase = Math.max(1.3, newEase);
                 schedule.ease = Math.round(newEase * 100);
 
-                if (qualityRating >= (ReviewResponse.CorrectWithDifficulty as number)) {
+                if (easy) {
+                    // Already booked as graduated above: n = 1.
                     schedule.consecutive += 1;
-                    if (qualityRating >= 3) {
-                        // repetitionCount for initial phase should increment if successful, reset if not.
-                        // This is distinct from the SM-2 n.
-                        schedule.repetitionCount = (schedule.repetitionCount || 0) + 1;
-                    } else { // q < 3
-                        schedule.repetitionCount = 0; // Reset progress in initial steps
+                } else if (passed) {
+                    schedule.consecutive += 1;
+                    // Good advances a step; Hard (quality 3) repeats the current one,
+                    // which is what makes Hard meaningfully harder than Good here.
+                    if (qualityRating >= (ReviewResponse.CorrectWithHesitation as number)) {
+                        schedule.repetitionCount = step + 1;
                     }
-                } else { // q < 3
+                } else {
                     schedule.consecutive = 0;
-                    schedule.repetitionCount = 0; // Reset progress in initial steps
+                    schedule.repetitionCount = 0; // Back to the first step (today).
+                    schedule.lapses = (schedule.lapses || 0) + 1;
                 }
             } else { // 'spaced' or 'graduated' (already graduated or started as spaced)
-                const daysLate = schedule.nextReviewDate < effectiveUTCDayStart ? // Compare with UTC day start
-                    DateUtils.dayDifferenceUTC(schedule.nextReviewDate, effectiveUTCDayStart) : 0;
                 const { interval, ease, repetitionCount } = this.calculateSM2Schedule(
-                    schedule.interval, schedule.ease, qualityRating, schedule.repetitionCount || 0, daysLate, isSkipped
+                    schedule.interval, schedule.ease, qualityRating, schedule.repetitionCount || 0, isSkipped
                 );
                 schedule.interval = interval;
                 schedule.ease = ease;
@@ -346,6 +358,7 @@ export class ReviewScheduleService {
                     schedule.consecutive += 1;
                 } else {
                     schedule.consecutive = 0;
+                    schedule.lapses = (schedule.lapses || 0) + 1;
                 }
             }
             // Base the next review date on the UTC start of the current review day
@@ -355,11 +368,260 @@ export class ReviewScheduleService {
         // Data saving is now handled by main.ts after this method returns
 
         // Notify any listeners (for UI updates)
-        if (this.plugin.events) {
+        if (this.plugin.events && !this.suppressSideEffects) {
             this.plugin.events.emit('sidebar-update');
         }
 
         return true; // Review was successfully recorded
+    }
+
+    /**
+     * Resolve a response to an FSRS rating.
+     *
+     * With `ratingKind: 'fsrs'` the number is already an FsrsRating (1-4) and is
+     * used as-is: the caller graded on the FSRS scale. The SM-2 ends (0 and 5) are
+     * accepted as Again/Easy so a stray SM-2 value cannot silently shift a grade.
+     * Everything else, and every `auto` caller, keeps the legacy translation from
+     * the SM-2 quality scale.
+     */
+    private toFsrsRating(response: ReviewResponse | FsrsRating, ratingKind: RatingKind): FsrsRating {
+        if (ratingKind === 'fsrs') {
+            if (response === FsrsRating.Again || response === FsrsRating.Hard
+                || response === FsrsRating.Good || response === FsrsRating.Easy) {
+                return response as FsrsRating;
+            }
+            if (response === ReviewResponse.CompleteBlackout) return FsrsRating.Again;
+            if (response === ReviewResponse.PerfectRecall) return FsrsRating.Easy;
+        }
+        if (response === ReviewResponse.PerfectRecall) return FsrsRating.Easy;
+        if (response === ReviewResponse.CorrectWithHesitation) return FsrsRating.Good;
+        if (response === ReviewResponse.CorrectWithDifficulty) return FsrsRating.Hard;
+        if (response === ReviewResponse.IncorrectResponse) return FsrsRating.Again;
+        if (Object.values(FsrsRating).includes(response as FsrsRating)) return response as FsrsRating;
+        const quality = toSM2Quality(response as ReviewResponse);
+        if (quality >= 4) return FsrsRating.Easy;
+        if (quality === 3) return FsrsRating.Good;
+        if (quality === 2) return FsrsRating.Hard;
+        return FsrsRating.Again;
+    }
+
+    /**
+     * Rebuild schedules from the review log.
+     *
+     * Cards graded under the earlier rules - a forced 1-day interval whenever a note
+     * was late, or an FSRS rating shifted a notch by the legacy translation - end up
+     * exactly as if the corrected rules had always applied: every logged review is
+     * replayed through recordReview with its own timestamp, starting from a fresh
+     * card for that note.
+     *
+     * Only notes whose log is complete are touched: one recorded review per counted
+     * review. A partial log (older than the log itself, or trimmed at 1000 entries)
+     * would produce a worse guess than the state it replaces, so those notes are left
+     * alone and reported instead.
+     *
+     * The caller owns the backup: snapshot the data file before running this.
+     */
+    repairFromHistory(): ScheduleRepairReport {
+        const report: ScheduleRepairReport = { repaired: [], skipped: [] };
+        const byPath = new Map<string, ReviewHistoryItem[]>();
+        for (const entry of this.history) {
+            const list = byPath.get(entry.path);
+            if (list) list.push(entry);
+            else byPath.set(entry.path, [entry]);
+        }
+
+        for (const [path, original] of Object.entries(this.schedules)) {
+            const entries = (byPath.get(path) ?? []).slice().sort((a, b) => a.timestamp - b.timestamp);
+            if (entries.length === 0) {
+                report.skipped.push({ path, reason: 'no history' });
+                continue;
+            }
+            const graded = entries.filter(entry => !entry.isSkipped).length;
+            const counted = original.reviewCount ?? 0;
+            if (graded !== counted) {
+                report.skipped.push({ path, reason: `partial history (${graded} of ${counted} reviews)` });
+                continue;
+            }
+
+            const isFsrs = original.schedulingAlgorithm === 'fsrs';
+            const fresh: ReviewSchedule = {
+                path,
+                lastReviewDate: null,
+                nextReviewDate: entries[0].timestamp,
+                ease: this.plugin.settings.baseEase,
+                interval: 0,
+                consecutive: 0,
+                lapses: 0,
+                repetitionCount: 0,
+                reviewCount: 0,
+                scheduleCategory: isFsrs ? undefined : (this.plugin.settings.useInitialSchedule ? 'initial' : 'spaced'),
+                schedulingAlgorithm: original.schedulingAlgorithm,
+                fsrsData: isFsrs ? this.fsrsService.createNewFsrsCardData(new Date(entries[0].timestamp)) : undefined,
+                leechHandledAtLapses: 0,
+            };
+
+            let recorded = 0;
+            try {
+                this.schedules[path] = fresh;
+                this.suppressSideEffects = true;
+                for (const entry of entries) {
+                    // Make it due at the moment it was reviewed, so the replay is not
+                    // gated by the due check.
+                    fresh.nextReviewDate = entry.timestamp;
+                    if (this.recordReview(path, entry.response, entry.isSkipped === true, entry.timestamp, isFsrs ? 'fsrs' : 'auto')) {
+                        recorded += 1;
+                    }
+                }
+            } catch (error) {
+                this.schedules[path] = original;
+                report.skipped.push({ path, reason: `replay failed: ${String(error)}` });
+                continue;
+            } finally {
+                this.suppressSideEffects = false;
+            }
+
+            if (recorded !== entries.length) {
+                this.schedules[path] = original;
+                report.skipped.push({ path, reason: `replay stopped after ${recorded} of ${entries.length} entries` });
+                continue;
+            }
+
+            // Never claim the user answered a lapse question for lapses the rebuilt
+            // card does not have.
+            const lapses = fresh.fsrsData?.lapses ?? fresh.lapses ?? 0;
+            fresh.leechHandledAtLapses = Math.min(original.leechHandledAtLapses ?? 0, lapses);
+
+            report.repaired.push({
+                path,
+                reviews: entries.length,
+                before: scheduleRepairSnapshot(original),
+                after: scheduleRepairSnapshot(fresh),
+            });
+        }
+
+        return report;
+    }
+
+    /**
+     * Compute what a rating would do to a note, without recording anything.
+     *
+     * Runs the real scheduling code on a throwaway copy of the schedule, so the
+     * interval shown on a grade button is exactly what recording the grade
+     * produces. History writes and UI events are suppressed for the duration.
+     *
+     * @param path Path to the note file
+     * @param response Rating to preview
+     * @param currentReviewDate Optional timestamp for the review (defaults to now)
+     * @returns The resulting interval and next review date, or null if the note
+     *          has no schedule or is not currently due.
+     */
+    previewReview(
+        path: string,
+        response: ReviewResponse | FsrsRating,
+        currentReviewDate?: number,
+        ratingKind: RatingKind = 'auto'
+    ): { interval: number; nextReviewDate: number } | null {
+        const schedule = this.schedules[path];
+        if (!schedule) return null;
+
+        const effectiveReviewDate = currentReviewDate || Date.now();
+        if (!this.isNoteDue(schedule, effectiveReviewDate)) return null;
+
+        const workingCopy: ReviewSchedule = JSON.parse(JSON.stringify(schedule)) as ReviewSchedule;
+        this.schedules[path] = workingCopy;
+        this.suppressSideEffects = true;
+        try {
+            const recorded = this.recordReview(path, response, false, effectiveReviewDate, ratingKind);
+            if (!recorded) return null;
+            return {
+                interval: workingCopy.interval ?? workingCopy.fsrsData?.scheduled_days ?? 0,
+                nextReviewDate: workingCopy.nextReviewDate,
+            };
+        } finally {
+            this.suppressSideEffects = false;
+            this.schedules[path] = schedule;
+        }
+    }
+
+    /**
+     * Lapse counters for a note, used for leech detection.
+     * FSRS tracks lapses itself; SM-2 notes count them in `lapses`.
+     */
+    getLapseInfo(path: string): { lapses: number; handledAtLapses: number } {
+        const schedule = this.schedules[path];
+        return lapseInfoFromSchedule(schedule);
+    }
+
+    /**
+     * Put a note's schedule back exactly as it was before a grade, and drop the
+     * history the grade wrote — the undo path for a mis-keyed rating.
+     *
+     * Only entries appended after the snapshot are considered (index at or past
+     * `historyLength`) and only for the note that was graded, so a rating made
+     * elsewhere in the meantime is not swallowed by the undo.
+     *
+     * @param snapshot Record taken just before the grade (see models/review-flow)
+     */
+    restoreSnapshot(snapshot: UndoRecord): void {
+        if (snapshot.scheduleJSON === null) {
+            delete this.schedules[snapshot.path];
+        } else {
+            this.schedules[snapshot.path] = JSON.parse(snapshot.scheduleJSON) as ReviewSchedule;
+        }
+
+        const boundary = Math.max(0, Math.min(snapshot.historyLength, this.history.length));
+        for (let i = this.history.length - 1; i >= boundary; i--) {
+            if (this.history[i].path === snapshot.path) {
+                this.history.splice(i, 1);
+            }
+        }
+    }
+
+    /**
+     * Apply the user's decision for a note that keeps failing.
+     *
+     * @param path Path to the note file
+     * @param action What the user chose: reset, postpone (one week), remove or keep
+     */
+    resolveLeech(path: string, action: LeechAction): void {
+        const schedule = this.schedules[path];
+        if (!schedule) return;
+
+        const lapses = this.getLapseInfo(path).lapses;
+
+        switch (action) {
+            case 'reset': {
+                const tomorrow = DateUtils.addDays(DateUtils.startOfUTCDay(new Date()), 1);
+                schedule.interval = 1;
+                schedule.nextReviewDate = tomorrow;
+                schedule.consecutive = 0;
+                schedule.repetitionCount = 0;
+                schedule.lapses = 0;
+                schedule.scheduleCategory = this.plugin.settings.useInitialSchedule ? 'initial' : 'spaced';
+                if (schedule.schedulingAlgorithm === 'fsrs' && schedule.fsrsData) {
+                    schedule.fsrsData.lapses = 0;
+                    schedule.fsrsData.scheduled_days = 1;
+                    schedule.fsrsData.stability = Math.min(schedule.fsrsData.stability, 1);
+                    schedule.fsrsData.state = FsrsState.Relearning as number;
+                }
+                break;
+            }
+            case 'postpone':
+                this.postponeNote(path, 7);
+                break;
+            case 'remove':
+                this.removeFromReview(path);
+                break;
+            case 'keep':
+            default:
+                break;
+        }
+
+        // Remember the checkpoint so the prompt only returns at the next multiple.
+        const updated = this.schedules[path];
+        if (updated) {
+            updated.leechHandledAtLapses = Math.max(lapses, updated.leechHandledAtLapses ?? 0);
+        }
     }
 
     /**
@@ -371,7 +633,6 @@ export class ReviewScheduleService {
      * @param currentEase Current ease factor
      * @param response User's response during review
      * @param repetitionCount Current repetition count (n)
-     * @param daysLate How many days late the review is (0 if on time or early)
      * @param isSkipped Whether the item was explicitly skipped by the user
      * @returns New interval, ease, and repetition count
      */
@@ -380,7 +641,6 @@ export class ReviewScheduleService {
         currentEase: number,
         response: ReviewResponse,
         repetitionCount = 0,
-        daysLate = 0,
         isSkipped = false
     ): { interval: number, ease: number, repetitionCount: number } {
         return this.calculateSM2Schedule(
@@ -388,41 +648,39 @@ export class ReviewScheduleService {
             currentEase,
             toSM2Quality(response),
             repetitionCount,
-            daysLate,
             isSkipped
         );
     }
 
     /**
-     * Calculate new schedule parameters using the enhanced SM-2 algorithm with lateness penalty
+     * Calculate new schedule parameters using SM-2 (Wozniak 1987).
      * (This is the core calculation logic used internally by recordReview and skipNote)
+     *
+     * The next interval is a function of the previous interval, the grade and the
+     * ease factor - nothing else. SM-2 has no lateness term: an item answered well
+     * late is scheduled exactly as if it had been answered on time, because the
+     * interval describes the wanted gap between repetitions, not a punishment.
+     * (Models that do account for elapsed time, FSRS among them, grow the interval
+     * after a late success rather than resetting it.)
      *
      * @param currentInterval Current interval in days
      * @param currentEase Current ease factor (expressed as a number where 2.5 = 250)
      * @param qualityRating User's response during review, as a numeric quality rating (0-5)
      * @param repetitionCount Current repetition count (n)
-     * @param daysLate How many days late the review is (0 if on time or early)
      * @param isSkipped Whether the item was explicitly skipped by the user
      * @returns New interval, ease, and repetition count
      */
     private calculateSM2Schedule(
         currentInterval: number,
         currentEase: number,
-        qualityRating: number, // Changed parameter type from ReviewResponse to number
+        qualityRating: number,
         repetitionCount = 0,
-        daysLate = 0,
         isSkipped = false
     ): { interval: number, ease: number, repetitionCount: number } {
-        // qualityRating is now expected to be a number (0-5) directly.
-        // The call to toSM2Quality(response) is removed.
-
-        // Handle overdue or skipped items according to modified SM-2 algorithm
-        if (isSkipped || daysLate > 0) {
-            // Determine effective quality rating:
-            // - If explicitly skipped, reduce quality by 1 (but not below 0)
-            // - If overdue, set quality to 0
-            // - If both overdue and explicitly skipped, prioritize the skip logic (user choice)
-            const q_eff = isSkipped ? Math.max(0, qualityRating - 1) : 0;
+        // Skipping is the user saying "not now": no ease is spent and the note
+        // returns tomorrow. It is not a failed recall, so it must not reset the item.
+        if (isSkipped) {
+            const q_eff = Math.max(0, qualityRating - 1);
 
             // Convert ease from internal format (250 = 2.5) to SM-2 format (2.5)
             let ease = currentEase / 100;
@@ -460,7 +718,10 @@ export class ReviewScheduleService {
         // If response is less than 3, reset repetition count to 0 (per strict SM-2)
         if (qualityRating < 3) {
             newRepetitionCount = 0;
-            interval = 1; // Next interval is 1 day for failed items
+            // SM-2 restarts the repetition schedule, and SuperMemo re-asks the item
+            // in the same session until it passes: interval 0 keeps it due today.
+            // Passing it again then follows I(1) = 1 day.
+            interval = 0;
         } else {
             // Increment repetition count for correct responses
             newRepetitionCount += 1;
@@ -482,8 +743,8 @@ export class ReviewScheduleService {
             interval = interval + Math.random() * fuzz * 2 - fuzz;
         }
 
-        // Ensure interval is at least 1 day
-        interval = Math.max(1, interval);
+        // No negative intervals; 0 means "still due today".
+        interval = Math.max(0, interval);
 
         // Enforce maximum interval (this is an extension to the algorithm)
         interval = Math.min(interval, this.plugin.settings.maximumInterval);
@@ -601,7 +862,7 @@ export class ReviewScheduleService {
             } else {
                 const { interval, ease, repetitionCount } = this.calculateSM2Schedule(
                     schedule.interval || 0, schedule.ease || this.plugin.settings.baseEase, qualityRating,
-                    schedule.repetitionCount || 0, 0, true // daysLate = 0 for a skip, isSkipped = true
+                    schedule.repetitionCount || 0, true // isSkipped = true
                 );
                 schedule.interval = interval; // Will be 1 due to isSkipped=true
                 schedule.ease = ease;
@@ -994,4 +1255,15 @@ export class ReviewScheduleService {
             this.plugin.events.emit('sidebar-update'); // Notify UI to refresh
         }
     }
+}
+
+function scheduleRepairSnapshot(schedule: ReviewSchedule): ScheduleRepairSnapshot {
+    return {
+        interval: schedule.interval ?? schedule.fsrsData?.scheduled_days ?? 0,
+        ease: schedule.ease ?? null,
+        difficulty: schedule.fsrsData?.difficulty ?? null,
+        stability: schedule.fsrsData?.stability ?? null,
+        lapses: schedule.fsrsData?.lapses ?? schedule.lapses ?? 0,
+        nextReviewDate: schedule.nextReviewDate,
+    };
 }

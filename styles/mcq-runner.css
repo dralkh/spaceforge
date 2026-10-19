@@ -1,0 +1,324 @@
+/* Spaceforge - Inline MCQ runner
+   The question loop lives inside a docked panel, so it fills whatever height
+   the host gives it and scrolls its own body rather than assuming a window. */
+
+.sf-mcq-runner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* Pinned to the reading size here rather than inherited from the host: the
+     same question must be the same size in the dock, the sidebar and a window.
+     Everything below sizes from this. */
+  /* the reader's own reading size is the base: nothing inside this
+     container should ever be smaller than what they chose */
+  font-size: var(--sf-font-text);
+}
+
+.sf-mcq-runner-head {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  padding-bottom: var(--sf-space-sm);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sf-mcq-runner-progress {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sf-mcq-runner-dots {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sf-mcq-runner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--background-modifier-border);
+  transition: background-color var(--sf-transition-fast);
+}
+
+.sf-mcq-runner-dot.is-current {
+  background-color: var(--sf-primary);
+}
+
+.sf-mcq-runner-dot.is-correct {
+  background-color: var(--sf-success);
+}
+
+.sf-mcq-runner-dot.is-missed {
+  background-color: var(--sf-danger);
+}
+
+.sf-mcq-runner-end {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background-color: transparent;
+  color: var(--text-muted);
+  font-size: var(--sf-font-ui);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-mcq-runner-end:hover:not(:disabled) {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.sf-mcq-runner-end:disabled {
+  cursor: default;
+}
+
+.sf-mcq-runner-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: var(--sf-space-sm);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sf-mcq-runner-question {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-normal);
+  /* A question wraps and grows; nothing about it may be cut off. */
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.sf-mcq-runner-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-mcq-runner-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sf-space-sm);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6em 0.85em;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  /* Scales with the reader's text size: a fixed px here is how the answers
+     ended up smaller than the question they answer. */
+  font-size: 1em;
+  font-weight: 500;
+  line-height: 1.45;
+  /* Obsidian's own `button` rule says `white-space: nowrap`, and an option is a
+     button: without this line a long answer is one endless line, and the panel's
+     edge cuts it mid-phrase with no ellipsis, because `overflow-wrap` inside the
+     span below only means anything once wrapping is allowed at all. */
+  white-space: normal;
+  /* Obsidian pins every button to --input-height; a choice is not an input, and
+     at the reader's text size that height clips the answer text. */
+  height: auto;
+  min-height: 2.8em;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
+}
+
+.sf-mcq-runner-choice:hover:not(:disabled) {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--sf-primary);
+}
+
+.sf-mcq-runner-choice:disabled {
+  cursor: default;
+}
+
+.sf-mcq-runner-choice.is-correct {
+  background-color: var(--sf-success-light);
+  border-color: var(--sf-success);
+}
+
+.sf-mcq-runner-choice.is-wrong {
+  background-color: var(--sf-danger-light);
+  border-color: var(--sf-danger);
+}
+
+/* The rest of the list once the question is settled. */
+.sf-mcq-runner-choice.is-dim {
+  opacity: 0.55;
+}
+
+/* Where the arrow keys are pointing. A visible pointer is the whole point of
+   navigating by keyboard; it is not a hover state. */
+.sf-mcq-runner-choice.is-highlighted:not(.is-wrong):not(.is-correct) {
+  border-color: var(--sf-primary);
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 92%);
+}
+
+.sf-mcq-runner-choice.is-highlighted::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--sf-radius-md);
+  border: 1px solid var(--sf-primary);
+  pointer-events: none;
+}
+
+.sf-mcq-runner-choice {
+  position: relative;
+}
+
+.sf-mcq-runner-keys {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--sf-font-small);
+  letter-spacing: 0.01em;
+}
+
+.sf-mcq-runner-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 85%);
+  color: var(--sf-primary);
+  font-size: var(--sf-font-ui);
+  font-weight: 700;
+}
+
+.sf-mcq-runner-choice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.sf-mcq-runner-key {
+  align-self: center;
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-mcq-runner-feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border-left: 3px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: var(--sf-font-text);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.sf-mcq-runner-feedback:empty {
+  display: none;
+}
+
+.sf-mcq-runner-feedback.is-correct {
+  border-left-color: var(--sf-success);
+  background-color: var(--sf-success-light);
+}
+
+.sf-mcq-runner-feedback.is-wrong {
+  border-left-color: var(--sf-danger);
+  background-color: var(--sf-danger-light);
+}
+
+.sf-mcq-runner-feedback.is-revealed {
+  border-left-color: var(--sf-info);
+  background-color: var(--sf-info-light);
+}
+
+.sf-mcq-runner-feedback-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.sf-mcq-runner-feedback-text {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.sf-mcq-runner-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+}
+
+.sf-mcq-runner-action {
+  width: 100%;
+  height: auto;
+  min-height: 2.4em;
+  padding: 0.5em 1em;
+  border: none;
+  border-radius: var(--sf-radius-md);
+  font-size: var(--sf-font-text);
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-mcq-runner-action.is-primary {
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+.sf-mcq-runner-action.is-ghost {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.sf-mcq-runner-action:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: var(--sf-shadow);
+}
+
+.sf-mcq-runner-ended {
+  color: var(--text-muted);
+  font-size: var(--sf-font-ui);
+  text-align: center;
+}
+
+/* Settled sitting: readable, but plainly no longer interactive. */
+.sf-mcq-runner.is-ended .sf-mcq-runner-body {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-mcq-runner-feedback {
+    animation: none;
+  }
+}

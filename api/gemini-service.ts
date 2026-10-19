@@ -88,7 +88,7 @@ export class GeminiService implements IMCQGenerationService {
 
     private async makeApiRequest(prompt: string, settings: SpaceforgeSettings): Promise<string> {
         const apiKey = settings.geminiApiKey;
-        const model = settings.geminiModel; // e.g., 'gemini-pro'
+        const model = settings.geminiModel; // e.g., 'gemini-4-argon'
 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 

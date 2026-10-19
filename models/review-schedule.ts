@@ -65,6 +65,18 @@ export interface ReviewSchedule {
     };
 
     schedulingAlgorithm: 'sm2' | 'fsrs'; // Determines which algo rules apply
+
+    /**
+     * Number of reviews rated below "correct with difficulty" (SM-2).
+     * FSRS keeps its own counter in fsrsData.lapses; both feed leech detection.
+     */
+    lapses?: number;
+
+    /**
+     * Lapse count at which the user last resolved the leech prompt for this note.
+     * The prompt comes back at the next multiple of the leech threshold.
+     */
+    leechHandledAtLapses?: number;
     
     // Recurring notes settings
     isRecurring?: boolean;
@@ -75,6 +87,16 @@ export interface ReviewSchedule {
 
 // Removed INITIAL_INTERVALS, isInitialPhase, and getInitialInterval.
 // This logic will now be handled in ReviewScheduleService using settings.initialScheduleCustomIntervals.
+
+/**
+ * Which scale a response value belongs to.
+ *
+ * The two scales overlap numerically (3 is "Correct with difficulty" in SM-2 and
+ * "Good" in FSRS, 4 is "Correct with hesitation" vs "Easy"), so a bare number is
+ * ambiguous: callers that already speak FSRS must say so. `auto` keeps the legacy
+ * SM-2 interpretation for anything that has not been updated.
+ */
+export type RatingKind = 'auto' | 'fsrs';
 
 /**
  * Represents a user's response for FSRS (1-4 rating)
@@ -139,6 +161,30 @@ export function toSM2Quality(response: ReviewResponse): number {
 /**
  * Review history entry
  */
+/** The scheduling numbers a repair changed, as they can be shown to a user. */
+export interface ScheduleRepairSnapshot {
+    interval: number;
+    ease: number | null;
+    difficulty: number | null;
+    stability: number | null;
+    lapses: number;
+    nextReviewDate: number;
+}
+
+/** One note the repair rebuilt, with before and after values. */
+export interface ScheduleRepairOutcome {
+    path: string;
+    reviews: number;
+    before: ScheduleRepairSnapshot;
+    after: ScheduleRepairSnapshot;
+}
+
+/** What a repair pass did, note by note. */
+export interface ScheduleRepairReport {
+    repaired: ScheduleRepairOutcome[];
+    skipped: Array<{ path: string; reason: string }>;
+}
+
 export interface ReviewHistoryItem {
     /**
      * Path to the note file

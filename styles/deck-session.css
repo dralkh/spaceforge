@@ -1,0 +1,800 @@
+/*
+ * The deck sitting: a bar, one card, and the four grades.
+ *
+ * A card sitting is the questions panel's twin — it lives in the same dock,
+ * under the same bar, opened by a tab beside it — so it is built from the same
+ * grammar, value for value: `styles/mcq-runner.css` is the reference for the
+ * head row, the counter, the dots, the bordered row a choice or a grade sits in,
+ * the circular key badge, the faint right-hand hint and the text scale. Nothing
+ * here invents a second visual language; where a value is shared it is shared
+ * with that file on purpose.
+ *
+ * Every size that is text is relative (`1em`, `0.82em`) so it follows the
+ * reader's own settings, and everything dynamic goes through the custom
+ * properties the view sets.
+ */
+
+.sf-deck-host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* A sitting owns the pane: the deck file's own rendering (its properties table,
+   its text) is put away rather than shown above the cards. */
+.sf-deck-host > *:not(.sf-deck) {
+  display: none;
+}
+
+.sf-deck {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-md) var(--sf-space-lg) var(--sf-space-lg);
+  background-color: var(--sf-bg-primary);
+  box-sizing: border-box;
+  /* The card is reading material: pinned to the reader's text size here so the
+     sitting is the same size in the dock, the sidebar and its own modal. */
+  font-size: var(--sf-font-text);
+}
+
+/* When the sitting lives in the review dock, the dock's own panel is the frame:
+   the sitting drops its background and takes the measure the other hosted panels
+   take, so a line of card text is not stretched across the whole window. */
+.sf-dock-body .sf-deck {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  height: auto;
+  padding: var(--sf-space-sm) 0;
+  background-color: transparent;
+}
+
+/* --------------------------------------------------------------- the bar */
+/* The same head row the questions panel draws: counter, dots, actions, and one
+   rule under them. */
+
+.sf-deck-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sf-deck-identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-deck-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sf-primary);
+}
+
+.sf-deck-icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+.sf-deck-title {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-deck-meta {
+  font-size: var(--sf-font-ui);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-deck-progress {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* One dot per card, the current one in the accent: how far through the sitting
+   the reader is, readable at a glance, exactly as on the questions panel. */
+.sf-deck-dots {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sf-deck-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--background-modifier-border);
+  transition: background-color var(--sf-transition-fast);
+}
+
+.sf-deck-dot.is-current {
+  background-color: var(--sf-primary);
+}
+
+.sf-deck-dot.is-done {
+  background-color: var(--text-faint);
+}
+
+.sf-deck-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  margin-left: auto;
+}
+
+/* The end button, the add button and the menu wear the questions panel's
+   end-button clothes: small, bordered, quiet until hovered. */
+.sf-deck-end,
+.sf-deck-menu,
+.sf-deck-new {
+  flex: 0 0 auto;
+  height: auto !important;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background-color: transparent;
+  color: var(--text-muted);
+  font-size: var(--sf-font-ui);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-deck-end:hover,
+.sf-deck-menu:hover,
+.sf-deck-new:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ------------------------------------------------------------------ the card */
+
+.sf-deck-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.sf-deck-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+/* The question, at the questions panel's weight and measure. */
+.sf-deck-front {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-normal);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.sf-deck-front a,
+.sf-deck-back a {
+  color: var(--link-color);
+}
+
+/* The answer, in the same box a choice is drawn in: the reader is looking at the
+   same kind of thing, one step further on. */
+.sf-deck-back {
+  padding: 0.5em 0.75em;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  font-size: var(--sf-font-text);
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.sf-deck-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* An image in a card behaves like an image in a note, but never pushes the
+   answer off the screen. */
+.sf-deck-front img,
+.sf-deck-back img,
+.sf-deck-choice-text img {
+  max-width: 100%;
+  max-height: 28vh;
+  object-fit: contain;
+  border-radius: var(--sf-radius-sm);
+}
+
+/* ---------------------------------------------------- multiple choice */
+
+.sf-deck-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-deck-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sf-space-sm);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6em 0.85em;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  font-size: var(--sf-font-text);
+  font-weight: 500;
+  line-height: 1.45;
+  height: auto !important;
+  min-height: 2.3em;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+  transition: border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
+}
+
+.sf-deck-choice:hover:not([disabled]) {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--sf-primary);
+}
+
+.sf-deck-choice[disabled] {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.sf-deck-choice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* The choice's number, drawn as the questions panel draws its letter. */
+.sf-deck-choice-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 85%);
+  color: var(--sf-primary);
+  font-size: var(--sf-font-ui);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-deck-choice-right {
+  border-color: var(--sf-success);
+  background-color: var(--sf-success-light);
+}
+
+.sf-deck-choice-right .sf-deck-choice-key {
+  background-color: var(--sf-success);
+  color: var(--sf-text-on-primary);
+}
+
+.sf-deck-choice-wrong {
+  border-color: var(--sf-danger);
+  background-color: var(--sf-danger-light);
+}
+
+.sf-deck-choice-wrong .sf-deck-choice-key {
+  background-color: var(--sf-danger);
+  color: var(--sf-text-on-primary);
+}
+
+/* --------------------------------------------------------- typed answer */
+
+.sf-deck-type {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+}
+
+.sf-deck-type-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto !important;
+  padding: 0.6em 0.85em;
+  font-family: var(--font-monospace);
+  font-size: var(--sf-font-text);
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+}
+
+.sf-deck-type-input:focus {
+  border-color: var(--sf-primary);
+  outline: none;
+}
+
+.sf-deck-type-right {
+  border-color: var(--sf-success);
+  background-color: var(--sf-success-light);
+}
+
+.sf-deck-type-wrong {
+  border-color: var(--sf-danger);
+  background-color: var(--sf-danger-light);
+}
+
+.sf-deck-check {
+  flex: 0 0 auto;
+  height: auto !important;
+  min-height: 2.3em;
+  padding: 0.45em 0.7em;
+  font-size: var(--sf-font-text);
+  font-weight: 500;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
+}
+
+.sf-deck-check:hover {
+  border-color: var(--sf-primary);
+  background-color: var(--background-modifier-hover);
+}
+
+/* ----------------------------------------------- the answer and the grades */
+/* One row per action, drawn like a choice: a key badge, the label, and the
+   interval where the questions panel keeps its keyboard hints. */
+
+.sf-deck-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  /* No pushing to the bottom: on a tall dock that left a field of empty space
+     between the answer and the grades. The rows follow the card directly. */
+  padding-top: 2px;
+}
+
+/* One action can be wide (showing the answer); the grades pair up. */
+.sf-deck-reveal {
+  grid-column: 1 / -1;
+}
+
+.sf-deck-reveal {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  height: auto !important;
+  min-height: 2.3em;
+  padding: 0.45em 0.7em;
+  font-size: var(--sf-font-text);
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
+}
+
+.sf-deck-reveal:hover {
+  border-color: var(--sf-primary);
+  background-color: var(--background-modifier-hover);
+}
+
+.sf-deck-grade {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  width: 100%;
+  box-sizing: border-box;
+  height: auto !important;
+  min-height: 2.3em;
+  padding: 0.45em 0.7em;
+  font-size: var(--sf-font-text);
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
+}
+
+.sf-deck-grade:hover {
+  border-color: var(--sf-primary);
+  background-color: var(--background-modifier-hover);
+}
+
+/* The key badge, drawn as the choices' number badge is. */
+.sf-deck-grade-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 85%);
+  color: var(--sf-primary);
+  font-size: var(--sf-font-ui);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-deck-grade-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 500;
+}
+
+/* The interval, in the box a choice keeps its keyboard hint in. */
+.sf-deck-grade-interval {
+  align-self: center;
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-deck-grade-again:hover {
+  border-color: var(--sf-danger);
+}
+
+.sf-deck-grade-good:hover {
+  border-color: var(--sf-success);
+}
+
+/* The grade the reader's own answer points at. Marked, never taken: the grade
+   is still theirs to give, the way Anki asks for one on every card. */
+.sf-deck-grade.is-suggested {
+  border-color: var(--sf-primary);
+  box-shadow: inset 0 0 0 1px var(--sf-primary);
+}
+
+.sf-deck-grade.is-suggested .sf-deck-grade-label {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------ the card's own controls */
+/* Editing is a move inside the sitting: one quiet row under the grades, the
+   card's Edit and the deck's Add, drawn as the finish screen's small buttons. */
+
+.sf-deck-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  padding-top: var(--sf-space-xs);
+}
+
+.sf-deck-tool {
+  height: auto !important;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background-color: transparent;
+  color: var(--text-muted);
+  font-size: var(--sf-font-ui);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-deck-tool:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--sf-primary);
+  color: var(--text-normal);
+}
+
+/* The deck's two write actions, in the accent the primary controls use: a
+   named pair, so a surface can say which one it pressed. */
+.sf-deck-edit,
+.sf-deck-add-card {
+  color: var(--sf-primary);
+  border-color: color-mix(in srgb, var(--sf-primary), transparent 55%);
+}
+
+/* ----------------------------------------------- the in-place card editor */
+
+.sf-card-editor-host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The editor is a section of the sitting, not a window: the card's own frame,
+   the sitting's own type scale, and Save/Cancel right where the card was. */
+.sf-card-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  padding: var(--sf-space-sm) var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background-color: var(--background-secondary);
+  font-size: var(--sf-font-text);
+}
+
+.sf-card-editor-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+}
+
+.sf-card-editor-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sf-primary);
+}
+
+.sf-card-editor-icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+.sf-card-editor-title {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sf-card-editor-deck {
+  font-size: var(--sf-font-ui);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-card-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+}
+
+.sf-card-editor-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+}
+
+.sf-card-editor-label {
+  font-size: var(--sf-font-ui);
+  color: var(--text-muted);
+}
+
+.sf-card-editor-select,
+.sf-card-editor-input {
+  height: auto !important;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4em 0.6em;
+  font-size: var(--sf-font-text);
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+}
+
+.sf-card-editor-select:focus,
+.sf-card-editor-input:focus,
+.sf-card-editor-area:focus {
+  border-color: var(--sf-primary);
+  outline: none;
+}
+
+/* A locked type says what the card is; it is not reopened by a stray click. */
+.sf-card-editor-select.is-locked {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.sf-card-editor-note {
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+}
+
+.sf-card-editor-area {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5em 0.75em;
+  font-size: var(--sf-font-text);
+  font-family: inherit;
+  line-height: 1.4;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  color: var(--text-normal);
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.sf-card-editor-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+}
+
+.sf-card-editor-save,
+.sf-card-editor-cancel {
+  height: auto !important;
+  min-height: 2.3em;
+  padding: 0.45em 0.9em;
+  font-size: var(--sf-font-ui);
+  font-weight: 500;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-card-editor-save {
+  border-color: var(--sf-primary);
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+.sf-card-editor-save:hover {
+  filter: brightness(1.08);
+}
+
+.sf-card-editor-cancel {
+  background-color: transparent;
+  color: var(--text-muted);
+}
+
+.sf-card-editor-cancel:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* What is wrong with the draft, next to the button that would save it. */
+.sf-card-editor-error {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--sf-font-small);
+  color: var(--sf-danger);
+}
+
+.sf-card-editor-error.is-empty {
+  display: none;
+}
+
+.sf-card-editor-hint {
+  font-size: var(--sf-font-small);
+  color: var(--text-faint);
+}
+
+/* ------------------------------------------------------- the finish card */
+
+.sf-deck-finished {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sf-space-sm);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sf-deck-finished-title {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sf-deck-finished-body {
+  font-size: var(--sf-font-ui);
+  color: var(--text-muted);
+}
+
+/* The finish screen points at the other lane: what it holds, and the way back —
+   a row, like every other action here. */
+.sf-deck-finished-next {
+  color: var(--text-muted);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-deck-back-notes {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  height: auto !important;
+  min-height: 2.3em;
+  padding: 0.45em 0.7em;
+  font-size: var(--sf-font-text);
+  font-weight: 500;
+  text-align: left;
+  border: 1px solid var(--sf-primary);
+  border-radius: var(--sf-radius-md);
+  background-color: transparent;
+  color: var(--sf-primary);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-deck-back-notes:hover {
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 90%);
+}
+
+.sf-deck-again,
+.sf-deck-done {
+  height: auto !important;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--sf-font-ui);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-deck-again:hover,
+.sf-deck-done:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* A quiet landing after an answer: enough to feel the card move on. */
+.sf-deck-landed .sf-deck-bar {
+  animation: sf-deck-land 400ms var(--sf-transition);
+}
+
+@keyframes sf-deck-land {
+  0% { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .sf-deck {
+    padding: var(--sf-space-sm);
+    gap: var(--sf-space-sm);
+  }
+
+  .sf-deck-buttons {
+    gap: var(--sf-space-xs);
+  }
+}

@@ -8,3 +8,13 @@ opencode.json
 main.js
 styles.css
 docs
+
+# Test build output
+.test-build
+
+# Local Obsidian vault used for live-testing the plugin
+live-test-vault/
+
+# Local tooling and scratch vaults, never shipped
+.test-build/
+media/

@@ -490,7 +490,7 @@ export class PomodoroUIManager {
     private updateTimerTextDisplay(): void {
         if (this.pomodoroTimerDisplayEl) {
             // This makes the text invisible but keeps the element in layout
-            this.pomodoroTimerDisplayEl.style.opacity = this.isTimerTextVisible ? '1' : '0';
+            this.pomodoroTimerDisplayEl.setCssProps({ '--sf-timer-opacity': this.isTimerTextVisible ? '1' : '0' });
             // Or, to truly remove text content:
             // this.pomodoroTimerDisplayEl.setText(this.isTimerTextVisible ? this.plugin.pomodoroService.getFormattedTimeLeft() : '');
             // Using opacity is generally smoother and preserves layout/border.

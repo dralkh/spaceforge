@@ -185,6 +185,27 @@ export class DataStorage {
             this.reviewScheduleService.customNoteOrder = [];
             isValid = false;
         }
+        // Study state: shapes are optional in data written before the feature.
+        if (!this.plugin.studyPlanService.plans || typeof this.plugin.studyPlanService.plans !== 'object') {
+            this.plugin.studyPlanService.plans = {};
+            isValid = false;
+        } else {
+            for (const path in this.plugin.studyPlanService.plans) {
+                const plan = this.plugin.studyPlanService.plans[path];
+                if (!plan || typeof plan !== 'object' || !Array.isArray(plan.objectives)) {
+                    delete this.plugin.studyPlanService.plans[path];
+                    isValid = false;
+                }
+            }
+        }
+        if (!this.plugin.studyPlanService.progress || typeof this.plugin.studyPlanService.progress !== 'object') {
+            this.plugin.studyPlanService.progress = {};
+            isValid = false;
+        }
+        if (!this.plugin.studyPlanService.sessions || typeof this.plugin.studyPlanService.sessions !== 'object') {
+            this.plugin.studyPlanService.sessions = {};
+            isValid = false;
+        }
         if (this.reviewScheduleService.lastLinkAnalysisTimestamp !== null && typeof this.reviewScheduleService.lastLinkAnalysisTimestamp !== 'number') {
             this.reviewScheduleService.lastLinkAnalysisTimestamp = null;
             isValid = false;

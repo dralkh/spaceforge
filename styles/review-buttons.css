@@ -21,7 +21,7 @@
 .review-button-skip,
 .review-button-mcq {
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: var(--sf-font-ui);
   font-weight: 500;
   border-radius: var(--sf-radius-md);
   cursor: pointer;
@@ -215,26 +215,6 @@ button.disabled:hover {
   color: var(--sf-primary);
 }
 
-.review-nav-buttons {
-  display: flex;
-  gap: var(--sf-space-sm);
-  margin-bottom: var(--sf-space-sm);
-  width: 100%;
-}
-
-.review-nav-buttons button {
-  flex: 1;
-  padding: var(--sf-space-sm) var(--sf-space-md);
-  border-radius: var(--sf-radius-md);
-  cursor: pointer;
-  font-weight: 500;
-  text-align: center;
-  background-color: var(--background-secondary);
-  color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border);
-  transition: var(--sf-transition);
-}
-
 .review-skip-next-day-button {
   background-color: var(--warning-color, #e78a4e);
   color: white;
@@ -254,8 +234,85 @@ button.disabled:hover {
   transform: translateY(-1px);
 }
 
-.review-nav-buttons button:hover {
-  background-color: var(--sf-primary-light);
-  border-color: var(--sf-primary);
-  color: var(--sf-primary);
+/* The session's actions, behind one three-dot button: the stack of buttons it
+   replaced took the sidebar over and said the same thing on every refresh. */
+.review-session-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.review-session-menu:hover {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+}
+
+/* Settings: the model field's suggestions, and the provider status lines. */
+.sf-model-suggestion {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sf-model-suggestion-note {
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+}
+
+.sf-model-status {
+  margin-top: 4px;
+  font-size: var(--sf-font-small);
+}
+
+.sf-model-status.is-ok {
+  color: var(--text-success, var(--color-green));
+}
+
+.sf-model-status.is-warn {
+  color: var(--text-warning, var(--color-orange));
+}
+
+.sf-model-status.is-error {
+  color: var(--text-error, var(--color-red));
+}
+
+.sf-provider-status-head,
+.sf-provider-status-summary {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+}
+
+.sf-provider-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.sf-provider-status {
+  display: flex;
+  gap: 8px;
+  font-size: var(--sf-font-small);
+}
+
+.sf-provider-status-name {
+  font-weight: 600;
+  min-width: 12ch;
+}
+
+.sf-provider-status-note {
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+.sf-provider-status.is-warn .sf-provider-status-name {
+  color: var(--text-warning, var(--color-orange));
 }

@@ -84,7 +84,8 @@
 }
 
 .pomodoro-timer-display {
-  font-size: 20px;
+  opacity: var(--sf-timer-opacity, 1);
+  font-size: var(--sf-font-title);
   font-weight: 600;
   font-family: monospace;
   color: var(--text-normal);
@@ -170,7 +171,7 @@
 }
 
 .pomodoro-quick-setting label {
-  font-size: 13px;
+  font-size: var(--sf-font-ui);
   color: var(--text-muted); /* Ensure consistency */
 }
 .pomodoro-quick-setting input[type=number] {
@@ -193,7 +194,7 @@
   align-items: center; 
   justify-content: center; 
   padding: 6px 10px; 
-  font-size: 13px;
+  font-size: var(--sf-font-ui);
   line-height: 1.3; /* Normalize line-height for consistent baseline */
   border-radius: var(--radius-s);
   cursor: pointer;
@@ -215,7 +216,7 @@
   background-color: var(--background-modifier-hover);
 }
 .pomodoro-calculation-result {
-    font-size: 0.9em;
+    font-size: var(--sf-font-ui);
     margin-top: 8px; /* Increased margin */
     padding: 10px; /* Increased padding */
     background-color: var(--background-secondary-alt);
@@ -229,7 +230,7 @@
 
 /* Cycle Tracking Styles */
 .pomodoro-cycle-progress {
-    font-size: 0.75em;
+    font-size: var(--sf-font-small);
     color: var(--text-muted);
     text-align: center;
     margin-top: 4px;
@@ -259,7 +260,7 @@
 }
 
 .pomodoro-override-label {
-    font-size: 0.9em;
+    font-size: var(--sf-font-ui);
     color: var(--text-normal);
     font-weight: 500;
     margin-bottom: 6px;
@@ -281,7 +282,7 @@
     border-radius: var(--radius-s);
     padding: 4px 6px;
     text-align: center;
-    font-size: 0.9em;
+    font-size: var(--sf-font-ui);
 }
 
 .pomodoro-override-hours:focus,
@@ -292,7 +293,7 @@
 }
 
 .pomodoro-override-label-small {
-    font-size: 0.8em;
+    font-size: var(--sf-font-ui);
     color: var(--text-muted);
     font-weight: 400;
 }
@@ -308,7 +309,7 @@
 }
 
 .pomodoro-toggle-label {
-    font-size: 0.85em;
+    font-size: var(--sf-font-ui);
     color: var(--text-normal);
     cursor: pointer;
     user-select: none;
@@ -317,7 +318,7 @@
 .pomodoro-override-info {
     color: var(--sf-info);
     font-style: italic;
-    font-size: 0.9em;
+    font-size: var(--sf-font-ui);
     margin-top: 4px;
     padding: 4px 6px;
     background-color: var(--background-primary);

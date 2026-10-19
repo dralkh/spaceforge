@@ -1,0 +1,93 @@
+/* ------------------------------------------------ the visualise gallery */
+/* Several interactive assets, one card each. The card is a disclosure: its head
+   is a real button, so the gallery is navigable by keyboard alone. */
+
+.sf-vg {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.sf-vg-count {
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+}
+
+.sf-vg-empty {
+    padding: 4px 0;
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+}
+
+.sf-vg-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    padding: var(--sf-space-sm);
+    min-width: 0;
+}
+
+.sf-vg-card.is-open {
+    border-color: var(--interactive-accent);
+}
+
+.sf-vg-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 2.3em;
+    padding: 2px 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-normal);
+    text-align: left;
+    cursor: pointer;
+    font-size: var(--sf-font-ui);
+}
+
+.sf-vg-kind {
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: var(--sf-font-small);
+}
+
+.sf-vg-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--sf-font-ui);
+}
+
+.sf-vg-chevron {
+    flex: 0 0 auto;
+    display: inline-flex;
+    color: var(--text-muted);
+}
+
+.sf-vg-teach {
+    padding: 0 4px;
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+    overflow-wrap: anywhere;
+}
+
+.sf-vg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding-top: 2px;
+}
+
+.sf-vg-body.sf-hidden {
+    display: none;
+}

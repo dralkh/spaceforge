@@ -5,6 +5,7 @@ import { ReviewBatchController } from './review-batch-controller';
 import { MCQController } from './review-controller-mcq'; // Import MCQController
 import { IReviewController } from './interfaces';
 import { ReviewResponse, FsrsRating } from '../models/review-schedule';
+import { ReviewRecordResult, ReviewResponseOptions } from '../models/review-flow';
 import { MCQService } from '../services/mcq-service'; // Import MCQService
 
 /**
@@ -144,13 +145,13 @@ export class ReviewController implements IReviewController {
     }
 
     /**
-     * Show the review modal for a note
+     * Put a note into the docked review bar
      * Delegates to core controller
      *
      * @param path Path to the note file
      */
-    showReviewModal(path: string): void {
-        this.coreController.showReviewModal(path);
+    openDockedReview(path: string): void {
+        this.coreController.openDockedReview(path);
     }
 
     /**
@@ -169,9 +170,10 @@ export class ReviewController implements IReviewController {
      *
      * @param path Path to the note file
      * @param response User's response during review (SM-2 or FSRS)
+     * @param options Navigation and notice behaviour for the calling flow
      */
-    async processReviewResponse(path: string, response: ReviewResponse | FsrsRating): Promise<void> {
-        await this.coreController.processReviewResponse(path, response);
+    async processReviewResponse(path: string, response: ReviewResponse | FsrsRating, options?: ReviewResponseOptions): Promise<ReviewRecordResult> {
+        return this.coreController.processReviewResponse(path, response, options);
     }
 
     /**

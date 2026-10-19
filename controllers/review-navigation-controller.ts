@@ -3,7 +3,19 @@ import SpaceforgePlugin from '../main';
 import { IReviewNavigationController } from './interfaces';
 
 /**
- * Controller for navigating between notes in review
+ * Walk the due list when nobody is sitting — the fallback half of navigation.
+ *
+ * A live review run *is* the navigation state: its queue and cursor are the one
+ * remembered position, and the sidebar list's Previous/Next, the bar's Skip and
+ * a press on a note row all read and move that one place. So this controller
+ * asks the run to take the step whenever a run is walking (see
+ * {@link ReviewFlowController.stepForward} / `stepBack`), and keeps the
+ * original due-list walk for the moments where there is no run at all — which
+ * is still the common case for a reader skimming a list that is not a sitting.
+ *
+ * The public methods are unchanged, so the palette commands, the sidebar's
+ * session menu and the list's own buttons all inherit the unified behaviour
+ * without knowing about it.
  */
 export class ReviewNavigationController implements IReviewNavigationController {
     /**
@@ -33,7 +45,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
         if (todayNotes.length === 0) {
             void reviewController.updateTodayNotes();
             if (todayNotes.length === 0) {
-                new Notice("No notes due for review today!");
+                if (this.plugin.settings.showNavigationNotifications) new Notice("No notes due for review today!");
                 return;
             }
         }
@@ -43,11 +55,27 @@ export class ReviewNavigationController implements IReviewNavigationController {
     }
 
     /**
-     * Navigate to the next note following the current order
+     * Navigate to the next note following the current order.
+     *
+     * While a run is walking, "the current order" is the run's own queue and
+     * this takes the very step the bar's Skip takes — one cursor, so the list
+     * and the dock can never be showing two different notes. With no run
+     * walking it is the due list's own circular walk, exactly as before.
      */
     async navigateToNextNote(): Promise<void> {
         const reviewController = this.plugin.reviewController;
         if (!reviewController) return;
+
+        const run = this.plugin.reviewFlowController;
+        const fromRun = run ? run.currentPath() : null;
+        if (run && await run.stepForward()) {
+            const path = run.currentPath();
+            if (path) {
+                const position = run.runPosition();
+                this.announceStep(this.describeStep(fromRun, path, 'next'), position.index, position.total);
+            }
+            return;
+        }
 
         const todayNotes = reviewController.getTodayNotes();
         const currentNoteIndex = reviewController.getCurrentNoteIndex();
@@ -56,7 +84,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
             // Force update notes regardless of custom order
             void reviewController.updateTodayNotes(false);
             if (todayNotes.length === 0) {
-                new Notice("No notes due for review today!");
+                if (this.plugin.settings.showNavigationNotifications) new Notice("No notes due for review today!");
                 return;
             }
         }
@@ -69,47 +97,19 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         // Simple circular navigation through todayNotes which already has the correct order
         const nextIndex = (currentNoteIndex + 1) % todayNotes.length;
-        const nextNote = todayNotes[nextIndex];
-        const nextPath = nextNote.path;
-
-        // Check the traversal order structure
-        // Display appropriate message
-        let messageType = "next note";
-
-        // Get file information for context message
-        const currentFile = this.plugin.app.vault.getAbstractFileByPath(todayNotes[currentNoteIndex].path);
-        const nextFile = this.plugin.app.vault.getAbstractFileByPath(nextPath);
-
-        if (currentFile instanceof TFile && nextFile instanceof TFile) {
-            const currentFolder = currentFile.parent ? currentFile.parent.path : null;
-            const nextFolder = nextFile.parent ? nextFile.parent.path : null;
-
-            if (this.plugin.sessionController &&
-                this.plugin.sessionController.getDueLinkedNotes(todayNotes[currentNoteIndex].path).includes(nextPath)) {
-                messageType = "linked note";
-            } else if (currentFolder === nextFolder) {
-                messageType = "next note in folder";
-            } else {
-                messageType = "next note in different folder";
-            }
-        }
+        const nextPath = todayNotes[nextIndex].path;
 
         // Update core controller current index
-        if (this.plugin.reviewController) {
-            // Set the index directly in the core controller
-            this.plugin.reviewController.setCurrentNoteIndex(nextIndex);
-        }
+        reviewController.setCurrentNoteIndex(nextIndex);
 
         // Navigate to the note
         await this.openNoteWithoutReview(nextPath);
 
-        if (this.plugin.settings.showNavigationNotifications) {
-            new Notice(`Navigated to ${messageType} (${nextIndex + 1}/${todayNotes.length})`);
-        }
-
-        if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
-            window.setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
-        }
+        this.announceStep(
+            this.describeStep(todayNotes[currentNoteIndex].path, nextPath, 'next'),
+            nextIndex,
+            todayNotes.length
+        );
     }
 
     /**
@@ -117,6 +117,21 @@ export class ReviewNavigationController implements IReviewNavigationController {
      * Uses the same traversal logic as navigateToNextNote
      */
     async navigateToNextNoteWithoutRating(): Promise<void> {
+        // Whichever walk takes the step, it is taken once: with a run walking,
+        // that is the run's own step, and the bar then opens on the note the
+        // run's cursor landed on rather than on a due-list guess.
+        const run = this.plugin.reviewFlowController;
+        const fromRun = run ? run.currentPath() : null;
+        if (run && await run.stepForward()) {
+            const path = run.currentPath();
+            if (path) {
+                const position = run.runPosition();
+                this.announceStep(this.describeStep(fromRun, path, 'next'), position.index, position.total);
+                this.plugin.reviewController.openDockedReview(path);
+            }
+            return;
+        }
+
         // First navigate to the next note
         await this.navigateToNextNote();
 
@@ -129,16 +144,32 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         if (todayNotes.length > 0) {
             const nextNote = todayNotes[currentNoteIndex];
-            reviewController.showReviewModal(nextNote.path);
+            reviewController.openDockedReview(nextNote.path);
         }
     }
 
     /**
-     * Navigate to the previous note in the current order
+     * Navigate to the previous note in the current order.
+     *
+     * With a run walking, that order is the run's queue: the cursor steps back
+     * one place and nothing is un-handled, so a look-back never resurrects a
+     * note the sitting has already passed. Without a run it is the due list's
+     * own circular walk, exactly as before.
      */
     async navigateToPreviousNote(): Promise<void> {
         const reviewController = this.plugin.reviewController;
         if (!reviewController) return;
+
+        const run = this.plugin.reviewFlowController;
+        const fromRun = run ? run.currentPath() : null;
+        if (run && await run.stepBack()) {
+            const path = run.currentPath();
+            if (path) {
+                const position = run.runPosition();
+                this.announceStep(this.describeStep(fromRun, path, 'previous'), position.index, position.total);
+            }
+            return;
+        }
 
         const todayNotes = reviewController.getTodayNotes();
         const currentNoteIndex = reviewController.getCurrentNoteIndex();
@@ -148,7 +179,7 @@ export class ReviewNavigationController implements IReviewNavigationController {
             const hasCustomOrder = this.plugin.reviewScheduleService.customNoteOrder.length > 0;
             void reviewController.updateTodayNotes(hasCustomOrder);
             if (todayNotes.length === 0) {
-                new Notice("No notes due for review today!");
+                if (this.plugin.settings.showNavigationNotifications) new Notice("No notes due for review today!");
                 return;
             }
         }
@@ -161,25 +192,15 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         // Simple circular navigation through todayNotes which already has the correct order
         const prevIndex = (currentNoteIndex - 1 + todayNotes.length) % todayNotes.length;
-        const prevNote = todayNotes[prevIndex];
-        const prevPath = prevNote.path;
+        const prevPath = todayNotes[prevIndex].path;
 
         // Update core controller current index
-        if (this.plugin.reviewController) {
-            // Set the index directly in the core controller
-            this.plugin.reviewController.setCurrentNoteIndex(prevIndex);
-        }
+        reviewController.setCurrentNoteIndex(prevIndex);
 
         // Navigate to the note
         await this.openNoteWithoutReview(prevPath);
 
-        if (this.plugin.settings.showNavigationNotifications) {
-            new Notice(`Navigated to previous note (${prevIndex + 1}/${todayNotes.length})`);
-        }
-
-        if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
-            window.setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
-        }
+        this.announceStep('previous note', prevIndex, todayNotes.length);
     }
 
     /**
@@ -233,6 +254,39 @@ export class ReviewNavigationController implements IReviewNavigationController {
 
         // Debug log
     }
+    /**
+     * A step in the reader's own terms: a next note, a linked note, a move
+     * within a folder or out of one. Previous has always read as just
+     * "previous note", and it still does.
+     */
+    private describeStep(fromPath: string | null, toPath: string, direction: 'next' | 'previous'): string {
+        if (direction === 'previous') return 'previous note';
+        const currentFile = fromPath ? this.plugin.app.vault.getAbstractFileByPath(fromPath) : null;
+        const nextFile = this.plugin.app.vault.getAbstractFileByPath(toPath);
+        if (!(currentFile instanceof TFile) || !(nextFile instanceof TFile)) return 'next note';
+        const currentFolder = currentFile.parent ? currentFile.parent.path : null;
+        const nextFolder = nextFile.parent ? nextFile.parent.path : null;
+        if (this.plugin.sessionController?.getDueLinkedNotes(currentFile.path).includes(toPath)) {
+            return 'linked note';
+        }
+        return currentFolder === nextFolder ? 'next note in folder' : 'next note in different folder';
+    }
+
+    /**
+     * Say where the reader landed, and fire the optional follow-up command.
+     *
+     * One place for both walks, so a step the run took and a step the due list
+     * took read identically: same wording, same position, same settings.
+     */
+    private announceStep(description: string, index: number, total: number): void {
+        if (this.plugin.settings.showNavigationNotifications && total > 0) {
+            new Notice(`Navigated to ${description} (${index + 1}/${total})`);
+        }
+        if (this.plugin.settings.enableNavigationCommands && this.plugin.settings.navigationCommand.key) {
+            window.setTimeout(() => this.executeCommand(), this.plugin.settings.navigationCommandDelay);
+        }
+    }
+
     private executeCommand(): void {
         const command = this.plugin.settings.navigationCommand;
         if (!command || !command.key) return;

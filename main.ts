@@ -2,15 +2,31 @@ import { Notice, Plugin, TFile, normalizePath, TFolder } from 'obsidian';
 import { EventEmitter } from './utils/event-emitter';
 import { DataStorage } from './data-storage';
 import { ReviewController } from './controllers/review-controller';
+import { ReviewFlowController } from './controllers/review-flow-controller';
 import { ReviewNavigationController } from './controllers/review-navigation-controller';
 import { ReviewSessionController } from './controllers/review-session-controller';
 import { ReviewBatchController } from './controllers/review-batch-controller';
 import { MCQController } from './controllers/review-controller-mcq';
 import { ContextMenuHandler } from './ui/context-menu';
 import { ReviewSidebarView } from './ui/sidebar-view';
+import { REVIEW_WINDOW_VIEW, ReviewWindowView } from './ui/review-window-view';
 import { SpaceforgeSettingTab } from './ui/settings-tab';
-import { DEFAULT_SETTINGS, SpaceforgeSettings, ApiProvider } from './models/settings';
+import { DEFAULT_SETTINGS, SpaceforgeSettings, ApiProvider, migrateSettings } from './models/settings';
+import { GradeBucket } from './models/review-flow';
 import { SpaceforgePluginData, PluginStateData, DEFAULT_APP_DATA, DEFAULT_PLUGIN_STATE_DATA } from './models/plugin-data';
+import {
+    collectRecoverableCandidates,
+    corruptBackupPath,
+    dataFileName,
+    goodCopyPath,
+    mergePluginStates,
+    parsePluginData,
+    readTextOrNull,
+    schedulesOf,
+    writeJsonAtomically,
+    type DataFileCandidate,
+} from './utils/data-file';
+import { DataRecoveryModal } from './ui/data-recovery-modal';
 import { EstimationUtils } from './utils/estimation';
 import { OpenRouterService } from './api/openrouter-service';
 import { OpenAIService } from './api/openai-service';
@@ -19,6 +35,11 @@ import { GeminiService } from './api/gemini-service';
 import { ClaudeService } from './api/claude-service';
 import { TogetherService } from './api/together-service';
 import { OpenAICompatibleService } from './api/openai-compatible-service';
+import { OpenAIHttpService } from './api/openai-http-service';
+import { CliService } from './api/cli-service';
+import { agentIdOfProvider, describeProviderGap, getHttpProvider, providerIsOpenAiShaped } from './api/provider-registry';
+import { getCliAgent } from './api/cli/cli-agents';
+import { setCliExtraPath } from './api/cli/cli-runner';
 import { IMCQGenerationService } from './api/mcq-generation-service';
 import { ReviewScheduleService } from './services/review-schedule-service';
 import { ReviewHistoryService } from './services/review-history-service';
@@ -27,6 +48,19 @@ import { MCQService } from './services/mcq-service';
 import { PomodoroService } from './services/pomodoro-service';
 import { CalendarEventService } from './services/calendar-event-service';
 import { RecurringNotesService } from './services/recurring-notes-service';
+import { StudyPlanService } from './services/study-plan-service';
+import { DeckStore } from './services/deck-store';
+import { DeckService } from './services/deck-service';
+import { AnkiWebService, AnkiWebDeckResult } from './services/ankiweb-service';
+import { AnkiWebSearchModal } from './ui/ankiweb-search-modal';
+import { pickFile } from './ui/file-picker';
+import { pickDeckPath, pickStudyTarget } from './ui/deck-picker-modal';
+import { isDeckPath } from './models/anki';
+import { DeckSessionController } from './controllers/deck-session-controller';
+import { StudyVisualService } from './services/study-visuals-service';
+import { StudyWebSearchService } from './services/study-web-search-service';
+import { StudyController } from './controllers/study-controller';
+import { StudyChartQueueService } from './services/study-chart-queue-service';
 
 /**
  * Spaceforge: Spaced Repetition Plugin for Obsidian
@@ -37,6 +71,14 @@ export interface SpaceforgeEvents {
 }
 
 export default class SpaceforgePlugin extends Plugin {
+
+    private studyVisualServiceInstance: StudyVisualService | null = null;
+
+    /** One visual service per plugin, so two panels never generate twice. */
+    get studyVisualService(): StudyVisualService {
+        this.studyVisualServiceInstance ??= new StudyVisualService(this);
+        return this.studyVisualServiceInstance;
+    }
     settings: SpaceforgeSettings;
     pluginState: PluginStateData;
     dataStorage: DataStorage;
@@ -47,6 +89,39 @@ export default class SpaceforgePlugin extends Plugin {
     pomodoroService: PomodoroService;
     calendarEventService: CalendarEventService;
     recurringNotesService: RecurringNotesService;
+    studyPlanService: StudyPlanService;
+    /** The deck lane: cards, their own schedule, Anki's rules. */
+    deckStore: DeckStore;
+    /** Cards due across every deck, as last counted; null until something counts. */
+    deckDueCount: number | null = null;
+    /** The decks holding due cards, in the order the sidebar lists them. */
+    deckDueDecks: string[] = [];
+    deckDueCountedAt = 0;
+
+    /**
+     * What the decks owe, when that number can be trusted.
+     *
+     * The count is worked out by the sidebar, which is the only place that reads
+     * every deck. It goes stale the moment a card is answered anywhere else, so
+     * a caller that wants to print it gets it only while it is fresh — a number
+     * that might be an hour old would be worse than no number.
+     */
+    freshDeckDue(maxAgeMs = 60_000): number {
+        if (this.deckDueCount === null) return 0;
+        return Date.now() - this.deckDueCountedAt < maxAgeMs ? this.deckDueCount : 0;
+    }
+
+    /** The decks behind that count, fresh or as last read. */
+    knownDeckDueDecks(): string[] {
+        return this.deckDueDecks ?? [];
+    }
+    deckSessionController: DeckSessionController;
+    /** Packages in and out: .apkg files, however they arrive. */
+    deckService: DeckService;
+    ankiWebService: AnkiWebService;
+    studyWebSearchService: StudyWebSearchService;
+    studyController: StudyController;
+    studyChartQueue: StudyChartQueueService;
 
 
     private readonly stylesheetPath: string = "styles.css";
@@ -54,11 +129,15 @@ export default class SpaceforgePlugin extends Plugin {
     private lastStylesModTime: number | null = null;
     private cssHotReloadIntervalId: number | null = null;
     private beforeUnloadHandler: (event: Event) => void; // Declared as a class property
+    /** The save that is currently writing, and whether state changed while it ran. */
+    private saveInFlight: Promise<void> | null = null;
+    private saveDirty = false;
 
     reviewController: ReviewController;
     navigationController: ReviewNavigationController;
     sessionController: ReviewSessionController;
     batchController: ReviewBatchController;
+    reviewFlowController: ReviewFlowController;
     mcqController: MCQController | undefined;
     mcqGenerationService: IMCQGenerationService | undefined; // Changed from openRouterService
     contextMenuHandler: ContextMenuHandler;
@@ -86,6 +165,19 @@ export default class SpaceforgePlugin extends Plugin {
         this.reviewHistoryService = new ReviewHistoryService(this.pluginState.history);
         this.reviewSessionService = new ReviewSessionService(this, this.pluginState.reviewSessions);
         this.mcqService = new MCQService(this.pluginState.mcqSets, this.pluginState.mcqSessions);
+        this.studyPlanService = new StudyPlanService(
+            this,
+            this.pluginState.studyPlans,
+            this.pluginState.studyProgress,
+            this.pluginState.studySessions
+        );
+
+        // The deck lane. A deck keeps its cards and their schedule in its own
+        // file under spaceforge/decks/, so this store needs no plugin state.
+        this.deckStore = new DeckStore(this);
+        this.deckSessionController = new DeckSessionController(this, this.deckStore);
+        this.deckService = new DeckService(this, this.deckStore);
+        this.ankiWebService = new AnkiWebService();
 
         // Load stored data, which will override the defaults in this.settings and this.pluginState
         await this.loadPluginData();
@@ -105,12 +197,37 @@ export default class SpaceforgePlugin extends Plugin {
         // Initialize RecurringNotesService after settings are loaded
         this.recurringNotesService = new RecurringNotesService(this);
 
+        // Study needs loaded settings (provider, search backend, limits)
+        this.studyWebSearchService = new StudyWebSearchService(this);
+        this.studyController = new StudyController(this, this.studyPlanService, this.studyWebSearchService);
+
+        // Background charting: the queue is re-derived from the review schedule,
+        // so it needs no persistence and cannot drift from the vault.
+        this.studyChartQueue = new StudyChartQueueService(this, this.studyPlanService);
+        this.studyController.attachToChartQueue();
+        this.setupStudyCharting();
+
+        // The auto-pilot: a note whose chart just became ready is finished in
+        // the background — its study material, then its questions — when the
+        // reader asked for that (both off by default). One subscription, at the
+        // plan service's own "ready" announcement, so it holds for a chart the
+        // background queue ran and one the reader started by hand alike.
+        this.studyPlanService.subscribePlanReady(plan => {
+            void this.studyChartQueue.notifyPlanReady(plan.notePath);
+        });
+
 
 
 
         this.registerView(
             'spaceforge-review-schedule',
             (leaf) => new ReviewSidebarView(leaf, this)
+        );
+
+        // A window of the session's own: closing it hands the session back.
+        this.registerView(
+            REVIEW_WINDOW_VIEW,
+            (leaf) => new ReviewWindowView(leaf, () => this.reviewFlowController?.handleSessionWindowClosed())
         );
 
         this.dataStorage = new DataStorage(
@@ -125,6 +242,15 @@ export default class SpaceforgePlugin extends Plugin {
         this.navigationController = new ReviewNavigationController(this);
         this.sessionController = new ReviewSessionController(this);
         this.batchController = new ReviewBatchController(this);
+        this.reviewFlowController = new ReviewFlowController(this);
+        // A sitting that was live when the app last closed comes back where it
+        // stopped — the reader's place in the queue is theirs, not the
+        // session's. Registered *here*, after the controller exists: a
+        // layout-ready callback registered earlier would fire before there is
+        // anything to resume into, and the resume would be silently skipped.
+        this.app.workspace.onLayoutReady(() => {
+            this.reviewFlowController?.resumeSavedRunIfAny();
+        });
         this.contextMenuHandler = new ContextMenuHandler(this);
 
         this.initializeMCQComponents(); // This will now use mcqGenerationService
@@ -141,21 +267,18 @@ export default class SpaceforgePlugin extends Plugin {
         this.addCommand({
             id: 'add-selected-file-to-review',
             name: 'Add selected file to review schedule (file explorer)',
-            callback: async () => {
-                const fileExplorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
-                const viewWithFile = fileExplorerLeaf?.view as { file?: TFile };
-                if (viewWithFile?.file) {
-                    const selectedFile = viewWithFile.file;
-                    if (selectedFile instanceof TFile && selectedFile.extension === 'md') {
-                        await this.reviewScheduleService.scheduleNoteForReview(selectedFile.path);
-                        await this.savePluginData();
-                        new Notice(`Added "${selectedFile.path}" to review schedule.`);
-                    } else {
-                        new Notice("Selected item is not a Markdown file.");
-                    }
-                } else {
-                    new Notice("No file selected in file explorer");
-                }
+            // Only offered when the file explorer has a note selected, so the
+            // palette never shows a command whose only outcome is a refusal.
+            checkCallback: (checking) => {
+                const selected = this.selectedExplorerFile();
+                if (!selected) return false;
+                if (checking) return true;
+                void (async () => {
+                    await this.reviewScheduleService.scheduleNoteForReview(selected.path);
+                    await this.savePluginData();
+                    new Notice(`Added "${selected.path}" to review schedule.`);
+                })();
+                return true;
             }
         });
 
@@ -179,9 +302,16 @@ export default class SpaceforgePlugin extends Plugin {
             void this.getSidebarView()?.refresh();
         }, 60 * 1000));
 
+        // A reload kills the renderer without waiting for pending writes. The save is
+        // atomic, so the worst case is losing the last moment of work rather than the
+        // whole file, and this gives that moment a chance to land.
+        this.registerDomEvent(window, 'pagehide', () => { void this.savePluginData(); });
+
         // this.app.workspace.onLayoutReady(() => this.activateSidebarView()); // Removed automatic activation
         this.addStylesheet();
 
+        // The adapter, not the Vault API: this path is the plugin's own stylesheet
+        // inside `.obsidian/plugins/`, which the vault does not index.
         if (this.app.vault.adapter.stat && typeof this.app.vault.adapter.stat === 'function') {
             this.cssHotReloadIntervalId = window.setInterval(() => {
                 void (async () => {
@@ -219,13 +349,16 @@ export default class SpaceforgePlugin extends Plugin {
                     reviewSessions: this.reviewSessionService.reviewSessions,
                     mcqSets: this.mcqService.mcqSets,
                     mcqSessions: this.mcqService.mcqSessions,
+                    studyPlans: this.studyPlanService.plans,
+                    studyProgress: this.studyPlanService.progress,
+                    studySessions: this.studyPlanService.sessions,
                     customNoteOrder: this.reviewScheduleService.customNoteOrder,
                     lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp,
                     version: this.manifest.version
                 };
                 const combinedData = { ...existingData, reviewData };
                 const backupStr = JSON.stringify(combinedData);
-                this.app.saveLocalStorage('spaceforge-backup', backupStr);
+                window.localStorage.setItem('spaceforge-backup', backupStr);
                 void (async () => {
                     try {
                         await this.savePluginData();
@@ -234,14 +367,61 @@ export default class SpaceforgePlugin extends Plugin {
             } catch {
                 try {
                     const minimalBackup = JSON.stringify({ settings: this.settings, reviewData: { schedules: this.reviewScheduleService.schedules || {}, customNoteOrder: this.reviewScheduleService.customNoteOrder || [], lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp, version: this.manifest.version } });
-                    this.app.saveLocalStorage('spaceforge-minimal-backup', minimalBackup);
+                    window.localStorage.setItem('spaceforge-minimal-backup', minimalBackup);
                 } catch { /* handle error */ }
             }
         }; // Removed the extra closing parenthesis and semicolon, and moved the declaration.
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
     }
 
-    // @typescript-eslint/no-misused-promises -- onunload can be async
+    /**
+     * Start the background charting loop.
+     *
+     * Charting waits for the workspace to be ready (it reads notes) and then
+     * works through the schedule a few sections at a time. Nothing here blocks
+     * the UI: the queue publishes progress and the sidebar shows it.
+     */
+    private setupStudyCharting(): void {
+        const queue = this.studyChartQueue;
+        this.registerInterval(window.setInterval(() => {
+            void queue.tick();
+        }, 45 * 1000));
+
+        this.app.workspace.onLayoutReady(() => {
+            const queued = queue.syncFromSchedules(Object.keys(this.reviewScheduleService.schedules));
+            if (queued > 0) {
+                window.setTimeout(() => { void queue.tick(); }, 10 * 1000);
+            }
+        });
+
+        // Keep the sidebar honest about what the background is doing, without
+        // refreshing it on every section the queue finishes.
+        let lastRefresh = 0;
+        queue.subscribe(status => {
+            const now = Date.now();
+            if (now - lastRefresh < 1500) return;
+            lastRefresh = now;
+            void this.getSidebarView()?.refresh();
+            void status;
+        });
+    }
+
+    /** Queue every scheduled note that still needs charting (command palette). */
+    chartAllScheduledNotes(): number {
+        const queue = this.studyChartQueue;
+        queue.resume();
+        const count = queue.syncFromSchedules(Object.keys(this.reviewScheduleService.schedules));
+        new Notice(count > 0 ? `Study: charting ${count} note(s) in the background.` : 'Study: nothing left to chart.');
+        void queue.drain(200);
+        return count;
+    }
+
+    /**
+     * Obsidian calls onunload synchronously and does not wait for it, so the save
+     * below is an awaited async block rather than a floating promise chain: the
+     * teardown is immediate, the write finishes on its own, and a failure is
+     * reported where it can be seen.
+     */
     onunload(): void {
         if (this.cssHotReloadIntervalId !== null) {
             window.clearInterval(this.cssHotReloadIntervalId);
@@ -250,48 +430,183 @@ export default class SpaceforgePlugin extends Plugin {
         const styleEl = document.getElementById(this.stylesheetId);
         if (styleEl) styleEl.remove();
 
+        // The review bar and the dock are ours; without this they outlive the
+        // plugin and the next enable puts a second copy beside the first.
+        this.reviewFlowController?.dispose();
+
         // Explicitly remove the global event listener
         if (this.beforeUnloadHandler) {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         }
 
-        let existingData: Partial<SpaceforgePluginData> = {};
-        try {
-            this.loadData().then(loaded => {
-                if (loaded) {
-                    existingData = loaded as Partial<SpaceforgePluginData>;
-                }
-            }).catch(() => { /* handle error */ });
-        }
-        catch { /* handle error */ }
+        void (async () => {
+            let existingData: Partial<SpaceforgePluginData> = {};
+            try {
+                const loaded = await this.loadData() as Partial<SpaceforgePluginData> | null;
+                if (loaded) existingData = loaded;
+            } catch {
+                // Unreadable or absent: start from what is already in memory.
+            }
 
-        try {
-            const reviewData = {
-                schedules: this.reviewScheduleService.schedules,
-                history: this.reviewHistoryService.history,
-                reviewSessions: this.reviewSessionService.reviewSessions,
-                mcqSets: this.mcqService.mcqSets,
-                mcqSessions: this.mcqService.mcqSessions,
-                customNoteOrder: this.reviewScheduleService.customNoteOrder,
-                lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp,
-                version: this.manifest.version
-            };
-            const combinedData = { ...existingData, reviewData };
-            const backupStr = JSON.stringify(combinedData);
-            this.app.saveLocalStorage('spaceforge-backup', backupStr);
-        } catch { /* handle error */ }
+            try {
+                const reviewData = {
+                    schedules: this.reviewScheduleService.schedules,
+                    history: this.reviewHistoryService.history,
+                    reviewSessions: this.reviewSessionService.reviewSessions,
+                    mcqSets: this.mcqService.mcqSets,
+                    mcqSessions: this.mcqService.mcqSessions,
+                    studyPlans: this.studyPlanService.plans,
+                    studyProgress: this.studyPlanService.progress,
+                    studySessions: this.studyPlanService.sessions,
+                    customNoteOrder: this.reviewScheduleService.customNoteOrder,
+                    lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp,
+                    version: this.manifest.version
+                };
+                const combinedData = { ...existingData, reviewData };
+                window.localStorage.setItem('spaceforge-backup', JSON.stringify(combinedData));
+            } catch { /* the plugin data file is the real store; this is a safety copy */ }
 
-        try {
-            this.savePluginData().catch(e => console.error("Error saving data on unload:", e));
-        } catch { /* handle error */ }
+            try {
+                await this.savePluginData();
+            } catch (e) {
+                console.error('[spaceforge] could not save data on unload:', e);
+            }
+        })();
 
         if (this.pomodoroService) this.pomodoroService.destroy();
+        this.studyChartQueue?.stop();
+        if (this.reviewFlowController) this.reviewFlowController.dispose();
+        this.deckSessionController?.destroy();
     }
 
-    // private async _getEffectiveDataPathFromLocalStorage(): Promise<string | null> {
-    //     const customPath = await this.app.loadLocalStorage('spaceforgeCustomDataPath');
-    //     return (customPath && typeof customPath === 'string' && customPath.trim() !== '') ? customPath.trim() : null;
-    // }
+    /**
+     * Study a deck: the one that is open when a deck is open, the only deck when
+     * there is only one, and a keyboard-first list otherwise.
+     */
+    /** 'Study a deck', also reachable from the sidebar session menu. */
+    async chooseDeckToStudy(): Promise<void> {
+        const active = this.activeMarkdownFile();
+        if (active && isDeckPath(active.path)) {
+            await this.deckSessionController.start(active.path);
+            return;
+        }
+
+        const decks = await this.deckStore.listDecks();
+        if (decks.length === 0) {
+            new Notice('No decks yet. Import an Anki package, or write one in the decks folder.');
+            return;
+        }
+        if (decks.length === 1) {
+            await this.deckSessionController.start(decks[0].path);
+            return;
+        }
+
+        const target = await pickStudyTarget(this.app, decks);
+        if (!target) return;
+        if (target.kind === 'everything') await this.deckSessionController.startAllDue();
+        else await this.deckSessionController.start(target.path);
+    }
+
+    /**
+     * Import a package the reader picked from their disk.
+     *
+     * The bytes go straight to the importer: an .apkg is read where it lies, its
+     * media land in the deck's own media folder, and the deck becomes an
+     * ordinary deck document that can be studied, edited and exported again.
+     */
+    async importAnkiPackage(): Promise<void> {
+        const picked = await pickFile({ accept: '.apkg,.colpkg,.anki2,application/zip', hint: 'Anki package' });
+        if (!picked) return;
+
+        try {
+            // The deck names itself: a package carries its own deck name, and the
+            // file it arrived in is only a fallback (with its .apkg clipped off,
+            // so the deck is not named after the container it came in).
+            const fallback = picked.name.replace(/\.(apkg|colpkg|anki2)$/i, '');
+            const name = await this.deckService.suggestImportName(picked.bytes, fallback);
+            const report = await this.deckService.importApkg(picked.bytes, { name });
+            new Notice(this.deckService.summarizeImport(report));
+            for (const warning of report.warnings.slice(0, 2)) new Notice(warning);
+            if (report.deckPath) this.deckSessionController.start(report.deckPath).catch(() => undefined);
+        } catch (error) {
+            console.error('spaceforge: could not import the package', error);
+            new Notice('That file could not be read as an Anki package.');
+        }
+    }
+
+    /** Export the deck that is open, or let the reader pick one. */
+    private async exportDeck(): Promise<void> {
+        const active = this.activeMarkdownFile();
+        let path = active && isDeckPath(active.path) ? active.path : null;
+        if (!path) {
+            const decks = await this.deckStore.listDecks();
+            if (decks.length === 0) {
+                new Notice('No decks to export yet.');
+                return;
+            }
+            path = await pickDeckPath(this.app, decks);
+            if (!path) return;
+        }
+
+        try {
+            const result = await this.deckService.exportDeck(path);
+            const folder = result.report.path.split('/').slice(0, -1).join('/');
+            if (folder.length > 0 && !this.app.vault.getAbstractFileByPath(folder)) {
+                await this.app.vault.createFolder(folder).catch(() => undefined);
+            }
+            const existing = this.app.vault.getAbstractFileByPath(result.report.path);
+            const bytes = result.bytes.buffer.slice(
+                result.bytes.byteOffset,
+                result.bytes.byteOffset + result.bytes.byteLength,
+            ) as ArrayBuffer;
+            if (existing instanceof TFile) await this.app.vault.modifyBinary(existing, bytes);
+            else await this.app.vault.createBinary(result.report.path, bytes);
+
+            new Notice(`Exported ${result.report.cards} cards to ${result.report.path}.`);
+            for (const warning of result.warnings.slice(0, 2)) new Notice(warning);
+        } catch (error) {
+            console.error('spaceforge: could not export the deck', error);
+            new Notice('That deck could not be exported.');
+        }
+    }
+
+    /**
+     * Search AnkiWeb from inside the plugin.
+     *
+     * Searching needs a signed-in visitor and this plugin never holds anyone's
+     * AnkiWeb session — so the honest shape is: try the search, and when AnkiWeb
+     * asks for a session, say so and hand the reader their browser, where they
+     * are already signed in. A deck that can be fetched is imported straight
+     * away; a refused one still gives them the deck's page.
+     */
+    private openAnkiWebSearch(): void {
+        new AnkiWebSearchModal(this.app, {
+            searchDecks: query => this.ankiWebService.searchDecks(query),
+            importDeck: async (deck: AnkiWebDeckResult) => {
+                const info = await this.ankiWebService.fetchItemInfo(deck.id);
+                const key = info.info?.deck?.downloadKey ?? null;
+                const download = await this.ankiWebService.downloadDeck(deck.id, key);
+
+                if (download.kind === 'needs-sign-in') {
+                    return { kind: 'needs-sign-in', message: download.message };
+                }
+                if (download.kind !== 'apkg') {
+                    return {
+                        kind: 'refused',
+                        message: download.kind === 'refused' ? download.message : 'AnkiWeb sent something that is not an Anki package.',
+                    };
+                }
+
+                try {
+                    const report = await this.deckService.importApkg(download.bytes, { name: deck.name });
+                    return { kind: 'imported', message: this.deckService.summarizeImport(report) };
+                } catch (error) {
+                    console.error('spaceforge: could not import the downloaded deck', error);
+                    return { kind: 'failed', message: 'The download arrived but could not be read as an Anki package.' };
+                }
+            },
+        }).open();
+    }
 
     private _getEffectiveDataPath(): string | null {
         if (this.settings?.useCustomDataPath) {
@@ -317,10 +632,141 @@ export default class SpaceforgePlugin extends Plugin {
         return null; // useCustomDataPath is false, use default plugin storage
     }
 
+    /**
+     * Point the services at the loaded state.
+     *
+     * The history array is deliberately shared: the scheduler appends to its own
+     * reference while savePluginData() serialises the history service's, so a
+     * mismatch silently drops every recorded review.
+     */
+    private applyLoadedState(): void {
+        this.reviewScheduleService.schedules = this.pluginState.schedules || {};
+        const sharedHistory = this.pluginState.history || [];
+        this.pluginState.history = sharedHistory;
+        this.reviewHistoryService.history = sharedHistory;
+        this.reviewScheduleService.history = sharedHistory;
+        this.reviewSessionService.reviewSessions = this.pluginState.reviewSessions || { sessions: {}, activeSessionId: null };
+        this.mcqService.mcqSets = this.pluginState.mcqSets || {};
+        this.mcqService.mcqSessions = this.pluginState.mcqSessions || {};
+        this.studyPlanService.plans = this.pluginState.studyPlans || {};
+        this.studyPlanService.progress = this.pluginState.studyProgress || {};
+        this.studyPlanService.sessions = this.pluginState.studySessions || {};
+        this.reviewScheduleService.customNoteOrder = this.pluginState.customNoteOrder || [];
+        this.reviewScheduleService.lastLinkAnalysisTimestamp = typeof this.pluginState.lastLinkAnalysisTimestamp === 'number' ? this.pluginState.lastLinkAnalysisTimestamp : null;
+        this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
+    }
+
+    /** Where the data file for this vault lives. */
+    private dataFilePath(): string {
+        return this._getEffectiveDataPath() ?? (this.app.vault.configDir + `/plugins/${this.manifest.id}/data.json`);
+    }
+
+    /** The folder holding the data file, where its backups live too. */
+    private dataDirectory(): string {
+        const path = this.dataFilePath();
+        const cut = path.lastIndexOf('/');
+        return cut > 0 ? path.substring(0, cut) : path;
+    }
+
+    private async fileMtime(path: string): Promise<number> {
+        try {
+            const stat = await this.app.vault.adapter.stat?.(path);
+            return stat?.mtime ?? 0;
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
+     * Read the data file, recovering from a copy when it cannot be read.
+     *
+     * A save interrupted by a reload or a quick restart used to leave a truncated
+     * file; loading that as "no data" and then saving over it is how a library
+     * disappears. Instead the unreadable file is kept, and the last-known-good copy,
+     * the backups and any sync-conflicted copies are searched for the richest state.
+     * Notes the current file already has are never overwritten by an older copy.
+     */
+    private async readDataFileWithRecovery(path: string): Promise<SpaceforgePluginData | undefined> {
+        const adapter = this.app.vault.adapter;
+        const raw = await readTextOrNull(adapter, path);
+        const parsed = parsePluginData(raw) as SpaceforgePluginData | null;
+
+        if (parsed && Object.keys(schedulesOf(parsed)).length > 0) {
+            this.refreshGoodCopy(path, parsed);
+            return parsed;
+        }
+
+        const candidates = await collectRecoverableCandidates(adapter, this.dataDirectory(), dataFileName(), candidate => this.fileMtime(candidate));
+        const best = candidates.find(candidate => candidate.schedules > 0);
+        if (!best) {
+            if (parsed) return parsed; // genuinely empty library: leave it as it is
+            if (raw !== null) {
+                const kept = await this.preserveUnreadableFile(path, raw);
+                console.error('[spaceforge] the data file could not be read and no copy holds any reviews');
+                new Notice(`Spaceforge: the data file could not be read, and no backup holds your notes. The unreadable file was kept as ${kept ?? '—'}.`, 12000);
+            }
+            return undefined;
+        }
+
+        const keptName = raw === null ? null : await this.preserveUnreadableFile(path, raw);
+        const base = parsed ?? ({ settings: this.settings, pluginState: { ...DEFAULT_PLUGIN_STATE_DATA } } as unknown as SpaceforgePluginData);
+        const { merged, addedSchedules, addedHistory } = mergePluginStates(base, best.data);
+        new Notice(`Spaceforge: recovered ${addedSchedules.length} note(s) and ${addedHistory} review(s) from ${best.name}.${keptName ? ` The unreadable file was kept as ${keptName}.` : ''}`, 12000);
+        return merged;
+    }
+
+    /** Keep a copy of the last state that loaded cleanly, to recover from next time. */
+    private refreshGoodCopy(path: string, data: SpaceforgePluginData): void {
+        void writeJsonAtomically(this.app.vault.adapter, goodCopyPath(path), data, message => console.warn('[spaceforge]', message))
+            .catch(error => console.warn('[spaceforge] could not refresh the good copy:', error));
+    }
+
+    /** Keep the bytes of an unreadable data file so nothing about the loss is thrown away. */
+    private async preserveUnreadableFile(path: string, raw: string): Promise<string | null> {
+        const target = corruptBackupPath(path, Date.now());
+        try {
+            await this.app.vault.adapter.write(target, raw);
+            return target.substring(target.lastIndexOf('/') + 1);
+        } catch (error) {
+            console.error('[spaceforge] could not preserve the unreadable data file:', error);
+            return null;
+        }
+    }
+
+    /** What is loaded right now, for the recovery dialog. */
+    describeCurrentDataCounts(): string {
+        const schedules = Object.keys(this.reviewScheduleService.schedules ?? {}).length;
+        const history = this.reviewHistoryService.history?.length ?? 0;
+        return `Current: ${schedules} note(s) scheduled, ${history} review(s) logged.`;
+    }
+
+    /** Copies of the data file that hold scheduling state, richest first. */
+    async listDataRecoveryCandidates(): Promise<DataFileCandidate[]> {
+        return collectRecoverableCandidates(this.app.vault.adapter, this.dataDirectory(), dataFileName(), path => this.fileMtime(path));
+    }
+
+    /**
+     * Fold a copy of the data file into the live state and save.
+     *
+     * Only what is missing is added - reviews of notes already present keep their
+     * due dates, so this can be run repeatedly without moving anything back.
+     */
+    async applyRecoveredData(candidate: DataFileCandidate): Promise<{ addedSchedules: number; addedHistory: number }> {
+        const current = { settings: this.settings, pluginState: this.pluginState };
+        const { merged, addedSchedules, addedHistory } = mergePluginStates(current, candidate.data);
+        this.pluginState = (merged.pluginState as PluginStateData | undefined) ?? this.pluginState;
+        this.applyLoadedState();
+        await this.savePluginData();
+        this.reviewController.updateTodayNotes(true);
+        void this.getSidebarView()?.refresh();
+        new Notice(`Spaceforge: restored ${addedSchedules.length} note(s) and ${addedHistory} review(s) from ${candidate.name}.`, 8000);
+        return { addedSchedules: addedSchedules.length, addedHistory };
+    }
+
     async loadPluginData(): Promise<void> {
         // Step 1: Bootstrap critical path settings from localStorage
-        const lsUseCustomPath = await this.app.loadLocalStorage('spaceforge_useCustomDataPath');
-        const lsCustomPathRelative = await this.app.loadLocalStorage('spaceforge_customDataPathRelative');
+        const lsUseCustomPath = window.localStorage.getItem('spaceforge_useCustomDataPath');
+        const lsCustomPathRelative = window.localStorage.getItem('spaceforge_customDataPathRelative');
 
         // Initialize settings with defaults
         this.settings = { ...DEFAULT_SETTINGS };
@@ -344,32 +790,20 @@ export default class SpaceforgePlugin extends Plugin {
         try {
             if (effectivePath) {
                 // Using custom path
-                const file = this.app.vault.getAbstractFileByPath(effectivePath);
-                if (file instanceof TFile) {
-                    const jsonData = await this.app.vault.read(file);
-                    if (jsonData) rawLoadedData = JSON.parse(jsonData) as SpaceforgePluginData;
-                    new Notice(`Spaceforge: Loaded data from custom path: ${effectivePath}`, 3000);
-                } else {
-                    // Custom path specified but file doesn't exist.
-                    // Check if old default data.json exists for migration.
-                    const oldFile = this.app.vault.getAbstractFileByPath(defaultPluginDataPath);
-                    if (oldFile instanceof TFile) {
-                        new Notice(`Spaceforge: Custom data file not found at ${effectivePath}. Attempting to migrate from default location.`, 5000);
-                        try {
-                            const oldJsonData = await this.app.vault.read(oldFile);
-                            if (oldJsonData) {
-                                rawLoadedData = JSON.parse(oldJsonData) as SpaceforgePluginData;
-                                // Data will be saved to new path by savePluginData later
-                            }
-                        } catch { /* handle error */ }
-                    }
-                    if (!rawLoadedData) {
-                        new Notice(`Spaceforge: No data file found at custom path ${effectivePath}. New data file will be created on save.`, 3000);
+                rawLoadedData = await this.readDataFileWithRecovery(effectivePath);
+                if (!rawLoadedData) {
+                    // Nothing usable at the custom path: migrate from the default one.
+                    const fallback = parsePluginData(await readTextOrNull(this.app.vault.adapter, defaultPluginDataPath)) as SpaceforgePluginData | null;
+                    if (fallback && Object.keys(schedulesOf(fallback)).length > 0) {
+                        new Notice(`Spaceforge: custom data file unusable. Migrating from the default location.`, 5000);
+                        rawLoadedData = fallback;
+                    } else {
+                        new Notice(`Spaceforge: no data file found at ${effectivePath}. A new one will be created on save.`, 3000);
                     }
                 }
             } else {
                 // Using default plugin storage path
-                rawLoadedData = await this.loadData() as SpaceforgePluginData | undefined;
+                rawLoadedData = await this.readDataFileWithRecovery(defaultPluginDataPath);
             }
 
             let loadedSettings = {}; // Start with empty object
@@ -379,6 +813,13 @@ export default class SpaceforgePlugin extends Plugin {
             }
             // Merge defaults, loaded settings, and prioritize localStorage path settings
             this.settings = { ...DEFAULT_SETTINGS, ...loadedSettings };
+            // One-time corrections for settings whose meaning changed; see
+            // migrateSettings() for what and why.
+            migrateSettings(this.settings);
+            // Where to look for the agent CLIs, from the moment settings load: a
+            // vault that names an unusual folder must be searched that way before
+            // anything (detection included) looks for a binary.
+            setCliExtraPath(this.settings.cliExtraPath);
             if (typeof lsUseCustomPath === 'boolean') {
                 this.settings.useCustomDataPath = lsUseCustomPath;
             }
@@ -398,6 +839,11 @@ export default class SpaceforgePlugin extends Plugin {
             if (!this.pluginState.calendarEvents) {
                 this.pluginState.calendarEvents = {};
             }
+
+            // Ensure Study containers exist for data written before the feature
+            if (!this.pluginState.studyPlans) this.pluginState.studyPlans = {};
+            if (!this.pluginState.studyProgress) this.pluginState.studyProgress = {};
+            if (!this.pluginState.studySessions) this.pluginState.studySessions = {};
 
             // Ensure pomodoro state is initialized if not present in loaded data
             this.pluginState.pomodoroCurrentMode = this.pluginState.pomodoroCurrentMode || DEFAULT_PLUGIN_STATE_DATA.pomodoroCurrentMode;
@@ -432,20 +878,14 @@ export default class SpaceforgePlugin extends Plugin {
                 }
             }
 
-            this.reviewScheduleService.schedules = this.pluginState.schedules || {};
-            this.reviewHistoryService.history = this.pluginState.history || [];
-            this.reviewSessionService.reviewSessions = this.pluginState.reviewSessions || { sessions: {}, activeSessionId: null };
-            this.mcqService.mcqSets = this.pluginState.mcqSets || {};
-            this.mcqService.mcqSessions = this.pluginState.mcqSessions || {};
-            this.reviewScheduleService.customNoteOrder = this.pluginState.customNoteOrder || [];
-            this.reviewScheduleService.lastLinkAnalysisTimestamp = typeof this.pluginState.lastLinkAnalysisTimestamp === 'number' ? this.pluginState.lastLinkAnalysisTimestamp : null;
+            this.applyLoadedState();
 
         } catch (error) {
             console.error("Spaceforge: Error loading data:", error);
 
             // SIMPLE RECOVERY: Try localStorage backup once, then use defaults
             try {
-                const backupData: unknown = await this.app.loadLocalStorage('spaceforge-backup');
+                const backupData: string | null = window.localStorage.getItem('spaceforge-backup');
                 if (backupData && typeof backupData === 'string') {
                     const parsedBackup = JSON.parse(backupData) as { reviewData?: Partial<PluginStateData>; settings?: Partial<SpaceforgeSettings> };
                     if (parsedBackup.reviewData) {
@@ -466,21 +906,82 @@ export default class SpaceforgePlugin extends Plugin {
             }
 
             // Repopulate services
-            this.reviewScheduleService.schedules = this.pluginState.schedules || {};
-            this.reviewHistoryService.history = this.pluginState.history || [];
-            this.reviewSessionService.reviewSessions = this.pluginState.reviewSessions || { sessions: {}, activeSessionId: null };
-            this.mcqService.mcqSets = this.pluginState.mcqSets || {};
-            this.mcqService.mcqSessions = this.pluginState.mcqSessions || {};
-            this.reviewScheduleService.customNoteOrder = this.pluginState.customNoteOrder || [];
-            this.reviewScheduleService.lastLinkAnalysisTimestamp = this.pluginState.lastLinkAnalysisTimestamp ?? null;
-
-            if (this.reviewScheduleService) {
-                this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
-            }
+            this.applyLoadedState();
         }
     }
 
+    /**
+     * Rebuild every note's schedule from its review log.
+     *
+     * Cards scheduled under the older rules (a forced 1-day interval whenever a note
+     * was late, an FSRS rating shifted a notch) end up where the corrected scheduler
+     * would have put them. Notes whose log is incomplete are left alone and counted in
+     * the notice; the data file is copied to a timestamped backup before anything
+     * changes.
+     */
+    async repairSchedulesFromHistory(): Promise<void> {
+        const backupPath = await this.writeRepairBackup();
+        if (!backupPath) {
+            new Notice('Repair cancelled: the data file could not be backed up.');
+            return;
+        }
+
+        const report = this.reviewScheduleService.repairFromHistory();
+        await this.savePluginData();
+        this.reviewController.updateTodayNotes(true);
+        void this.getSidebarView()?.refresh();
+
+        const noHistory = report.skipped.filter(entry => entry.reason === 'no history').length;
+        const partial = report.skipped.length - noHistory;
+        const parts = [`${report.repaired.length} rebuilt from history`];
+        if (partial > 0) parts.push(`${partial} skipped (incomplete log)`);
+        if (noHistory > 0) parts.push(`${noHistory} skipped (never logged)`);
+        new Notice(`Schedule repair: ${parts.join(', ')}. Backup: ${backupPath.substring(backupPath.lastIndexOf('/') + 1)}`);
+        // Nothing goes to the console unless it is a problem; the report itself
+        // is shown in a Notice, which is where the user will look for it.
+
+    }
+
+    /** Copy the data file aside before a repair, so the change can be undone. */
+    private async writeRepairBackup(): Promise<string | null> {
+        const target = this._getEffectiveDataPath()
+            ?? (this.app.vault.configDir + `/plugins/${this.manifest.id}/data.json`);
+        try {
+            const contents = await this.app.vault.adapter.read(target);
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const backupPath = `${target}.backup-${stamp}`;
+            await this.app.vault.adapter.write(backupPath, contents);
+            return backupPath;
+        } catch (error) {
+            console.error('[spaceforge] could not write the repair backup:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Save, at most one write at a time.
+     *
+     * Overlapping saves used to interleave two writers on one file, which is how a
+     * reload in the middle of a save left an empty data.json behind. Callers that
+     * await this get a write that includes their changes; a save already running just
+     * marks the state dirty and loops once more.
+     */
     async savePluginData(): Promise<void> {
+        if (this.saveInFlight) {
+            this.saveDirty = true;
+            return this.saveInFlight;
+        }
+        const run = (async () => {
+            do {
+                this.saveDirty = false;
+                await this.performSave();
+            } while (this.saveDirty);
+        })();
+        this.saveInFlight = run.finally(() => { this.saveInFlight = null; });
+        return this.saveInFlight;
+    }
+
+    private async performSave(): Promise<void> {
         try {
             // Ensure settings object exists and is valid, applying defaults if necessary
             if (!this.settings || typeof this.settings !== 'object') {
@@ -501,6 +1002,9 @@ export default class SpaceforgePlugin extends Plugin {
                 reviewSessions: this.reviewSessionService.reviewSessions || { sessions: {}, activeSessionId: null },
                 mcqSets: this.mcqService.mcqSets || {},
                 mcqSessions: this.mcqService.mcqSessions || {},
+                studyPlans: this.studyPlanService.plans || {},
+                studyProgress: this.studyPlanService.progress || {},
+                studySessions: this.studyPlanService.sessions || {},
                 customNoteOrder: this.reviewScheduleService.customNoteOrder || [],
                 lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp ?? null,
                 pomodoroCurrentMode: this.pluginState.pomodoroCurrentMode || DEFAULT_PLUGIN_STATE_DATA.pomodoroCurrentMode,
@@ -516,6 +1020,12 @@ export default class SpaceforgePlugin extends Plugin {
                 pomodoroUserOverrideMinutes: typeof this.pluginState.pomodoroUserOverrideMinutes === 'number' ? this.pluginState.pomodoroUserOverrideMinutes : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserOverrideMinutes,
                 pomodoroUserAddToEstimation: typeof this.pluginState.pomodoroUserAddToEstimation === 'boolean' ? this.pluginState.pomodoroUserAddToEstimation : DEFAULT_PLUGIN_STATE_DATA.pomodoroUserAddToEstimation,
                 calendarEvents: this.calendarEventService ? Object.fromEntries(this.calendarEventService.getAllEvents().map(event => [event.id, event])) : {},
+                // The interrupted sitting. This object is rebuilt field by field
+                // on every save, so a field that is not named here is a field
+                // the save quietly deletes — which is exactly what happened to
+                // the run the reader was in the middle of.
+                noteRun: this.pluginState.noteRun ?? null,
+                deckSitting: this.pluginState.deckSitting ?? null,
                 version: this.manifest.version,
             };
             this.pluginState = currentPluginState; // Update the live pluginState
@@ -536,13 +1046,14 @@ export default class SpaceforgePlugin extends Plugin {
                         new Notice(`Created directory for custom data: ${dirPathOnly}`, 3000);
                     }
 
-                    // SIMPLE SAVE: Use Obsidian's standard file operations
-                    const file = this.app.vault.getAbstractFileByPath(effectiveSavePath);
-                    if (file instanceof TFile) {
-                        await this.app.vault.modify(file, JSON.stringify(dataToSave, null, 2));
-                    } else {
-                        await this.app.vault.create(effectiveSavePath, JSON.stringify(dataToSave, null, 2));
-                    }
+                    // Atomic save: a temp file is renamed over the target, so an
+                    // interrupted write can never truncate the real data file.
+                    // The custom path may be inside the vault, but it is written
+                    // through the adapter on purpose: the Vault API has no way to
+                    // write to a temporary name and rename over the target, and a
+                    // plain Vault.modify truncates before it writes — exactly the
+                    // failure this guards against.
+                    await writeJsonAtomically(this.app.vault.adapter, effectiveSavePath, dataToSave, message => console.warn('[spaceforge]', message));
                     // new Notice(`Spaceforge: Data saved to custom path: ${effectiveSavePath}`, 3000); // Removed notice
 
                     // Migration/Cleanup: If we just successfully saved to a custom path,
@@ -566,8 +1077,10 @@ export default class SpaceforgePlugin extends Plugin {
                     }
                 }
             } else {
-                // Saving to default plugin storage path
-                await this.saveData(dataToSave); // Plugin's internal save
+                // Saving to default plugin storage path. Obsidian's own saveData()
+                // truncates the file before writing it, which is what a quick restart
+                // catches in the act - write through a temp file and rename instead.
+                await writeJsonAtomically(this.app.vault.adapter, defaultPluginDataPath, dataToSave, message => console.warn('[spaceforge]', message));
                 // new Notice(`Spaceforge: Data saved to default plugin storage.`, 3000); // Removed notice
             }
 
@@ -599,12 +1112,51 @@ export default class SpaceforgePlugin extends Plugin {
         }
     }
 
+    /**
+     * The Markdown file the user is looking at, or null. One place for the
+     * checkCallbacks above, so "is there a note to act on?" has one answer.
+     */
+    /**
+     * The note selected in the core file explorer, if any.
+     *
+     * The explorer is not part of the public API, so every step of this is
+     * optional-chained: an Obsidian version that changes shape leaves the
+     * command hidden rather than broken.
+     */
+    private selectedExplorerFile(): TFile | null {
+        const leaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
+        const view = leaf?.view as { file?: unknown } | undefined;
+        const file = view?.file;
+        return file instanceof TFile && file.extension === 'md' ? file : null;
+    }
+
+    private activeMarkdownFile(): TFile | null {
+        const file = this.app.workspace.getActiveFile();
+        return file instanceof TFile && file.extension === 'md' ? file : null;
+    }
+
     addCommands(): void {
         this.addCommand({
             id: 'next-review-note',
             name: 'Next review note',
             callback: () => {
                 void this.navigationController.navigateToNextNote();
+            },
+        });
+
+        this.addCommand({
+            id: 'review-session-in-window',
+            name: 'Move the review session into a window',
+            callback: () => {
+                this.reviewFlowController.setHost('window');
+            },
+        });
+
+        this.addCommand({
+            id: 'review-session-in-sidebar',
+            name: 'Move the review session into the sidebar',
+            callback: () => {
+                void this.reviewFlowController.moveToHost('sidebar');
             },
         });
 
@@ -616,46 +1168,253 @@ export default class SpaceforgePlugin extends Plugin {
             },
         });
 
+        // The note-bound commands are checkCallbacks: the palette greys them out
+        // when there is no note to act on, instead of offering a command whose
+        // only outcome is a Notice saying it cannot run.
         this.addCommand({
             id: 'review-current-note',
             name: 'Review current note',
+            checkCallback: (checking: boolean) => {
+                const activeFile = this.activeMarkdownFile();
+                if (!activeFile) return false;
+                if (!checking) void this.reviewController.reviewNote(activeFile.path);
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'study-current-note',
+            name: 'Study current note',
+            checkCallback: (checking: boolean) => {
+                const activeFile = this.activeMarkdownFile();
+                if (!activeFile) return false;
+                if (!checking) this.studyController.openStudy(activeFile.path);
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'chart-scheduled-notes-for-study',
+            name: 'Chart scheduled notes',
             callback: () => {
-                const activeFile = this.app.workspace.getActiveFile();
-                if (activeFile && activeFile instanceof TFile && activeFile.extension === 'md') {
-                    void this.reviewController.reviewNote(activeFile.path);
-                } else {
-                    new Notice('No active Markdown file to review');
-                }
+                this.chartAllScheduledNotes();
+            },
+        });
+
+        this.addCommand({
+            id: 'chart-current-note-for-study',
+            name: 'Chart this note',
+            checkCallback: (checking: boolean) => {
+                const activeFile = this.activeMarkdownFile();
+                if (!activeFile) return false;
+                if (!checking) void this.studyController.chartNote(activeFile.path, true);
+                return true;
             },
         });
 
         this.addCommand({
             id: 'add-current-note-to-review',
             name: 'Add current note to review schedule',
-            callback: async () => {
-                const activeFile = this.app.workspace.getActiveFile();
-                if (activeFile && activeFile instanceof TFile && activeFile.extension === 'md') {
-                    await this.reviewScheduleService.scheduleNoteForReview(activeFile.path);
-                    await this.savePluginData();
-                    new Notice(`Added "${activeFile.path}" to review schedule`);
-                } else {
-                    new Notice('No active Markdown file to add to review');
+            checkCallback: (checking: boolean) => {
+                const activeFile = this.activeMarkdownFile();
+                if (!activeFile) return false;
+                if (!checking) {
+                    void (async () => {
+                        await this.reviewScheduleService.scheduleNoteForReview(activeFile.path);
+                        await this.savePluginData();
+                        new Notice(`Added "${activeFile.path}" to review schedule`);
+                    })();
                 }
+                return true;
             },
         });
 
         this.addCommand({
             id: 'add-current-folder-to-review',
             name: "Add current note's folder to review schedule",
-            callback: async () => {
-                const activeFile = this.app.workspace.getActiveFile();
-                if (activeFile && activeFile.parent && activeFile.parent instanceof TFolder) {
-                    const folder = activeFile.parent;
-                    // Use the same logic as the context menu for consistency
-                    await this.contextMenuHandler.addFolderToReview(folder);
-                } else {
-                    new Notice("Could not determine the current note's folder, no active file, or parent is not a folder");
+            checkCallback: (checking: boolean) => {
+                const folder = this.activeMarkdownFile()?.parent;
+                if (!folder || !(folder instanceof TFolder)) return false;
+                // Same logic as the context menu, so the two cannot disagree.
+                if (!checking) void this.contextMenuHandler.addFolderToReview(folder);
+                return true;
+            },
+        });
+        this.addCommand({
+            id: 'study-all-decks-due',
+            name: 'Study everything due (all decks)',
+            callback: () => void this.deckSessionController.startAllDue(),
+        });
+
+        this.addCommand({
+            id: 'import-anki-package',
+            name: 'Import an Anki deck (.apkg file)',
+            callback: () => void this.importAnkiPackage(),
+        });
+
+        this.addCommand({
+            id: 'export-deck',
+            name: 'Export a deck as an Anki package',
+            checkCallback: (checking: boolean) => {
+                const ready = this.deckService !== undefined;
+                if (!ready) return false;
+                if (!checking) void this.exportDeck();
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'search-ankiweb-decks',
+            name: 'Find a deck on AnkiWeb',
+            callback: () => this.openAnkiWebSearch(),
+        });
+
+        this.addCommand({
+            id: 'study-deck',
+            name: 'Study a deck',
+            checkCallback: (checking: boolean) => {
+                const decks = this.deckSessionController ? true : false;
+                if (!decks) return false;
+                if (!checking) void this.chooseDeckToStudy();
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'study-deck-in-window',
+            name: 'Study a deck in a new window',
+            callback: () => {
+                const previous = this.settings.reviewSessionPlacement;
+                this.settings.reviewSessionPlacement = 'window';
+                void this.chooseDeckToStudy().finally(() => {
+                    this.settings.reviewSessionPlacement = previous;
+                });
+            },
+        });
+
+        this.addCommand({
+            id: 'start-review-session-in-window',
+            name: 'Start review session in a new window',
+            callback: () => {
+                // One-off: the session opens in its own window without changing the
+                // setting, so a note on a second monitor needs no detour through
+                // the settings screen.
+                const previous = this.settings.reviewSessionPlacement;
+                this.settings.reviewSessionPlacement = 'window';
+                this.reviewFlowController.start();
+                this.settings.reviewSessionPlacement = previous;
+            }
+        });
+
+        this.addCommand({
+            id: 'start-review-session',
+            name: 'Start review session (docked review bar)',
+            callback: () => {
+                this.reviewFlowController.start();
+            },
+        });
+
+        // Straight to the tutor, or straight to the questions, on the note you
+        // are looking at — the two things the dock is for.
+        const openDockTab = (tab: 'study' | 'mcq'): void => {
+            const file = this.activeMarkdownFile();
+            if (!file) return;
+            // The dock lives under the review bar, so the note has to be under
+            // review for it to exist.
+            if (!this.reviewFlowController.isActive()) {
+                this.reviewFlowController.start(file.path);
+            }
+            window.setTimeout(() => {
+                if (!this.reviewFlowController.openDockTab(tab)) {
+                    new Notice(tab === 'study' ? 'Study is not available for this note.' : 'Questions are not available for this note.');
                 }
+            }, 120);
+        };
+
+        // No default hotkeys: Obsidian reserves the right to bind keys itself,
+        // and a plugin that ships defaults fights the user's own settings. These
+        // four are meant to be bound in Settings → Hotkeys (search "Spaceforge"),
+        // which the settings tab links to directly.
+        this.addCommand({
+            id: 'open-study-dock',
+            name: 'Study the current note in the dock',
+            checkCallback: (checking: boolean) => {
+                if (!this.activeMarkdownFile()) return false;
+                if (!checking) openDockTab('study');
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'open-mcq-dock',
+            name: 'Ask me questions on the current note',
+            checkCallback: (checking: boolean) => {
+                if (!this.activeMarkdownFile()) return false;
+                if (!checking) openDockTab('mcq');
+                return true;
+            },
+        });
+
+        const gradeCommand = (id: string, name: string, bucket: GradeBucket) => {
+            this.addCommand({
+                id,
+                name,
+                checkCallback: (checking: boolean) => {
+                    if (!this.reviewFlowController.isActive()) return false;
+                    if (!checking) {
+                        void this.reviewFlowController.gradeBucket(bucket);
+                    }
+                    return true;
+                },
+            });
+        };
+
+        // Coarse grades that work whichever algorithm the current note uses, so
+        // they can be bound to keys in Obsidian's own hotkey settings.
+        gradeCommand('rate-review-note-again', 'Rate current review note: again', 'again');
+        gradeCommand('rate-review-note-hard', 'Rate current review note: hard', 'hard');
+        gradeCommand('rate-review-note-good', 'Rate current review note: good', 'good');
+        gradeCommand('rate-review-note-easy', 'Rate current review note: easy', 'easy');
+
+        this.addCommand({
+            id: 'recover-review-data',
+            name: 'Recover review data from backup files',
+            callback: () => { new DataRecoveryModal(this.app, this).open(); },
+        });
+
+        this.addCommand({
+            id: 'repair-review-schedules-from-history',
+            name: 'Repair review schedules from history',
+            callback: () => { void this.repairSchedulesFromHistory(); },
+        });
+
+        this.addCommand({
+            id: 'undo-last-review-rating',
+            name: 'Undo last review rating',
+            checkCallback: (checking: boolean) => {
+                if (!this.reviewFlowController.isActive()) return false;
+                if (!checking) void this.reviewFlowController.undo();
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'skip-current-review-note',
+            name: 'Skip current review note',
+            checkCallback: (checking: boolean) => {
+                if (!this.reviewFlowController.isActive()) return false;
+                if (!checking) void this.reviewFlowController.skip();
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'end-review-session',
+            name: 'End review session',
+            checkCallback: (checking: boolean) => {
+                if (!this.reviewFlowController.isActive()) return false;
+                if (!checking) this.reviewFlowController.end();
+                return true;
             },
         });
     }
@@ -717,16 +1476,44 @@ export default class SpaceforgePlugin extends Plugin {
                 return new TogetherService(this);
             case ApiProvider.OpenAICompatible:
                 if (!this.settings.openaiCompatibleApiUrl || !this.settings.openaiCompatibleModel) {
-                    new Notice('OpenAI Compatible API URL or model is not set in settings');
+                    new Notice('The provider needs a server address and a model.');
                     return undefined;
                 }
                 return new OpenAICompatibleService(this);
-            default:
-                // It's good practice to handle unexpected enum values, even if TypeScript provides some safety.
-                // This could happen if settings data is corrupted or from an older version.
-                // const exhaustiveCheck: never = this.settings.mcqApiProvider; // This will cause a type error now, which is good!
-                new Notice(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
-                return undefined;
+            case ApiProvider.Cli:
+                if (!this.settings.cliAgent) {
+                    new Notice('No local CLI chosen yet.');
+                    return undefined;
+                }
+                // The CLI brings its own login, so there is no key to check here;
+                // whether it is installed and signed in is reported by detection
+                // in the settings, and by the run itself if it is not.
+                return new CliService(this);
+            default: {
+                // A local CLI is its own provider row (`cli:claude`), and runs
+                // through the same service the old single CLI choice used.
+                const agentId = agentIdOfProvider(this.settings.mcqApiProvider);
+                if (agentId) {
+                    if (!getCliAgent(agentId)) {
+                        new Notice(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
+                        return undefined;
+                    }
+                    return new CliService(this);
+                }
+                // Every other provider in the registry is spoken to through one
+                // OpenAI-shaped service, so a new company needs no case here.
+                const descriptor = getHttpProvider(this.settings.mcqApiProvider);
+                if (!descriptor || !providerIsOpenAiShaped(descriptor)) {
+                    new Notice(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
+                    return undefined;
+                }
+                const gap = describeProviderGap(descriptor, this.settings);
+                if (gap) {
+                    new Notice(gap);
+                    return undefined;
+                }
+                return new OpenAIHttpService(this, descriptor);
+            }
         }
     }
 

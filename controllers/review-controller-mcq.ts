@@ -6,6 +6,7 @@ import { MCQSet, MCQSession } from '../models/mcq';
 import { ReviewSchedule, ReviewResponse, FsrsRating } from '../models/review-schedule'; // Import rating enums and ReviewSchedule
 import { MCQService } from '../services/mcq-service';
 import { IMCQGenerationService } from '../api/mcq-generation-service';
+import { mapScoreToFsrsRating, mapScoreToSm2Response } from '../utils/rating';
 
 /**
  * Controller for managing Multiple-Choice Question (MCQ) reviews
@@ -45,21 +46,79 @@ export class MCQController {
      * @param notePath Path to the note
      * @param onCompleteCallback Optional callback when the modal closes
      */
-    // Helper methods to map score to ratings
+    // Helper methods to map score to ratings (shared with the Study feature so
+    // the two cannot drift apart in what a given score means).
     private mapScoreToSm2Response(score: number): ReviewResponse {
-        if (score >= 0.95) return ReviewResponse.PerfectRecall; // 5
-        if (score >= 0.80) return ReviewResponse.CorrectWithHesitation; // 4
-        if (score >= 0.60) return ReviewResponse.CorrectWithDifficulty; // 3
-        if (score >= 0.40) return ReviewResponse.IncorrectButFamiliar; // 2
-        if (score > 0) return ReviewResponse.IncorrectResponse; // 1
-        return ReviewResponse.CompleteBlackout; // 0
+        return mapScoreToSm2Response(score);
     }
 
     private mapScoreToFsrsRating(score: number): FsrsRating {
-        if (score >= 0.90) return FsrsRating.Easy;   // 4
-        if (score >= 0.70) return FsrsRating.Good;   // 3
-        if (score >= 0.50) return FsrsRating.Hard;   // 2
-        return FsrsRating.Again; // 1
+        return mapScoreToFsrsRating(score);
+    }
+
+    /**
+     * Question sets being prepared right now, one promise per note.
+     *
+     * The dock's panel and this controller's own window path both ask for a
+     * note's questions, and they can ask in the same breath: two simultaneous
+     * preparations would write two sets and leave two surfaces showing a
+     * different set of questions. Concurrent callers share the first promise.
+     */
+    private mcqSetRequests = new Map<string, Promise<MCQSet | null>>();
+
+    /**
+     * The questions for a note, writing a set when there is none (or when the
+     * existing one was flagged for regeneration).
+     *
+     * Split out of startMCQReview so a docked sitting can ask for the set
+     * without anything opening a window over the note.
+     *
+     * Safe to call concurrently: N callers for one note get one preparation.
+     */
+    async ensureMcqSetForNote(notePath: string): Promise<MCQSet | null> {
+        const inFlight = this.mcqSetRequests.get(notePath);
+        if (inFlight) return inFlight;
+
+        const request = this.prepareMcqSetForNote(notePath);
+        const settle = (): void => {
+            // Cleared when it settles, success or failure, so a retry after an
+            // error starts a fresh preparation instead of joining a finished
+            // one.
+            if (this.mcqSetRequests.get(notePath) === request) this.mcqSetRequests.delete(notePath);
+        };
+        void request.then(settle, settle);
+        this.mcqSetRequests.set(notePath, request);
+        return request;
+    }
+
+    /** The actual preparation; the shared promise ensureMcqSetForNote() hands out. */
+    private async prepareMcqSetForNote(notePath: string): Promise<MCQSet | null> {
+        if (!this.plugin.settings.enableMCQ || !this.mcqGenerationService) {
+            new Notice('Feature is disabled or the generation service is not available. Check API provider settings.');
+            return null;
+        }
+
+        let mcqSet = this.mcqService.getMCQSetForNote(notePath);
+
+        if (mcqSet && mcqSet.needsQuestionRegeneration) {
+            new Notice('Questions flagged for regeneration. Generating new set...');
+            mcqSet = await this.generateMCQs(notePath, true);
+            if (mcqSet) {
+                mcqSet.needsQuestionRegeneration = false;
+                this.mcqService.saveMCQSet(mcqSet);
+                await this.plugin.savePluginData();
+            } else {
+                new Notice('Failed to regenerate. Using existing set if available.');
+                mcqSet = this.mcqService.getMCQSetForNote(notePath);
+            }
+        }
+
+        if (!mcqSet || mcqSet.questions.length === 0) {
+            new Notice('No questions found. Generating new set...');
+            mcqSet = await this.generateMCQs(notePath);
+        }
+
+        return mcqSet ?? null;
     }
 
     async startMCQReview(
@@ -78,37 +137,28 @@ export class MCQController {
         }
 
         try {
-            let mcqSet = this.mcqService.getMCQSetForNote(notePath);
-
-            if (mcqSet && mcqSet.needsQuestionRegeneration) {
-                new Notice('Questions flagged for regeneration. Generating new set...');
-                mcqSet = await this.generateMCQs(notePath, true);
-                if (mcqSet) {
-                    mcqSet.needsQuestionRegeneration = false;
-                    this.mcqService.saveMCQSet(mcqSet);
-                    await this.plugin.savePluginData();
-                } else {
-                    new Notice('Failed to regenerate. Using existing set if available.');
-                    mcqSet = this.mcqService.getMCQSetForNote(notePath);
-                }
-            }
-
-            if (!mcqSet || mcqSet.questions.length === 0) {
-                new Notice('No questions found. Generating new set...');
-                mcqSet = await this.generateMCQs(notePath);
-                if (!mcqSet) {
-                    new Notice('Failed to generate questions.');
-                    return;
-                }
+            const mcqSet = await this.ensureMcqSetForNote(notePath);
+            if (!mcqSet) {
+                new Notice('Failed to generate questions.');
+                return;
             }
 
             // Define the internal callback for MCQModal that includes the score
             const internalOnComplete = (path: string, score: number, completed: boolean) => {
                 void (async () => {
+                    if (completed && this.plugin.settings.mcqGradingMode === 'ask') {
+                        // The score is the sitting's to report; the grade is the
+                        // learner's to give. Nothing is recorded here — the
+                        // docked bar offers the grades next to the score.
+                        new Notice(`MCQs complete: ${(score * 100).toFixed(0)}% — grade it from the review bar.`);
+                        if (externalOnCompleteCallback) externalOnCompleteCallback(path, score >= 0.7);
+                        return;
+                    }
                     if (completed) {
                         const schedule = this.plugin.reviewScheduleService.schedules[path];
                         if (schedule) {
                             let rating: ReviewResponse | FsrsRating;
+                            const ratingKind = schedule.schedulingAlgorithm === 'fsrs' ? 'fsrs' as const : 'auto' as const;
                             if (schedule.schedulingAlgorithm === 'fsrs') {
                                 rating = this.mapScoreToFsrsRating(score);
                                 new Notice(`MCQ complete for FSRS card.Score: ${(score * 100).toFixed(0)}%.Rating: ${FsrsRating[rating]} (${rating as number}).`);
@@ -117,7 +167,7 @@ export class MCQController {
                                 new Notice(`MCQ complete for SM - 2 card.Score: ${(score * 100).toFixed(0)}%.Rating: ${ReviewResponse[rating]} (${rating as number}).`);
                             }
                             // Process the review using the determined rating
-                            await this.plugin.reviewController.processReviewResponse(path, rating);
+                            await this.plugin.reviewController.processReviewResponse(path, rating, { ratingKind, navigate: false });
                         } else {
                             new Notice(`MCQ complete.Score: ${(score * 100).toFixed(0)}%.Could not find schedule to update review status.`);
                         }
@@ -281,6 +331,7 @@ export class MCQController {
                     const schedule = this.plugin.reviewScheduleService.schedules[result.path];
                     if (schedule && typeof result.score === 'number') {
                         let rating: ReviewResponse | FsrsRating;
+                        const ratingKind = schedule.schedulingAlgorithm === 'fsrs' ? 'fsrs' as const : 'auto' as const;
                         if (schedule.schedulingAlgorithm === 'fsrs') {
                             rating = this.mapScoreToFsrsRating(result.score);
                             new Notice(`MCQ for ${result.path}(FSRS) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${FsrsRating[rating]} (${rating as number})`);
@@ -288,7 +339,7 @@ export class MCQController {
                             rating = this.mapScoreToSm2Response(result.score);
                             new Notice(`MCQ for ${result.path}(SM - 2) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${ReviewResponse[rating]} (${rating as number})`);
                         }
-                        await this.plugin.reviewController.processReviewResponse(result.path, rating);
+                        await this.plugin.reviewController.processReviewResponse(result.path, rating, { ratingKind });
                         reviewsProcessed++;
                     }
                 }

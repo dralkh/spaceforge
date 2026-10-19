@@ -17,8 +17,14 @@ interface ReviewSidebarViewState {
     expandedUpcomingDayKey?: string | null;
     selectedNotes?: string[];
     lastScrollPosition?: number;
-    sidebarViewType?: 'list' | 'calendar';
+    sidebarViewType?: 'list' | 'calendar' | 'review';
 }
+
+/** The pane this sidebar is showing: the list, the calendar, or the session. */
+type SidebarPaneMode = 'list' | 'calendar' | 'review';
+
+/** How often the list asks the run where it is, while a run is walking. */
+const RUN_FOLLOW_MS = 400;
 
 /**
  * Sidebar view for displaying review schedules. Acts as an orchestrator for sub-components.
@@ -33,6 +39,10 @@ export class ReviewSidebarView extends ItemView {
     private resizeObserver: ResizeObserver | null = null;
     private refreshPromise: Promise<void> | null = null;
     private refreshQueued = false;
+    /** The run's position as last painted; the tick compares against it. */
+    private lastRunSignature: string | null = null;
+    /** The follow tick, up only while the list is the pane and a run walks. */
+    private runFollowTimer: number | null = null;
     private readonly onSidebarUpdate = () => { void this.refresh(); };
     private readonly onPomodoroUpdate = () => {
         if (this.pomodoroUIManager) {
@@ -51,6 +61,10 @@ export class ReviewSidebarView extends ItemView {
     private persistentHeaderEl: HTMLElement | null = null;
     private listViewContentEl: HTMLElement | null = null;
     private calendarViewContentEl: HTMLElement | null = null;
+    /** The review tab: a mount point, created once, for the session's own DOM. */
+    private reviewViewContentEl: HTMLElement | null = null;
+    /** Whether this view has already handed its container to the session. */
+    private claimedReviewTab = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: SpaceforgePlugin) {
         super(leaf);
@@ -62,6 +76,24 @@ export class ReviewSidebarView extends ItemView {
     getViewType(): string { return "spaceforge-review-schedule"; }
     getDisplayText(): string { return "Spaceforge review"; }
     getIcon(): string { return "calendar-clock"; }
+
+    /**
+     * True only while the review pane is the pane this sidebar is really showing.
+     *
+     * This is the one honest answer to "is the session's home on screen?": the
+     * mode says which pane the reader chose, and the container's own state says
+     * whether this view is showing it. The two disagree more often than the tab
+     * buttons suggest — the mode is remembered across restarts, and it is
+     * written from elsewhere (a date picked in the calendar, a setting, the
+     * bar's menu) — so the review flow asks this instead of reading the setting
+     * and assuming the pane followed.
+     */
+    isReviewPaneVisible(): boolean {
+        if (this.plugin.settings.sidebarViewType !== 'review') return false;
+        const container = this.reviewViewContentEl;
+        if (!container) return false;
+        return container.isConnected && !container.hasClass('sf-hidden');
+    }
 
     async onOpen(): Promise<void> {
         this.plugin.events.on('sidebar-update', this.onSidebarUpdate);
@@ -75,8 +107,19 @@ export class ReviewSidebarView extends ItemView {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
+        this.stopRunFollow();
         this.plugin.events.off('sidebar-update', this.onSidebarUpdate);
         this.plugin.events.off('pomodoro-update', this.onPomodoroUpdate);
+        // Closing the pane must not strand the session inside an element the
+        // app is about to discard: the review tab hands it back, exactly as
+        // leaving the tab by hand does. Unconditional on purpose — the mode can
+        // name another pane while this one is still holding a live session (a
+        // mode written from outside the view), and only the view's own record
+        // of where the session went can settle that.
+        this.leaveReviewTab();
+        // The calendar half of this view holds a tooltip and a pending timer of
+        // its own; closing the pane has to take them down with it.
+        this.calendarView?.destroy();
         return Promise.resolve();
     }
 
@@ -97,24 +140,22 @@ export class ReviewSidebarView extends ItemView {
             const listViewBtn = viewToggle.createDiv("review-view-btn");
             listViewBtn.setText("List");
             listViewBtn.addEventListener("click", () => {
-                if (this.plugin.settings.sidebarViewType === 'list') return;
-                this.plugin.settings.sidebarViewType = 'list';
-                this.activeListBaseDate = null;
-                void (async () => {
-                    await this.plugin.savePluginData();
-                    await this.refresh();
-                })();
+                void this.switchMode('list');
             });
 
             const calendarViewBtn = viewToggle.createDiv("review-view-btn");
             calendarViewBtn.setText("Calendar");
             calendarViewBtn.addEventListener("click", () => {
-                if (this.plugin.settings.sidebarViewType === 'calendar') return;
-                this.plugin.settings.sidebarViewType = 'calendar';
-                void (async () => {
-                    await this.plugin.savePluginData();
-                    await this.refresh();
-                })();
+                void this.switchMode('calendar');
+            });
+
+            // The third mode is a mount point for the live session rather than a
+            // rendering of the schedule, but the reader chooses it exactly the
+            // way they choose the other two.
+            const reviewViewBtn = viewToggle.createDiv("review-view-btn");
+            reviewViewBtn.setText("Review");
+            reviewViewBtn.addEventListener("click", () => {
+                void this.switchMode('review');
             });
         }
         this.updateViewToggleButtonsState();
@@ -139,6 +180,14 @@ export class ReviewSidebarView extends ItemView {
             });
         }
 
+        if (!this.reviewViewContentEl) {
+            // Created once and never re-created: the session's live DOM — the
+            // grading bar and the dock — is moved in here by the flow
+            // controller, and it has to survive every refresh of this view.
+            this.reviewViewContentEl = this.mainContainer.createDiv("sf-sidebar-review");
+            this.reviewViewContentEl.addClass('sf-hidden');
+        }
+
         if (!this.calendarViewContentEl) {
             this.calendarViewContentEl = this.mainContainer.createDiv("calendar-view-content");
         }
@@ -154,8 +203,10 @@ export class ReviewSidebarView extends ItemView {
         if (!viewToggle) return;
         const listViewBtn = viewToggle.children[0] as HTMLElement;
         const calendarViewBtn = viewToggle.children[1] as HTMLElement;
+        const reviewViewBtn = viewToggle.children[2] as HTMLElement;
         if (listViewBtn) listViewBtn.classList.toggle("active", this.plugin.settings.sidebarViewType === 'list');
         if (calendarViewBtn) calendarViewBtn.classList.toggle("active", this.plugin.settings.sidebarViewType === 'calendar');
+        if (reviewViewBtn) reviewViewBtn.classList.toggle("active", this.plugin.settings.sidebarViewType === 'review');
     }
 
     async refresh(): Promise<void> {
@@ -244,6 +295,12 @@ export class ReviewSidebarView extends ItemView {
         this.updateViewToggleButtonsState();
         await this.showCorrectViewPane(); // Handles showing/hiding and rendering content
 
+        // The list now wears the pin for the position it just painted; from
+        // here the follow tick keeps it wearing the right one while the run
+        // walks (a step of the run re-renders the bar, not this pane).
+        this.lastRunSignature = this.runSignature();
+        this.ensureRunFollow();
+
         // Apply scroll position *after* rendering is complete
         if (this.mainContainer) {
             requestAnimationFrame(() => {
@@ -253,7 +310,84 @@ export class ReviewSidebarView extends ItemView {
         }
     }
 
+    /**
+     * Where the run is standing, as one string: what the list's pin is painted
+     * from. Null while no run is walking.
+     *
+     * A deck step names no note — `currentPath()` is null there by design — so
+     * the deck case asks the question the list's own marker asks: which deck is
+     * the sitting on. The sitting's deck is named late (the run starts it on
+     * the way to the step), and an empty deck name is therefore a position too:
+     * when the sitting lands, the string changes and the pin is repainted.
+     */
+    private runSignature(): string | null {
+        const flow = this.plugin.reviewFlowController;
+        if (!flow || !flow.isActive?.()) return null;
+        if (flow.isOnCardsStep?.()) {
+            return `cards:${this.plugin.deckSessionController?.currentDeckPath?.() ?? ''}`;
+        }
+        return `note:${flow.currentPath?.() ?? ''}`;
+    }
+
+    /**
+     * Keep the list's pin following the run, from the moment the pane is up.
+     *
+     * A step of the run is not an event this pane can hear: it re-renders the
+     * bar and opens the note, and the sidebar is never told about it — so the
+     * note row's marker moves through the flow controller's own walk, and the
+     * row of the deck a deck step stands on (which that walk does not know
+     * about) would keep yesterday's paint until something else refreshed the
+     * list. The tick this installs asks the run where it is, and repaints only
+     * when the answer has changed since the last paint. It reads three
+     * properties when it has nothing to do, runs for as long as the view does,
+     * and gates itself: no run, or a pane that is not the list, is not news.
+     */
+    private ensureRunFollow(): void {
+        if (this.runFollowTimer !== null) return;
+        const handle = window.setInterval(() => this.followRun(), RUN_FOLLOW_MS);
+        // A number in the app; a Timeout in a test runner, which must not hold
+        // the process open after its tests are done.
+        (handle as unknown as { unref?: () => void }).unref?.();
+        // Let the app take it down with the view, however the view goes.
+        (this as unknown as { registerInterval?: (id: number) => void }).registerInterval?.(handle);
+        this.runFollowTimer = handle;
+    }
+
+    /** One tick of the follow: repaint only when the pinned position is stale. */
+    private followRun(): void {
+        const signature = this.runSignature();
+        if (signature === null) {
+            // No run walking: nothing to follow — and the next run's first
+            // position must read as news, never as the paint that was left.
+            this.lastRunSignature = null;
+            return;
+        }
+        if (this.plugin.settings.sidebarViewType !== 'list') return;
+        if (signature === this.lastRunSignature) return;
+        // Recorded before the refresh so the refresh's own pass is not news.
+        this.lastRunSignature = signature;
+        void this.refresh();
+    }
+
+    private stopRunFollow(): void {
+        if (this.runFollowTimer === null) return;
+        window.clearInterval(this.runFollowTimer);
+        this.runFollowTimer = null;
+    }
+
     private async showCorrectViewPane(): Promise<void> {
+        // The buttons follow the pane, whoever changed the mode: a click, a date
+        // picked in the calendar, or the bar's menu moving the session here.
+        this.updateViewToggleButtonsState();
+        if (this.plugin.settings.sidebarViewType === 'review') {
+            if (this.listViewContentEl) this.listViewContentEl.hide();
+            if (this.calendarViewContentEl) this.calendarViewContentEl.hide();
+            this.enterReviewTab();
+            return;
+        }
+        // Any other tab ends the session's stay in the sidebar.
+        this.leaveReviewTab();
+
         if (this.plugin.settings.sidebarViewType === 'calendar') {
             if (this.listViewContentEl) this.listViewContentEl.hide();
             if (this.calendarViewContentEl) {
@@ -268,6 +402,98 @@ export class ReviewSidebarView extends ItemView {
                 await this.renderListViewContent(this.listViewContentEl);
             }
         }
+    }
+
+    /**
+     * The one way the tabs change panes.
+     *
+     * A tab press is a choice, and the review pane hands the session back
+     * *before* the new mode is written: between the write and the next render
+     * there is a window in which a session started from the list would mount
+     * into a pane the reader has already left. The other writers of the mode
+     * (the calendar's date pick, the settings tab, the bar's own menu) land in
+     * the refresh that follows them, where showCorrectViewPane does the same.
+     */
+    private async switchMode(mode: SidebarPaneMode): Promise<void> {
+        if (this.plugin.settings.sidebarViewType === mode) return;
+        if (mode === 'review') {
+            // Being here is the choice; showCorrectViewPane reveals the pane.
+            this.plugin.settings.sidebarViewType = mode;
+        } else {
+            this.leaveReviewTab();
+            this.plugin.settings.sidebarViewType = mode;
+            if (mode === 'list') this.activeListBaseDate = null;
+        }
+        await this.plugin.savePluginData();
+        await this.refresh();
+    }
+
+    /**
+     * The reader is on the review tab: hand the flow controller the element to
+     * mount the session into, and make sure there is a session to show.
+     *
+     * Persisting the host here is the reader's own choice — they picked the
+     * tab — so it is written to their settings rather than kept as view state.
+     */
+    private enterReviewTab(): void {
+        const container = this.reviewViewContentEl;
+        if (!container) return;
+        container.removeClass('sf-hidden');
+        const flow = this.plugin.reviewFlowController;
+        if (!flow) return;
+        // The tab claims the session once, when the reader opens it. Claiming
+        // again on every render would fight any move they make from the bar's
+        // menu — and restart a run they had just ended.
+        if (this.claimedReviewTab) return;
+        // A claim is only honest while this pane is the one on screen. The mode
+        // can name the review pane while the app is showing something else — a
+        // view whose element the app has discarded, a mode written from outside
+        // — and a session handed to a pane nobody can see is a session that
+        // disappears until the reader hunts for it.
+        if (!this.isReviewPaneVisible()) return;
+        this.claimedReviewTab = true;
+        flow.setHost('sidebar', container);
+        if (!flow.isActive()) {
+            // An empty tab would read as broken; a run is what the tab is for.
+            flow.start();
+        }
+    }
+
+    /**
+     * The reader left the review tab (or the view is closing): give the session
+     * back to the home they remember, without overwriting that memory — and
+     * only while the sidebar is really the one holding it.
+     *
+     * The session leaves *before* the tab is hidden: hiding first is what left
+     * a live bar and dock inside an invisible element (a container is only safe
+     * to hide once nothing of the session is inside it).
+     */
+    private leaveReviewTab(): void {
+        this.claimedReviewTab = false;
+        const container = this.reviewViewContentEl;
+        const flow = this.plugin.reviewFlowController;
+        if (flow && container && flow.getHost() === 'sidebar') {
+            const remembered = this.plugin.settings.reviewSessionHost;
+            flow.setHost(remembered === 'sidebar' ? 'note' : remembered, null, false);
+        }
+        container?.addClass('sf-hidden');
+    }
+
+    /**
+     * Open the review tab for a session the reader is already in — the bar's
+     * menu calls this right after the sidebar pane has been revealed, which can
+     * happen before this view has ever rendered. Only `this.plugin` is needed:
+     * refresh() builds the structure if it is not there yet.
+     */
+    async openReviewTab(): Promise<void> {
+        // The reader asked for the tab by name, so it claims the session again
+        // even if an earlier render had already done so.
+        this.claimedReviewTab = false;
+        if (this.plugin.settings.sidebarViewType !== 'review') {
+            this.plugin.settings.sidebarViewType = 'review';
+            await this.plugin.savePluginData();
+        }
+        await this.refresh();
     }
 
     /**
@@ -331,11 +557,12 @@ export class ReviewSidebarView extends ItemView {
         if (calendarContainer) {
             const sidebarWidth = this.containerEl.clientWidth; // sidebarWidth is the width of the entire sidebar ItemView
             const collapsedThreshold = 300;
-            if (sidebarWidth < collapsedThreshold) {
-                calendarContainer.classList.add("is-collapsed");
-            } else {
-                calendarContainer.classList.remove("is-collapsed");
-            }
+            const isNarrow = sidebarWidth < collapsedThreshold;
+            calendarContainer.classList.toggle("is-collapsed", isNarrow);
+            // Seven columns of a pane this narrow leaves under forty pixels for a
+            // day — less than a date, let alone the day's counts need. The month
+            // reads as one day per row instead (see .is-stacked in calendar.css).
+            calendarContainer.classList.toggle("is-stacked", isNarrow);
         }
     }
 

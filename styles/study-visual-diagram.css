@@ -1,0 +1,496 @@
+/* ==========================================================================
+ * Spaceforge Study — the interactive diagram.
+ *
+ * An SVG whose viewBox is the asset's own 0–100 space, scaled to the host's
+ * measured width up to a readable cap, with shapes, an arrowhead, labels, and
+ * one focusable marker per hotspot whose detail opens beneath the picture.
+ *
+ * Text inside the SVG is sized in real pixels, from the house tokens. The
+ * renderer writes the drawing's units-per-CSS-pixel factor onto the SVG
+ * (`--sf-vd-unit-scale`) on every draw, and each text rule multiplies its house
+ * size by it — a viewBox otherwise scales text with the geometry it sits in,
+ * which is how a wide dock ended up drawing labels at 40px. So a label reads at
+ * the reader's size whether the drawing is drawn at 320px or at its cap, and
+ * the renderer's wrapping model measures the same room in the same pixels.
+ *
+ * Motion lives here too, and only when the reader asked for it. An arrow that
+ * carries flow is drawn as a dashed overlay that travels; a shape that should
+ * breathe gets a slow transform of its whole group. A reader who asked for
+ * reduced motion never gets either class — the renderer leaves them out — and
+ * the media query at the end stops them if the preference changes while the
+ * drawing is already up.
+ *
+ * Two rules hold for every rule below. Nothing clips text silently: the panel's
+ * text wraps, and a drawing label that cannot fit steps down a house size and
+ * wraps inside its shape before it is ever ellipsised — and it then carries its
+ * full text in a `title`. And nothing here sizes the host: the drawing is
+ * measured to the host and capped at the width a diagram can be read at, so a
+ * stale measurement can never widen the panel it sits in.
+ * ========================================================================== */
+
+.sf-vd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The one thing this diagram should make the reader see, above the picture. */
+.sf-vd-teach {
+  font-size: var(--sf-font-ui);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The picture's own box. The drawing is measured to this width in the code;
+   the caps on the drawing are the second guard, so the diagram can never make
+   the host wider than the host already is. */
+.sf-vd-figure {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* The drawing itself: scaled to the host's measured width, centred, and capped
+   at the width its labels stay readable at — the same 560px the renderer caps
+   the width it sets to. The custom property is the drawing's units per CSS
+   pixel: the renderer writes the real value onto this element on every draw,
+   and the value here is only what a drawing nobody has sized falls back to. */
+.sf-vd-svg {
+  --sf-vd-unit-scale: 0.3;
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  width: min(100%, 560px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+}
+
+/* ------------------------------------------------------------------ tones */
+/* What the asset's own `primary | muted | accent` means in the reader's theme.
+   The group carries the default so a shape with no tone still has a colour. */
+
+.sf-vd-shapes {
+  --sf-vd-tone: var(--sf-text-muted);
+}
+
+.sf-vd-tone-primary {
+  --sf-vd-tone: var(--sf-primary);
+}
+
+.sf-vd-tone-muted {
+  --sf-vd-tone: var(--sf-text-muted);
+}
+
+.sf-vd-tone-accent {
+  --sf-vd-tone: var(--interactive-accent);
+}
+
+/* ----------------------------------------------------------------- shapes */
+/* The geometry is drawn in the asset's own units, so a shape scales with the
+   drawing — but its border does not: a hairline is one real pixel whatever the
+   width (0.6 units was a three-pixel slab at a wide host), so a shape reads as
+   a plated box, never as a heavy outline. The border is the shape's tone — the
+   panel's own border colour when the asset named none — and the fill is the
+   same quiet plate the panel's other boxes are drawn in. */
+
+.sf-vd-box {
+  fill: var(--background-secondary);
+  stroke: var(--sf-vd-tone, var(--background-modifier-border));
+  stroke-width: calc(1px * var(--sf-vd-unit-scale));
+  stroke-linejoin: round;
+}
+
+.sf-vd-ellipse {
+  fill: var(--background-secondary);
+  stroke: var(--sf-vd-tone, var(--background-modifier-border));
+  stroke-width: calc(1px * var(--sf-vd-unit-scale));
+}
+
+.sf-vd-arrow {
+  stroke: var(--sf-vd-tone, var(--sf-text-muted));
+  stroke-width: calc(1px * var(--sf-vd-unit-scale));
+  stroke-linecap: round;
+}
+
+.sf-vd-arrowhead {
+  fill: var(--sf-vd-tone, var(--sf-text-muted));
+  stroke: none;
+}
+
+/* A label inside a box or an ellipse: the house UI size, in real pixels at any
+   host width, centred on the shape and fitted by the renderer. A label that had
+   to step down to fit carries `is-shrunk`, the floor size it stepped down to. */
+.sf-vd-shape-text {
+  fill: var(--text-normal);
+  font-size: calc(var(--sf-font-ui) * var(--sf-vd-unit-scale));
+  text-anchor: middle;
+}
+
+.sf-vd-shape-text.is-shrunk {
+  font-size: calc(var(--sf-font-small) * var(--sf-vd-unit-scale));
+}
+
+/* A label placed on the drawing itself: a step smaller and weighted, so it
+   reads as a name rather than as the shape's own text. */
+.sf-vd-label {
+  fill: var(--sf-vd-tone, var(--text-normal));
+  font-size: calc(var(--sf-font-small) * var(--sf-vd-unit-scale));
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-anchor: middle;
+}
+
+/* ----------------------------------------------------------------- motion */
+/* An arrow that carries flow is drawn twice: the arrow, and a dashed overlay of
+   the very same path. The dashes travel from tail to head as the offset moves
+   one whole dash period per cycle, so the loop is seamless, and both the
+   pattern and its travel are measured in the drawing's units-per-pixel: dashes
+   of the same real size whatever width the picture is drawn at. The overlay is
+   the one part of the drawing that moves, so it wears the reader's own accent —
+   and it takes no pointer events, so the parts still open on the arrows it
+   rides. */
+
+.sf-vd-arrow-flow {
+  fill: none;
+  stroke: var(--interactive-accent);
+  stroke-width: calc(1.5px * var(--sf-vd-unit-scale));
+  stroke-linecap: round;
+  stroke-dasharray: calc(6px * var(--sf-vd-unit-scale)) calc(10px * var(--sf-vd-unit-scale));
+  pointer-events: none;
+  animation: sf-vd-flow-travel 1.2s linear infinite;
+}
+
+/* One cycle is one dash period, so the pattern loops without a jump. */
+
+@keyframes sf-vd-flow-travel {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: calc(-16px * var(--sf-vd-unit-scale));
+  }
+}
+
+/* A shape the reader should watch breathes: a small, slow swell of its whole
+   group — the shape and its label together. It is a transform, which moves
+   paint rather than boxes: nothing is resized, re-measured or re-fitted by it. */
+
+.sf-vd-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sf-vd-pulse-breathe 4s ease-in-out infinite;
+}
+
+@keyframes sf-vd-pulse-breathe {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+}
+
+/* --------------------------------------------------------------- hotspots */
+/* A hotspot is a real button at the point it names: the marker is its hit
+   area, `:focus-visible` thickens the dot's ring so the keyboard can see where
+   it is, and the open state fills it. The rings are real pixels, like the text:
+   a marker keeps the weight it has at any drawing width. */
+
+.sf-vd-hotspots {
+  pointer-events: none;
+}
+
+.sf-vd-hotspot {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.sf-vd-hotspot-dot {
+  fill: var(--background-primary);
+  stroke: var(--interactive-accent);
+  stroke-width: calc(1px * var(--sf-vd-unit-scale));
+  transition: fill var(--sf-transition-fast), stroke-width var(--sf-transition-fast);
+}
+
+.sf-vd-hotspot-num {
+  fill: var(--interactive-accent);
+  font-size: calc(var(--sf-font-small) * var(--sf-vd-unit-scale));
+  font-weight: 600;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.sf-vd-hotspot:hover .sf-vd-hotspot-dot {
+  stroke-width: calc(1.4px * var(--sf-vd-unit-scale));
+}
+
+.sf-vd-hotspot:focus-visible .sf-vd-hotspot-dot {
+  stroke-width: calc(2px * var(--sf-vd-unit-scale));
+}
+
+.sf-vd-hotspot.is-open .sf-vd-hotspot-dot {
+  fill: var(--interactive-accent);
+  stroke: var(--sf-text-on-primary);
+}
+
+.sf-vd-hotspot.is-open .sf-vd-hotspot-num {
+  fill: var(--sf-text-on-primary);
+}
+
+/* ------------------------------------------------------ the label game */
+/* The picture arrives taken apart: the parts' labels sit in a tray, shuffled,
+   and the reader puts them back. A chip is a real button, so it is focusable
+   and presses like one; the part it lands on gets its state on the drawing. */
+
+.sf-vd-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-xs);
+  min-width: 0;
+}
+
+.sf-vd-chip {
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  max-width: 100%;
+  padding: 3px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-secondary);
+  box-shadow: none;
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: grab;
+}
+
+.sf-vd-chip-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sf-vd-chip:hover {
+  border-color: var(--interactive-accent);
+}
+
+.sf-vd-chip:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+/* The label in hand: the one the next press on a part will place. */
+.sf-vd-chip.is-selected {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--sf-text-on-primary);
+  cursor: grabbing;
+}
+
+.sf-vd-chip.is-carrying {
+  opacity: 0.45;
+}
+
+/* A label that is home: it stays in the tray, dimmed and unpressable, so the
+   reader can see how much of the picture they have rebuilt. */
+.sf-vd-chip.is-placed {
+  border-style: dashed;
+  border-color: var(--sf-success);
+  background: transparent;
+  color: var(--sf-text-muted);
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* The drag's own chip: the tray's chip rides the pointer while it is carried. */
+.sf-vd-ghost {
+  position: fixed;
+  left: var(--sf-vd-ghost-x, 0);
+  top: var(--sf-vd-ghost-y, 0);
+  z-index: 30;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  padding: 3px 10px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 999px;
+  background: var(--background-primary);
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  opacity: 0.92;
+}
+
+/* The hint and the score: one line under the tray, and the score is the only
+   thing that changes as the reader works. */
+.sf-vd-game {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.sf-vd-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--sf-font-small);
+  line-height: 1.4;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-vd-report {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-vd-report.is-solved {
+  border-color: var(--sf-success);
+  background: var(--sf-success-light);
+  color: var(--sf-success);
+}
+
+/* A part that has its label: green, and its name written on the drawing. The
+   label is drawn text inside the SVG, so it scales with the house tokens like
+   every other drawing label. */
+.sf-vd-hotspot.is-placed .sf-vd-hotspot-dot {
+  fill: var(--sf-success);
+  stroke: var(--sf-success);
+}
+
+.sf-vd-hotspot.is-placed .sf-vd-hotspot-num {
+  fill: var(--sf-text-on-primary);
+}
+
+.sf-vd-hotspot-label {
+  fill: var(--sf-success);
+  font-size: calc(var(--sf-font-small) * var(--sf-vd-unit-scale));
+  font-weight: 600;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* A refused placement: the part flashes warning-toned and settles back. The
+   class is removed by the code after a beat; the animation is the nicety. */
+.sf-vd-hotspot.is-rejected .sf-vd-hotspot-dot {
+  fill: var(--sf-warning-light);
+  stroke: var(--sf-warning);
+  animation: sf-vd-reject 0.45s ease-in-out;
+}
+
+@keyframes sf-vd-reject {
+  0%,
+  100% {
+    stroke-width: calc(1px * var(--sf-vd-unit-scale));
+  }
+
+  40% {
+    stroke-width: calc(3px * var(--sf-vd-unit-scale));
+  }
+}
+
+/* Solved: the tray's line goes quiet and the drawing's edge says the picture
+   is whole again. */
+.sf-vd.is-solved .sf-vd-figure {
+  border-left: 3px solid var(--sf-success);
+  border-radius: 0 var(--sf-radius-md) var(--sf-radius-md) 0;
+}
+
+/* ---------------------------------------------------- caption and detail */
+
+.sf-vd-caption {
+  font-size: var(--sf-font-ui);
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* The open part: its name, then what it means. Hidden while nothing is open,
+   so no empty box sits under the drawing. */
+.sf-vd-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--sf-space-sm);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: 0 var(--sf-radius-sm) var(--sf-radius-sm) 0;
+  background: var(--background-secondary);
+}
+
+.sf-vd-detail-label {
+  font-size: var(--sf-font-text);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.sf-vd-detail-text {
+  font-size: var(--sf-font-ui);
+  line-height: 1.5;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-vd-hidden {
+  display: none;
+}
+
+/* --------------------------------------------------------------- the pearl */
+
+.sf-vd-pearl {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: flex-start;
+  padding-left: var(--sf-space-sm);
+  border-left: 3px solid var(--sf-primary);
+}
+
+.sf-vd-pearl-tag {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sf-primary);
+}
+
+.sf-vd-pearl-text {
+  min-width: 0;
+  font-size: var(--sf-font-text);
+  line-height: 1.5;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Reduced motion ============================== */
+/* The renderer already leaves both animated classes out when the reader asked
+   for reduced motion; this is the second guard, for a preference that changes
+   while the drawing is already up. */
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-vd-arrow-flow,
+  .sf-vd-pulse {
+    animation: none;
+  }
+
+  .sf-vd-hotspot.is-rejected .sf-vd-hotspot-dot {
+    animation: none;
+  }
+}

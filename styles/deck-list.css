@@ -1,0 +1,306 @@
+/*
+ * The decks inside the note list: one day's decks, grouped per deck, with the
+ * questions each is holding for that day.
+ *
+ * There is no section furniture here on purpose — no heading, no panel, no
+ * scroll area. These rows borrow the note list's own rhythm (the box, the
+ * padding, the hover, the chip) from `styles/sidebar.css` and are inset a
+ * little so the eye reads them as part of the day rather than a second widget.
+ * Everything is sized from the reader's own settings and coloured from the
+ * app's variables, so a theme restyles this with the rest of the sidebar.
+ */
+
+/* ------------------------------------------------------ a day's deck rows */
+
+/* Only as much structure as "below the notes, above nothing": the day's
+   container already spaces its children. */
+.sf-deck-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  margin-top: var(--sf-space-sm);
+}
+
+.sf-deck-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  /* Barely inset: the accent edge on each row and the rail under an open deck
+     already say "these belong to this day". A larger inset pushed the deck
+     names off the note titles' column, which read as a second list after all. */
+  margin-left: var(--sf-space-xs);
+  min-width: 0;
+}
+
+/* The deck row, in a note row's box (see .review-note-item in sidebar.css):
+   same padding, same radius, same hover, plus a tinted left edge so a deck
+   never reads as a note. */
+.sf-deck-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  min-width: 0;
+  padding: var(--sf-space-sm);
+  border: 1px solid transparent;
+  border-left: 3px solid var(--sf-info, var(--interactive-accent));
+  border-radius: var(--radius-s, 4px);
+  background-color: var(--background-secondary);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.sf-deck-row:hover,
+.sf-deck-row.is-open {
+  background-color: var(--background-modifier-hover);
+}
+
+.sf-deck-row:hover {
+  border-color: var(--interactive-hover);
+  border-left-color: var(--interactive-accent);
+}
+
+.sf-deck-row:focus-visible,
+.sf-deck-question:focus-visible,
+.sf-deck-resting-line:focus-visible,
+.sf-deck-resting-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+/* The leading square: the same weight as a note row's leading title, and the
+   mark that says "this row is a deck". */
+.sf-deck-lead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: var(--sf-radius-sm);
+  background-color: color-mix(in srgb, var(--sf-info, var(--interactive-accent)), transparent 85%);
+  color: var(--sf-info, var(--interactive-accent));
+}
+
+.sf-deck-lead svg {
+  width: 1em;
+  height: 1em;
+}
+
+.sf-deck-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+/* The chip: one shape for a deck's card count and a card's state, mirroring
+   .review-note-phase. Quiet by default; it is a count, not a call to action. */
+.sf-deck-chip {
+  flex: 0 0 auto;
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  background-color: var(--sf-bg-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  white-space: nowrap;
+}
+
+/* The row's own buttons: the same chrome as a note row's action buttons, but
+   quieter — they sit inside a row that is itself clickable. */
+.sf-deck-play,
+.sf-deck-chevron {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sf-space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--sf-radius-sm);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.sf-deck-play:hover,
+.sf-deck-chevron:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border);
+}
+
+.sf-deck-play svg,
+.sf-deck-chevron svg {
+  width: var(--sf-font-ui);
+  height: var(--sf-font-ui);
+}
+
+/* Studying is offered, not shouted: the play button appears when the row is
+   pointed at (or focused, so the keyboard finds it too), and it is hidden
+   rather than transparent — an invisible button would still swallow a click
+   meant for the row. */
+.sf-deck-play {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--sf-transition-fast), visibility var(--sf-transition-fast);
+}
+
+.sf-deck-row:hover .sf-deck-play,
+.sf-deck-row:focus-within .sf-deck-play {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* A touch screen has no hover: the button is simply there. */
+@media (hover: none) {
+  .sf-deck-play {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+.sf-deck-row.is-open .sf-deck-chevron {
+  color: var(--text-normal);
+}
+
+/* --------------------------------------------------------------- questions */
+
+/* The questions hang off a rail, the way the note list hangs a day's notes
+   under its header. */
+.sf-deck-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  margin-left: var(--sf-space-sm);
+  padding-left: var(--sf-space-sm);
+  border-left: 2px solid var(--background-modifier-border-hover);
+}
+
+.sf-deck-question {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.sf-deck-question:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* One line, always: the question is cut in the code, and this keeps a row from
+   ever growing taller than the note rows beside it. */
+.sf-deck-question-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: inherit;
+  color: var(--text-normal);
+}
+
+.sf-deck-more {
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------- decks with nothing due */
+
+/* The trailing line: muted, one row, and only as loud as a footnote. */
+.sf-deck-resting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  margin: var(--sf-space-xs) 0 var(--sf-space-sm) var(--sf-space-md);
+}
+
+.sf-deck-resting-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-xs);
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  border-radius: var(--radius-s, 4px);
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.sf-deck-resting-line:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.sf-deck-resting-chevron {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.sf-deck-resting-chevron svg {
+  width: var(--sf-font-small);
+  height: var(--sf-font-small);
+}
+
+.sf-deck-resting-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sf-deck-resting-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+  margin-left: var(--sf-space-sm);
+  padding-left: var(--sf-space-sm);
+  border-left: 2px solid var(--background-modifier-border);
+}
+
+.sf-deck-resting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  padding: var(--sf-space-xs) var(--sf-space-sm);
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.sf-deck-resting-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.sf-deck-resting-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+}
+
+/* A deck's estimate, in the same voice as a note row's time. */
+.sf-deck-time {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+

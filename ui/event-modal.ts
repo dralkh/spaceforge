@@ -270,7 +270,8 @@ export class EventModal extends Modal {
     private updateColorPreview(): void {
         const colorPreview = this.contentEl.querySelector(".event-modal-color-preview") as HTMLElement;
         if (colorPreview) {
-            colorPreview.style.backgroundColor = this.colorInput.value;
+            // The chosen colour is data; the stylesheet gives the swatch its shape.
+            colorPreview.setCssProps({ '--sf-event-color': this.colorInput.value });
         }
     }
 
@@ -281,9 +282,7 @@ export class EventModal extends Modal {
         const isAllDay = this.isAllDayToggle.checked;
         const timeContainer = this.timeInput.closest(".event-modal-input-group") as HTMLElement;
 
-        if (timeContainer) {
-            timeContainer.style.display = isAllDay ? "none" : "block";
-        }
+        timeContainer?.toggleClass('sf-hidden', isAllDay);
 
         if (isAllDay) {
             this.timeInput.value = "";
@@ -308,9 +307,7 @@ export class EventModal extends Modal {
         const recurrence = this.recurrenceSelect.value as EventRecurrence;
         const endDateContainer = this.recurrenceEndDateInput.closest(".event-modal-recurrence-end-container") as HTMLElement;
 
-        if (endDateContainer) {
-            endDateContainer.style.display = recurrence === EventRecurrence.None ? "none" : "block";
-        }
+        endDateContainer?.toggleClass('sf-hidden', recurrence === EventRecurrence.None);
 
         if (recurrence === EventRecurrence.None) {
             this.recurrenceEndDateInput.value = "";

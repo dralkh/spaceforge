@@ -6,9 +6,24 @@
 @import url('./_buttons.css');
 @import url('./_components.css');
 @import url('./review-buttons.css');
+@import url('./review-strip.css');
+@import url('./data-recovery.css');
 @import url('./settings.css');
 @import url('./sidebar.css');
 @import url('./calendar.css');
 @import url('./mcq.css');
+@import url('./study.css');
+@import url('./mcq-runner.css');
+@import url('./deck-session.css');
+@import './deck-list.css';
+@import './review-window.css';
+@import url('./ankiweb.css');
 @import url('./pomodoro.css'); /* Added Pomodoro styles */
 @import url('./responsive.css');
+@import url('./study-mindmap.css');
+@import url('./study-visual-gallery.css');
+@import url('./study-visual-sequence.css');
+@import url('./study-visual-diagram.css');
+@import url('./study-visual-graph.css');
+@import url('./study-visual-lab.css');
+@import url('./study-visual-board.css');

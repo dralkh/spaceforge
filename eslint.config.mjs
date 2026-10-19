@@ -5,7 +5,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 import tsparser from "@typescript-eslint/parser";
 
 export default [
-    { ignores: ["dist/", "node_modules/", "main.js", ".eslintrc.js", "esbuild.config.mjs", "version-bump.mjs", "eslint-plugin/", "install.js"] },
+    { ignores: ["dist/", "node_modules/", "main.js", ".eslintrc.js", "esbuild.config.mjs", "version-bump.mjs", "eslint-plugin/", "install.js", ".test-build/", "test/", "live-test-vault/", "media/"] },
 
     pluginJs.configs.recommended,
     ...tseslint.configs.recommended,
@@ -57,13 +57,43 @@ export default [
             "obsidianmd/no-static-styles-assignment": "error",
             "obsidianmd/object-assign": "error",
             "obsidianmd/platform": "error",
-            "obsidianmd/prefer-file-manager-trash-file": "warn",
+            "obsidianmd/prefer-file-manager-trash-file": "error",
             "obsidianmd/prefer-abstract-input-suggest": "error",
             "obsidianmd/regex-lookbehind": "error",
             "obsidianmd/sample-names": "error",
             "obsidianmd/validate-manifest": "error",
             "obsidianmd/validate-license": ["error"],
-            "obsidianmd/ui/sentence-case": "warn"
+            // Product and feature names this plugin uses in its UI. The rule keeps
+            // proper nouns capitalised and lowercases everything else, so without
+            // this list our own names ("Spaceforge", "Study") and the CLIs we drive
+            // read as title case to the linter.
+            "obsidianmd/ui/sentence-case": ["error", {
+                brands: [
+                    "Anki",
+                    "AnkiWeb",
+                    "FSRS",
+                    "SM-2",
+                    "Cloze",
+                    "Spaceforge",
+                    "Spaceforge Study",
+                    "Study",
+                    "MCQs",
+                    "Pomodoro",
+                    "OpenRouter",
+                    "Claude Code",
+                    "Codex",
+                    "Cursor Agent",
+                    "Hermes",
+                    "OpenClaw",
+                    "Gemini CLI",
+                    "Together AI",
+                    "Tavily",
+                    "Brave",
+                    "SearXNG",
+                    "FSRS",
+                    "SM-2",
+                ],
+            }]
         },
     },
 ];

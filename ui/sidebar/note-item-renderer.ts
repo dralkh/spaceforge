@@ -103,6 +103,18 @@ export class NoteItemRenderer {
             }
         }
 
+        // Study badge: a dot when objectives are due, a calmer one when a plan
+        // exists but nothing is due yet.
+        const studyBtnEl = noteEl.querySelector<HTMLButtonElement>(".review-note-study");
+        if (studyBtnEl && this.plugin.studyController) {
+            const badge = this.plugin.studyController.studyBadge(note.path);
+            studyBtnEl.classList.remove("has-plan", "has-work");
+            if (badge.hasPlan) studyBtnEl.classList.add(badge.due > 0 ? "has-work" : "has-plan");
+            studyBtnEl.title = badge.hasPlan
+                ? `Study · ${badge.mastered}/${badge.total} solid${badge.due > 0 ? ` · ${badge.due} due` : ""}`
+                : "Study this note";
+        }
+
         // Advance button state
         const advanceBtn = noteEl.querySelector<HTMLButtonElement>(".review-note-advance");
         if (advanceBtn) {
@@ -160,6 +172,18 @@ export class NoteItemRenderer {
         setIcon(reviewBtn, "play");
         reviewBtn.title = "Review";
 
+        // Adaptive study: opens the tutor, with a dot when objectives are due.
+        if (this.plugin.settings.studyEnabled && this.plugin.settings.studyShowInSidebar && this.plugin.studyController) {
+            const studyBtn = actionBtnsEl.createEl("button", { cls: "review-note-button review-note-study" });
+            setIcon(studyBtn, "graduation-cap");
+            studyBtn.title = "Study";
+            studyBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const path = noteEl.dataset.notePath;
+                if (path) this.plugin.studyController.openStudy(path);
+            });
+        }
+
         const advanceBtn = actionBtnsEl.createEl("button", { cls: "review-note-button review-note-advance" });
         setIcon(advanceBtn, "arrow-left-circle"); // Or 'chevrons-left', 'skip-back'
         advanceBtn.title = "Advance";
@@ -190,7 +214,10 @@ export class NoteItemRenderer {
         titleEl.addEventListener("click", (e) => {
             e.stopPropagation();
             const path = noteEl.dataset.notePath; // Get current path from element
-            if (path) void this.plugin.reviewController.openNoteWithoutReview(path);
+            // One click on the note's name is both things at once: the note comes
+            // up in the leaf and its review session starts on it. A note in the
+            // list is there to be studied, not to be read about.
+            if (path) void this.plugin.reviewController.reviewNote(path);
         });
 
         reviewBtn.addEventListener("click", (e) => {
@@ -244,7 +271,7 @@ export class NoteItemRenderer {
                  const file = this.plugin.app.vault.getAbstractFileByPath(path);
                  new ConfirmationModal(
                      this.plugin.app,
-                     'Remove Note',
+                     'Remove note',
                      `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
                      () => {
                          void (async () => {
@@ -278,8 +305,10 @@ export class NoteItemRenderer {
                     } else {
                         // Convert to recurring note with default interval
                         const defaultInterval = this.plugin.settings.defaultRecurrenceInterval;
-                        await this.plugin.recurringNotesService.convertToRecurringNote(path, defaultInterval);
-                        new Notice(`Note is now recurring every ${defaultInterval} days`);
+                        const converted = await this.plugin.recurringNotesService.convertToRecurringNote(path, defaultInterval);
+                        new Notice(converted
+                            ? `Note is now recurring every ${defaultInterval} days`
+                            : 'Add this note to review before making it recurring.');
                     }
                     
                     await onNoteAction();
@@ -351,6 +380,11 @@ export class NoteItemRenderer {
             } else {
                 selectedNotesArray.length = 0;
                 selectedNotesArray.push(currentPath);
+                // A plain click is the reader asking for this note: bring it up
+                // and start its session on it, in one step. Only a modified
+                // click (or the selection the bulk bar works on) selects without
+                // starting anything.
+                void this.plugin.reviewController.reviewNote(currentPath);
             }
             lastSelectedNotePathRef.current = currentPath;
             onSelectionChange();
@@ -434,8 +468,10 @@ export class NoteItemRenderer {
                     .setIcon("repeat")
                     .onClick(async () => {
                         const defaultInterval = this.plugin.settings.defaultRecurrenceInterval;
-                        await this.plugin.recurringNotesService.convertToRecurringNote(path, defaultInterval);
-                        new Notice(`Note is now recurring every ${defaultInterval} days`);
+                        const converted = await this.plugin.recurringNotesService.convertToRecurringNote(path, defaultInterval);
+                        new Notice(converted
+                            ? `Note is now recurring every ${defaultInterval} days`
+                            : 'Add this note to review before making it recurring.');
                         await onNoteAction();
                     }));
             }
@@ -447,7 +483,7 @@ export class NoteItemRenderer {
                      const file = this.plugin.app.vault.getAbstractFileByPath(path);
                      new ConfirmationModal(
                          this.plugin.app,
-                         'Remove Note',
+                         'Remove note',
                          `Remove "${file instanceof TFile ? file.basename : path}" from review schedule?`,
                          () => {
                              void (async () => {
