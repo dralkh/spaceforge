@@ -752,7 +752,8 @@ export function migrateSettings(settings: SpaceforgeSettings): boolean {
     // Gemini moves to the Antigravity row; only the one model id both CLIs took
     // is carried across, and anything else falls back to Antigravity's default
     // so the next run cannot fail on a slug the new CLI never had.
-    if (settings.mcqApiProvider === 'cli:gemini') {
+    const provider: string = settings.mcqApiProvider;
+    if (provider === 'cli:gemini') {
         settings.mcqApiProvider = 'cli:antigravity';
         const models = { ...(settings.providerModels ?? {}) };
         if (!models['cli:antigravity'] && models['cli:gemini'] === 'gemini-3.8-flash') {

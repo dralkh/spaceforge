@@ -252,7 +252,7 @@ export function renderHeatmap(host: HTMLElement, options: HeatmapOptions): void 
             rect.addClass('is-clickable');
             rect.addEventListener('click', () => onSelect(day));
             rect.addEventListener('keydown', event => {
-                const key = (event as KeyboardEvent).key;
+                const key = event.key;
                 if (key === 'Enter' || key === ' ') {
                     event.preventDefault();
                     onSelect(day);

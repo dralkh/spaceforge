@@ -244,9 +244,11 @@ export function gradeOfSm2Quality(quality: number): ReviewGrade {
 
 /** The answer button an FSRS rating (1-4) corresponds to. */
 export function gradeOfFsrsRating(rating: number): ReviewGrade {
-    if (rating >= FsrsRating.Easy) return 'easy';
-    if (rating >= FsrsRating.Good) return 'good';
-    if (rating >= FsrsRating.Hard) return 'hard';
+    // Number(...) keeps the enum names without comparing a plain number to an
+    // enum member, which TypeScript's enum-comparison rule refuses.
+    if (rating >= Number(FsrsRating.Easy)) return 'easy';
+    if (rating >= Number(FsrsRating.Good)) return 'good';
+    if (rating >= Number(FsrsRating.Hard)) return 'hard';
     return 'again';
 }
 

@@ -39,7 +39,7 @@ function makeView(options: { deck?: { bundle: DeckBundle; summary: Record<string
             workspace: {
                 on: () => undefined,
                 off: () => undefined,
-                activeLeaf: null,
+                getActiveViewOfType: () => null,
                 openLinkText: async () => undefined,
             },
         },

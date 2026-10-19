@@ -161,7 +161,9 @@ export class StatsView extends ItemView {
     private lastWidth = 0;
     private readonly onSidebarUpdate = () => this.scheduleRefresh();
     private readonly onActiveLeafChange = (): void => {
-        if (this.plugin.app.workspace.activeLeaf === this.leaf) void this.refresh();
+        // The deprecated active-leaf field is not read here: asking for the
+        // active view of this type tells the same thing the supported way.
+        if (this.plugin.app.workspace.getActiveViewOfType(StatsView) === this) void this.refresh();
     };
 
     constructor(leaf: WorkspaceLeaf, plugin: SpaceforgePlugin) {

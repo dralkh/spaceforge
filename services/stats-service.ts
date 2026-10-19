@@ -52,6 +52,7 @@ import {
     sumLaneDays,
     timestampOfDayKey,
 } from '../models/stats';
+import { StudyObjectiveStatus } from '../models/study';
 import { deckDayBase } from '../utils/dates';
 
 /** One day's totals for the forecast chart. */
@@ -447,10 +448,10 @@ export class StatsService {
             for (const state of Object.values(progress.objectives)) {
                 objectives.total += 1;
                 switch (state.status) {
-                    case 'mastered': objectives.mastered += 1; break;
-                    case 'stable': objectives.stable += 1; break;
-                    case 'fragile': objectives.fragile += 1; break;
-                    case 'learning': objectives.learning += 1; break;
+                    case StudyObjectiveStatus.Mastered: objectives.mastered += 1; break;
+                    case StudyObjectiveStatus.Stable: objectives.stable += 1; break;
+                    case StudyObjectiveStatus.Fragile: objectives.fragile += 1; break;
+                    case StudyObjectiveStatus.Learning: objectives.learning += 1; break;
                     default: objectives.unseen += 1; break;
                 }
                 if (state.nextReviewAt !== null && state.nextReviewAt !== undefined && state.nextReviewAt <= now) {
@@ -534,9 +535,9 @@ export function deckDueAt(card: AnkiCard, dayBase: number): number {
 
 /** The four-button grade an Anki grade is; kept local to avoid a cycle. */
 function gradeOfDeckGrade(grade: AnkiGrade): 'again' | 'hard' | 'good' | 'easy' {
-    if (grade >= 4) return 'easy';
-    if (grade >= 3) return 'good';
-    if (grade >= 2) return 'hard';
+    if (grade >= AnkiGrade.Easy) return 'easy';
+    if (grade >= AnkiGrade.Good) return 'good';
+    if (grade >= AnkiGrade.Hard) return 'hard';
     return 'again';
 }
 
