@@ -1,5 +1,6 @@
 import { CliAgentDef, CliInvokeOptions, CliParseResult, isAuthFailureText } from './cli-types';
 import { clearCliBinaryCache, CliSearchOptions, cliPathDirs, findCliBinary } from './cli-binary';
+import { loadNodeModule, nodeProcess } from './node-modules';
 
 /**
  * Spawning agent CLIs from inside Obsidian.
@@ -14,8 +15,10 @@ import { clearCliBinaryCache, CliSearchOptions, cliPathDirs, findCliBinary } fro
  */
 
 interface ChildProcessHandle {
-    stdout: { on(event: 'data', handler: (chunk: Buffer | string) => void): void } | null;
-    stderr: { on(event: 'data', handler: (chunk: Buffer | string) => void): void } | null;
+    // The chunk is a Buffer in Node, but typing it as `unknown` keeps the
+    // handler working (and lint-clean) with or without Node's declarations.
+    stdout: { on(event: 'data', handler: (chunk: unknown) => void): void } | null;
+    stderr: { on(event: 'data', handler: (chunk: unknown) => void): void } | null;
     stdin: { write(text: string): void; end(): void } | null;
     on(event: string, handler: (...args: unknown[]) => void): void;
     kill(signal?: string): void;
@@ -33,23 +36,7 @@ let cachedNode: ChildProcessModule | null | undefined;
 /** Node's child_process, or null on a build that has no Node (mobile). */
 export function nodeChildProcess(): ChildProcessModule | null {
     if (cachedNode !== undefined) return cachedNode;
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Node is only reachable this way in a plugin bundle, and only on desktop.
-        const req = eval('require') as (id: string) => unknown;
-        cachedNode = req('child_process') as ChildProcessModule;
-        return cachedNode;
-    } catch {
-        // Not every bundle has a `require` in scope: a test build (and any future
-        // ESM-only host) reaches the same module through the Node API instead.
-    }
-    try {
-        const getBuiltin = (process as unknown as { getBuiltinModule?: (id: string) => unknown }).getBuiltinModule;
-        cachedNode = typeof getBuiltin === 'function'
-            ? getBuiltin('child_process') as ChildProcessModule
-            : null;
-    } catch {
-        cachedNode = null;
-    }
+    cachedNode = loadNodeModule<ChildProcessModule>('child_process');
     return cachedNode;
 }
 
@@ -86,7 +73,7 @@ let cachedPath: string | null = null;
  */
 export function resolveShellPath(): string | null {
     if (cachedPath !== null) return cachedPath;
-    const base = (typeof process !== 'undefined' && process.env?.PATH) ? process.env.PATH : '/usr/bin:/bin';
+    const base = nodeProcess()?.env?.PATH ?? '/usr/bin:/bin';
     cachedPath = [...cliPathDirs({ extra: extraPath }), base].join(':');
     return cachedPath;
 }
@@ -101,8 +88,7 @@ export function resolveCliBinary(bin: string, search?: CliSearchOptions): string
 }
 
 export function getEnvVar(name: string): string | undefined {
-    if (typeof process === 'undefined' || !process.env) return undefined;
-    const value = process.env[name];
+    const value = nodeProcess()?.env?.[name];
     return value && value.trim() !== '' ? value.trim() : undefined;
 }
 
@@ -151,11 +137,11 @@ export async function runCliCapture(
         const finish = (exitCode: number): void => {
             if (settled) return;
             settled = true;
-            clearTimeout(timer);
+            window.clearTimeout(timer);
             resolve({ stdout, stderr, exitCode, notFound, timedOut });
         };
 
-        const timer = setTimeout(() => {
+        const timer = window.setTimeout(() => {
             timedOut = true;
             try { child.kill('SIGKILL'); } catch { /* already gone */ }
             finish(-1);
@@ -181,7 +167,7 @@ export async function runCliCapture(
 }
 
 function envWithPath(): Record<string, string | undefined> {
-    const env: Record<string, string | undefined> = { ...(typeof process !== 'undefined' ? process.env : {}) };
+    const env: Record<string, string | undefined> = { ...(nodeProcess()?.env ?? {}) };
     if (cachedPath) env.PATH = cachedPath;
     // Keep CLI output machine-readable: no colour codes, no spinners.
     env.NO_COLOR = '1';

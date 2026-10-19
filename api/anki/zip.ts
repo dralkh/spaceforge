@@ -147,7 +147,7 @@ interface ByteStreams {
 type StreamConstructor = new (format: string) => ByteStreams;
 
 function streamFactory(name: string): StreamConstructor {
-    const factory = (globalThis as unknown as Record<string, unknown>)[name];
+    const factory = (window as unknown as Record<string, unknown>)[name];
     if (typeof factory !== 'function') {
         throw new Error(`${name} is not available in this environment`);
     }

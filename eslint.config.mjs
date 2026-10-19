@@ -46,6 +46,7 @@ export default [
             "obsidianmd/commands/no-plugin-name-in-command-name": "error",
             "obsidianmd/settings-tab/no-manual-html-headings": "error",
             "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+            "obsidianmd/settings-tab/prefer-setting-definitions": "warn",
             "obsidianmd/vault/iterate": "error",
             "obsidianmd/detach-leaves": "error",
             "obsidianmd/hardcoded-config-path": "error",

@@ -507,7 +507,7 @@ export function createChatClient(settings: SpaceforgeSettings): ChatClient | nul
         // differs, and the CLI brings its own credentials.
         return createCliChatClient(agent.id, cliModelForProvider(settings, agent));
     }
-    const descriptor = descriptorFor(provider as ApiProvider);
+    const descriptor = descriptorFor(provider);
     if (!descriptor || descriptor.missing(settings) !== null) return null;
 
     const label = descriptor.label;

@@ -171,7 +171,7 @@ export class ReviewBatchController implements IReviewBatchController {
 
         new Notice(`Postponing ${paths.length} notes by ${days} day(s)...`);
         for (const path of paths) {
-            await this.plugin.dataStorage.postponeNote(path, days);
+            this.plugin.dataStorage.postponeNote(path, days);
             // No need to call handleNotePostponed here for each note,
             // as a single refresh of the sidebar after the loop is sufficient.
         }
@@ -204,7 +204,7 @@ export class ReviewBatchController implements IReviewBatchController {
         for (const path of paths) {
             // Directly call the core controller's advanceNote, which handles eligibility and notices
             // The service's advanceNote returns a boolean indicating success
-            const advanced = await this.plugin.dataStorage.reviewScheduleService.advanceNote(path);
+            const advanced = this.plugin.dataStorage.reviewScheduleService.advanceNote(path);
             if (advanced) {
                 advancedCount++;
             }
@@ -239,7 +239,7 @@ export class ReviewBatchController implements IReviewBatchController {
 
         new Notice(`Removing ${paths.length} notes from review schedule...`);
         for (const path of paths) {
-            await this.plugin.dataStorage.removeFromReview(path);
+            this.plugin.dataStorage.removeFromReview(path);
             // No need to call handleNotePostponed here for each note,
             // as a single refresh of the sidebar after the loop is sufficient.
         }

@@ -29,7 +29,7 @@ export function mapScoreToFsrsRating(score: number): FsrsRating {
 
 /** Human-readable name for a rating, used in notices. */
 export function describeRating(rating: ReviewResponse | FsrsRating): string {
-    return typeof rating === 'number' && rating <= 4 && FsrsRating[rating as FsrsRating] !== undefined
+    return typeof rating === 'number' && Number(rating) <= 4 && FsrsRating[rating as FsrsRating] !== undefined
         ? FsrsRating[rating as FsrsRating]
         : ReviewResponse[rating as ReviewResponse] ?? String(rating);
 }

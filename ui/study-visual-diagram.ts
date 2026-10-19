@@ -188,7 +188,7 @@ const PREFERS_REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
  */
 export function prefersReducedMotion(): boolean {
     try {
-        const scope = globalThis as unknown as { matchMedia?: unknown };
+        const scope = window as unknown as { matchMedia?: unknown };
         if (typeof scope.matchMedia !== 'function') return false;
         const query = (scope.matchMedia as (query: string) => { matches?: boolean } | null | undefined)(
             PREFERS_REDUCED_MOTION
@@ -582,7 +582,7 @@ export class StudyVisualDiagramView {
     }
 
     private bind(el: EventTarget, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.bindings.push({ el, type, handler: listener });
     }
@@ -991,7 +991,7 @@ export class StudyVisualDiagramView {
     }
 
     private bindDrag(el: EventTarget, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.dragBindings.push({ el, type, handler: listener });
     }

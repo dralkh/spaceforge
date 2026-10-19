@@ -8,11 +8,11 @@
  *  - the registry half (search ranking, key resolution, model discovery via a
  *    canned `requestUrl` response).
  *
- * The test bundle runs as an ES module on Node 20+, where a bundled
- * `eval('require')` throws: `cli-runner` reaches `child_process` that way
- * because in Obsidian it is plain CJS. Putting a real `require` on the global
- * object restores the runtime the plugin actually sees, so every spawn test
- * below runs the shipping code path rather than a fallback. Without it,
+ * The test bundle runs as an ES module on Node 20+. `cli-runner` reaches
+ * `child_process` through node-modules, which prefers Node's
+ * `process.getBuiltinModule()` and falls back to Electron's `window.require`;
+ * this runtime has the former, so every spawn test below runs the shipping
+ * code path rather than a fallback. Without a Node module loader,
  * `isCliExecAvailable()` reports false and the spawn tests would silently test
  * the "cannot launch local processes" branch instead.
  */

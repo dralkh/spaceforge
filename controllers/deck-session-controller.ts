@@ -868,17 +868,17 @@ export class DeckSessionController {
     private closeStaleSurfaces(): void {
         // No DOM (unit tests, a stripped environment): nothing to sweep — and a
         // document stand-in without a search finds nothing to take down either.
-        if (typeof document === 'undefined') return;
-        if (typeof document.querySelectorAll !== 'function') return;
+        if (typeof document === 'undefined' || !document.body) return;
+        if (typeof document.body.findAll !== 'function') return;
         // The dock may still be holding the *previous* sitting's mount closure,
         // and a closure is enough to build a second copy of the same panel the
         // next time the dock renders. Clearing its bookkeeping comes first; the
         // markup sweep below is the belt to that pair of braces.
         this.plugin.reviewFlowController?.cardSittingEnded?.();
-        for (const panel of Array.from(document.querySelectorAll<HTMLElement>('.sf-dock-body.sf-deck-host'))) {
+        for (const panel of document.body.findAll('.sf-dock-body.sf-deck-host')) {
             panel.remove();
         }
-        for (const root of Array.from(document.querySelectorAll<HTMLElement>('.sf-deck'))) {
+        for (const root of document.body.findAll('.sf-deck')) {
             root.remove();
         }
     }

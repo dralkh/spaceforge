@@ -524,7 +524,7 @@ class TreeWriter {
                 total += size;
                 j++;
             }
-            let max = inPage[inPage.length - 1] as EncodedCell;
+            let max = inPage[inPage.length - 1];
             if (j < leafCells.length && index) {
                 // An index b-tree stores every key exactly once, so a divider
                 // moves up into the parent. (A table row's key lives in the

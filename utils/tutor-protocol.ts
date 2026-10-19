@@ -117,7 +117,7 @@ export function parseJsonLoose(text: string): Record<string, unknown> | null {
         try {
             const parsed = JSON.parse(candidate) as unknown;
             if (Array.isArray(parsed)) {
-                const first = parsed[0];
+                const first = (parsed as unknown[])[0];
                 if (first && typeof first === 'object') return first as Record<string, unknown>;
                 continue;
             }
@@ -126,7 +126,7 @@ export function parseJsonLoose(text: string): Record<string, unknown> | null {
             try {
                 const parsed = JSON.parse(repairJson(candidate)) as unknown;
                 if (Array.isArray(parsed)) {
-                    const first = parsed[0];
+                    const first = (parsed as unknown[])[0];
                     if (first && typeof first === 'object') return first as Record<string, unknown>;
                     continue;
                 }

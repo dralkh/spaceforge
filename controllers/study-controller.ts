@@ -1,6 +1,6 @@
 import { Notice, TFile, normalizePath } from 'obsidian';
 import SpaceforgePlugin from '../main';
-import { StudyChartReport, StudySummaryPayload } from '../models/study';
+import { StudyChartReport, StudyObjectiveStatus, StudySummaryPayload } from '../models/study';
 import { FsrsRating, ReviewResponse } from '../models/review-schedule';
 import { StudyPlanService } from '../services/study-plan-service';
 import { StudySessionService } from '../services/study-session-service';
@@ -96,7 +96,7 @@ export class StudyController {
         const store = this.planService.getProgress(notePath);
         if (!store) return { hasPlan: true, due: 0, mastered: 0, total: plan.objectives.length, charting };
         const due = this.planService.dueObjectives(plan, store).length;
-        const mastered = plan.objectives.filter(objective => store.objectives[objective.id]?.status === 'mastered').length;
+        const mastered = plan.objectives.filter(objective => store.objectives[objective.id]?.status === StudyObjectiveStatus.Mastered).length;
         return { hasPlan: true, due, mastered, total: plan.objectives.length, charting };
     }
 
@@ -423,7 +423,7 @@ export class StudyController {
         const label = ratingKind === 'fsrs'
             ? FsrsRating[rating as FsrsRating]
             : ReviewResponse[rating as ReviewResponse];
-        const suggested = { rating: rating as number, label, ratingKind };
+        const suggested = { rating: rating, label, ratingKind };
 
         if (!this.plugin.settings.studyAutoRateNote) {
             new Notice(`Study complete: ${Math.round(score * 100)}% — grade it from the review bar (${label} suggested).`);

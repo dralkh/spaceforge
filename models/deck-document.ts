@@ -1111,8 +1111,8 @@ function cardFromState(state: Record<string, unknown>, deck: AnkiDeck, warnings:
         noteId: asTextValue(state.nid) ?? freshAnkiId(),
         deckId: deck.id,
         ord: asNumberValue(state.ord) ?? 0,
-        type: (asNumberValue(state.type) ?? AnkiCardType.New) as AnkiCardType,
-        queue: (asNumberValue(state.queue) ?? AnkiCardQueue.New) as AnkiCardQueue,
+        type: (asNumberValue(state.type) ?? AnkiCardType.New),
+        queue: (asNumberValue(state.queue) ?? AnkiCardQueue.New),
         interval: asNumberValue(state.ivl) ?? 0,
         easeFactor: asNumberValue(state.factor) ?? deck.options.startingEase,
         reviews: asNumberValue(state.reps) ?? 0,
@@ -1421,7 +1421,8 @@ function formatYamlBlock(entries: [string, YamlValue][], indent: string): string
                 continue;
             }
             if (value.every(item => item === null || typeof item !== 'object')) {
-                lines.push(`${indent}${name}: [${value.map(item => formatYamlScalar(item as YamlScalar)).join(', ')}]`);
+                const scalars = value.filter((item): item is YamlScalar => item === null || typeof item !== 'object');
+                lines.push(`${indent}${name}: [${scalars.map(item => formatYamlScalar(item)).join(', ')}]`);
                 continue;
             }
             lines.push(`${indent}${name}:`);
@@ -1685,7 +1686,7 @@ function isYamlSubsetValue(value: unknown, depth = 0): value is YamlValue {
     if (value === null || value === undefined) return value === null;
     const type = typeof value;
     if (type === 'string' || type === 'boolean') return true;
-    if (type === 'number') return Number.isFinite(value as number);
+    if (type === 'number') return Number.isFinite(value);
     if (depth > 4) return false;
     if (Array.isArray(value)) {
         // Scalar lists only: the subset reader does not rebuild objects in a list.

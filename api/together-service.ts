@@ -112,7 +112,7 @@ export class TogetherService implements IMCQGenerationService {
             });
 
             if (response.status !== 200) {
-                const errorData: TogetherErrorResponse = response.json ?? { message: response.text };
+                const errorData = (response.json ?? { message: response.text }) as TogetherErrorResponse;
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message ?? errorData.message ?? 'Unknown error'}`);
             }
 

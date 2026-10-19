@@ -114,7 +114,7 @@ export class ClaudeService implements IMCQGenerationService {
             });
 
             if (response.status !== 200) {
-                const errorData: ClaudeErrorResponse = response.json ?? { message: response.text };
+                const errorData = (response.json ?? { message: response.text }) as ClaudeErrorResponse;
                 throw new Error(`API request failed (${response.status}): ${errorData.error?.message ?? errorData.message ?? 'Unknown error'}`);
             }
 

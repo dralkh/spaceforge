@@ -2,7 +2,7 @@
  * Spaceforge Study — the arithmetic a lab's answers are written in.
  *
  * A lab's outputs are expressions a model produced, so they are evaluated here
- * rather than handed to the host: no `eval`, no `new Function`, no property
+ * rather than handed to the host: no dynamic code execution, and no property
  * access — a tokenizer, a small recursive-descent parser, and an evaluator over
  * that tree. Nothing in this file can reach outside its own numbers.
  *
@@ -307,7 +307,7 @@ export function parseExpression(expression: string): ExpressionNode | null {
         // Trailing tokens are not an expression: `1+2 3` is refused whole.
         if (!node || cursor.index !== tokens.length) return null;
         return node;
-    } catch (_error) {
+    } catch {
         return null;
     }
 }
@@ -405,7 +405,7 @@ export function evaluateNode(node: ExpressionNode, variables: Record<string, num
         const value = valueOf(node, scope, 0);
         if (value === null || !Number.isFinite(value)) return null;
         return value === 0 ? 0 : value;
-    } catch (_error) {
+    } catch {
         return null;
     }
 }

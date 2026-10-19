@@ -313,7 +313,7 @@ class RevealControl {
     handleKey(event: KeyboardEvent): boolean {
         if (!ACTIVATION_KEYS.includes(event.key)) return false;
         const target = event.target as HTMLElement | null;
-        const cell = target && typeof target.closest === 'function' ? (target.closest('.sf-vb-cell') as HTMLElement | null) : null;
+        const cell = target && typeof target.closest === 'function' ? target.closest('.sf-vb-cell') : null;
         const entry = cell ? this.cells.find(candidate => candidate.cell === cell) : undefined;
         if (!entry) return false;
         this.reveal(entry);
@@ -857,7 +857,7 @@ export class StudyVisualBoardView {
      */
     handleKey(event: KeyboardEvent): boolean {
         const target = event.target as HTMLElement | null;
-        const owner = target && typeof target.closest === 'function' ? (target.closest(`[${CONTROL_TAG}]`) as HTMLElement | null) : null;
+        const owner = target && typeof target.closest === 'function' ? target.closest(`[${CONTROL_TAG}]`) : null;
         if (!owner) return false;
         const control = this.controls.find(entry => entry.element === owner);
         return control ? control.handleKey(event) : false;

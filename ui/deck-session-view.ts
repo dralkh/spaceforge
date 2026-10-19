@@ -655,7 +655,7 @@ export class DeckSessionView {
 
         if (this.revealed && /^[1-4]$/.test(event.key)) {
             event.preventDefault();
-            this.grade(Number(event.key) as AnkiGrade);
+            this.grade(Number(event.key));
         }
     };
 }

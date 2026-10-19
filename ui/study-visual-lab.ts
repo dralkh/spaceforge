@@ -110,7 +110,7 @@ export function motionAllowed(): boolean {
         if (typeof matchMedia !== 'function') return false;
         const query = matchMedia('(prefers-reduced-motion: reduce)');
         return !!query && query.matches !== true;
-    } catch (_error) {
+    } catch {
         return false;
     }
 }
@@ -491,7 +491,7 @@ export class StudyVisualLabView {
     }
 
     private bind(el: Element, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.bindings.push({ el, type, handler: listener });
     }

@@ -256,7 +256,7 @@ export class NoteItemRenderer {
                         await this.plugin.reviewController.postponeNote(path);
                         new Notice(`Note postponed`);
                         await onNoteAction();
-                    } catch (_error) {
+                    } catch {
                         new Notice("Failed to postpone note.");
                         await onNoteAction();
                     }
@@ -280,7 +280,7 @@ export class NoteItemRenderer {
                                  await this.plugin.savePluginData();
                                  new Notice(`Note removed from review schedule`);
                                  await onNoteAction();
-                             } catch (_error) {
+                             } catch {
                                  new Notice("Failed to remove note from schedule.");
                                  await onNoteAction();
                              }

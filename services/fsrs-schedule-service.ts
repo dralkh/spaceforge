@@ -1,4 +1,4 @@
-import { FSRS, FSRSParameters, Card as FsrsLibCard, State as FsrsState, Rating as TsFsrsRating, createEmptyCard as createFsrsLibEmptyCard, ReviewLog as FsrsReviewLog, default_w } from 'ts-fsrs';
+import { FSRS, FSRSParameters, Card as FsrsLibCard, Rating as TsFsrsRating, createEmptyCard as createFsrsLibEmptyCard, ReviewLog as FsrsReviewLog, default_w } from 'ts-fsrs';
 import { SpaceforgeSettings } from '../models/settings';
 import { ReviewSchedule, FsrsRating } from '../models/review-schedule';
 
@@ -28,7 +28,7 @@ export class FsrsScheduleService {
             // relearning); ts-fsrs 4.7 exposes no parameter for them.
             enable_short_term: params.enable_short_term ?? true,
         };
-        return mappedParams as FSRSParameters; // Cast to FSRSParameters
+        return mappedParams; // Cast to FSRSParameters
     }
 
     public updateFSRSInstance(settings: SpaceforgeSettings): void {
@@ -45,7 +45,7 @@ export class FsrsScheduleService {
             scheduled_days: emptyCard.scheduled_days,
             reps: emptyCard.reps,
             lapses: emptyCard.lapses,
-            state: emptyCard.state as number, // Cast to number; FsrsState is an enum
+            state: emptyCard.state, // Cast to number; FsrsState is an enum
             last_review: emptyCard.last_review ? emptyCard.last_review.getTime() : undefined,
         };
     }
@@ -54,7 +54,7 @@ export class FsrsScheduleService {
         return {
             ...fsrsData,
             due: now, // This will be the review date for the repeat() call
-            state: fsrsData.state as FsrsState,
+            state: fsrsData.state,
             last_review: fsrsData.last_review ? new Date(fsrsData.last_review) : undefined,
         };
     }
@@ -94,7 +94,7 @@ export class FsrsScheduleService {
             scheduled_days: resultCard.scheduled_days,
             reps: resultCard.reps,
             lapses: resultCard.lapses,
-            state: resultCard.state as number,
+            state: resultCard.state,
             last_review: resultCard.last_review ? resultCard.last_review.getTime() : undefined,
         };
 

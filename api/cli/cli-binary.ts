@@ -15,9 +15,45 @@
  * win over our guess). The resolved absolute path is then handed to the spawn,
  * so the run works for the same reason the search did.
  */
-import { existsSync, readdirSync, statSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
+import { loadNodeModule, nodeProcess } from './node-modules';
+
+/** The fs surface this file uses, so no Node declaration file is required. */
+interface StatLike {
+    isFile(): boolean;
+    mode: number;
+}
+
+interface FsModuleLike {
+    existsSync(path: string): boolean;
+    readdirSync(path: string): string[];
+    statSync(path: string): StatLike;
+}
+
+interface OsModuleLike {
+    homedir(): string;
+}
+
+interface PathModuleLike {
+    join(...parts: string[]): string;
+}
+
+interface NodeModules {
+    fs: FsModuleLike;
+    os: OsModuleLike;
+    path: PathModuleLike;
+}
+
+let cachedNodeModules: NodeModules | null | undefined;
+
+/** fs/os/path on desktop; null on mobile, where a CLI cannot run anyway. */
+function nodeModules(): NodeModules | null {
+    if (cachedNodeModules !== undefined) return cachedNodeModules;
+    const fs = loadNodeModule<FsModuleLike>('fs');
+    const os = loadNodeModule<OsModuleLike>('os');
+    const path = loadNodeModule<PathModuleLike>('path');
+    cachedNodeModules = fs && os && path ? { fs, os, path } : null;
+    return cachedNodeModules;
+}
 
 /** A home to search, and extra directories to try before anything else. */
 export interface CliSearchOptions {
@@ -27,7 +63,7 @@ export interface CliSearchOptions {
     extra?: string;
 }
 
-const IS_WINDOWS = typeof process !== 'undefined' && process.platform === 'win32';
+const IS_WINDOWS = nodeProcess()?.platform === 'win32';
 
 /** Relative to the home directory: npm/yarn/bun/deno/cargo/pnpm installs and shims. */
 const HOME_BIN_DIRS = [
@@ -75,8 +111,10 @@ const VERSION_MANAGER_LAYOUTS: string[][] = [
 ];
 
 function isExecutableFile(path: string): boolean {
+    const modules = nodeModules();
+    if (!modules) return false;
     try {
-        const stat = statSync(path);
+        const stat = modules.fs.statSync(path);
         if (!stat.isFile()) return false;
         // Windows has no execute bit: an existing .cmd/.exe is runnable.
         return IS_WINDOWS ? true : (stat.mode & 0o111) !== 0;
@@ -102,20 +140,22 @@ function compareVersionsDesc(a: string, b: string): number {
 }
 
 function versionManagerBins(home: string): string[] {
+    const modules = nodeModules();
+    if (!modules) return [];
     const dirs: string[] = [];
     for (const parts of VERSION_MANAGER_LAYOUTS) {
-        const root = join(home, ...parts);
-        if (!existsSync(root)) continue;
+        const root = modules.path.join(home, ...parts);
+        if (!modules.fs.existsSync(root)) continue;
         let versions: string[];
         try {
-            versions = readdirSync(root)
+            versions = modules.fs.readdirSync(root)
                 .filter(name => /^v?\d/.test(name))
                 .sort(compareVersionsDesc);
         } catch {
             continue;
         }
         for (const version of versions) {
-            dirs.push(join(root, version, 'bin'));
+            dirs.push(modules.path.join(root, version, 'bin'));
         }
     }
     return dirs;
@@ -140,6 +180,8 @@ const CACHE_MS = 30_000;
  * one the reader keeps up to date.
  */
 export function cliPathDirs(options: CliSearchOptions = {}): string[] {
+    const modules = nodeModules();
+    if (!modules) return [];
     const home = options.home ?? safeHomeDir();
     const extra = options.extra ?? '';
     const key = `${home}\u0000${extra}`;
@@ -152,15 +194,15 @@ export function cliPathDirs(options: CliSearchOptions = {}): string[] {
         if (trimmed) dirs.push(trimmed.replace(/[/\\]+$/, ''));
     }
     if (home) {
-        dirs.push(...HOME_BIN_DIRS.map(relative => join(home, ...relative.split('/'))));
+        dirs.push(...HOME_BIN_DIRS.map(relative => modules.path.join(home, ...relative.split('/'))));
         dirs.push(...versionManagerBins(home));
     }
     if (!IS_WINDOWS) dirs.push(...ABSOLUTE_BIN_DIRS);
     if (IS_WINDOWS) {
         const appData = getEnvVar('APPDATA');
-        if (appData) dirs.push(join(appData, 'npm'));
+        if (appData) dirs.push(modules.path.join(appData, 'npm'));
         const localAppData = getEnvVar('LOCALAPPDATA');
-        if (localAppData) dirs.push(join(localAppData, 'Programs'));
+        if (localAppData) dirs.push(modules.path.join(localAppData, 'Programs'));
     }
 
     const seen = new Set<string>();
@@ -179,16 +221,19 @@ export function clearCliBinaryCache(): void {
 }
 
 function safeHomeDir(): string {
+    const modules = nodeModules();
+    if (!modules) return '';
     try {
-        return homedir();
+        return modules.os.homedir();
     } catch {
         return '';
     }
 }
 
 function getEnvVar(name: string): string | undefined {
-    if (typeof process === 'undefined' || !process.env) return undefined;
-    const value = process.env[name];
+    const env = nodeProcess()?.env;
+    if (!env) return undefined;
+    const value = env[name];
     return value && value.trim() !== '' ? value.trim() : undefined;
 }
 
@@ -210,6 +255,8 @@ export function findCliBinary(bin: string, options: CliSearchOptions = {}): stri
         return isExecutableFile(bin) ? bin : null;
     }
 
+    const modules = nodeModules();
+    if (!modules) return null;
     const names = binaryNames(bin);
     const dirs = [...cliPathDirs(options)];
     const pathValue = getEnvVar('PATH');
@@ -220,7 +267,7 @@ export function findCliBinary(bin: string, options: CliSearchOptions = {}): stri
         if (!dir || seen.has(dir)) continue;
         seen.add(dir);
         for (const name of names) {
-            const candidate = join(dir, name);
+            const candidate = modules.path.join(dir, name);
             if (isExecutableFile(candidate)) return candidate;
         }
     }

@@ -273,8 +273,8 @@ export class UpcomingEvents {
     /**
      * Refresh the upcoming events display
      */
-    async refresh(): Promise<void> {
-        await this.render();
+    refresh(): void {
+        this.render();
     }
 
     /**

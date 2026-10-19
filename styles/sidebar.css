@@ -230,13 +230,13 @@
 /* While the review tab is showing, the sidebar is a column: its own heading
    first, then the session filling everything that is left — otherwise a
    full-height tab starts below the heading and pushes the dock off the bottom. */
-.spaceforge-container:has(> .sf-sidebar-review:not(.sf-hidden)) {
+.spaceforge-container.sf-review-mode {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.spaceforge-container:has(> .sf-sidebar-review:not(.sf-hidden)) > .sf-sidebar-review {
+.spaceforge-container.sf-review-mode > .sf-sidebar-review {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;

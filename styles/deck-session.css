@@ -147,11 +147,11 @@
 
 /* The end button, the add button and the menu wear the questions panel's
    end-button clothes: small, bordered, quiet until hovered. */
-.sf-deck-end,
-.sf-deck-menu,
-.sf-deck-new {
+.sf-deck .sf-deck-end,
+.sf-deck .sf-deck-menu,
+.sf-deck .sf-deck-new {
   flex: 0 0 auto;
-  height: auto !important;
+  height: auto;
   min-height: 28px;
   padding: 4px 10px;
   border: 1px solid var(--background-modifier-border);
@@ -241,7 +241,7 @@
   gap: 6px;
 }
 
-.sf-deck-choice {
+.sf-deck .sf-deck-choice {
   display: flex;
   align-items: flex-start;
   gap: var(--sf-space-sm);
@@ -255,7 +255,7 @@
   font-size: var(--sf-font-text);
   font-weight: 500;
   line-height: 1.45;
-  height: auto !important;
+  height: auto;
   min-height: 2.3em;
   text-align: left;
   white-space: normal;
@@ -324,10 +324,10 @@
   gap: var(--sf-space-sm);
 }
 
-.sf-deck-type-input {
+.sf-deck .sf-deck-type-input {
   flex: 1 1 auto;
   min-width: 0;
-  height: auto !important;
+  height: auto;
   padding: 0.6em 0.85em;
   font-family: var(--font-monospace);
   font-size: var(--sf-font-text);
@@ -352,9 +352,9 @@
   background-color: var(--sf-danger-light);
 }
 
-.sf-deck-check {
+.sf-deck .sf-deck-check {
   flex: 0 0 auto;
-  height: auto !important;
+  height: auto;
   min-height: 2.3em;
   padding: 0.45em 0.7em;
   font-size: var(--sf-font-text);
@@ -390,12 +390,12 @@
   grid-column: 1 / -1;
 }
 
-.sf-deck-reveal {
+.sf-deck .sf-deck-reveal {
   display: flex;
   align-items: center;
   width: 100%;
   box-sizing: border-box;
-  height: auto !important;
+  height: auto;
   min-height: 2.3em;
   padding: 0.45em 0.7em;
   font-size: var(--sf-font-text);
@@ -415,13 +415,13 @@
   background-color: var(--background-modifier-hover);
 }
 
-.sf-deck-grade {
+.sf-deck .sf-deck-grade {
   display: flex;
   align-items: center;
   gap: var(--sf-space-sm);
   width: 100%;
   box-sizing: border-box;
-  height: auto !important;
+  height: auto;
   min-height: 2.3em;
   padding: 0.45em 0.7em;
   font-size: var(--sf-font-text);
@@ -506,8 +506,8 @@
   padding-top: var(--sf-space-xs);
 }
 
-.sf-deck-tool {
-  height: auto !important;
+.sf-deck .sf-deck-tool {
+  height: auto;
   min-height: 28px;
   padding: 4px 10px;
   border: 1px solid var(--background-modifier-border);
@@ -603,9 +603,9 @@
   color: var(--text-muted);
 }
 
-.sf-card-editor-select,
-.sf-card-editor-input {
-  height: auto !important;
+.sf-card-editor .sf-card-editor-select,
+.sf-card-editor .sf-card-editor-input {
+  height: auto;
   width: 100%;
   box-sizing: border-box;
   padding: 0.4em 0.6em;
@@ -656,9 +656,9 @@
   gap: var(--sf-space-sm);
 }
 
-.sf-card-editor-save,
-.sf-card-editor-cancel {
-  height: auto !important;
+.sf-card-editor .sf-card-editor-save,
+.sf-card-editor .sf-card-editor-cancel {
+  height: auto;
   min-height: 2.3em;
   padding: 0.45em 0.9em;
   font-size: var(--sf-font-ui);
@@ -735,12 +735,12 @@
   font-size: var(--sf-font-ui);
 }
 
-.sf-deck-back-notes {
+.sf-deck .sf-deck-back-notes {
   display: flex;
   align-items: center;
   width: 100%;
   box-sizing: border-box;
-  height: auto !important;
+  height: auto;
   min-height: 2.3em;
   padding: 0.45em 0.7em;
   font-size: var(--sf-font-text);
@@ -758,9 +758,9 @@
   background-color: color-mix(in srgb, var(--sf-primary), transparent 90%);
 }
 
-.sf-deck-again,
-.sf-deck-done {
-  height: auto !important;
+.sf-deck .sf-deck-again,
+.sf-deck .sf-deck-done {
+  height: auto;
   min-height: 28px;
   padding: 4px 10px;
   font-size: var(--sf-font-ui);

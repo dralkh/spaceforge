@@ -351,7 +351,7 @@ export class ContextMenuHandler {
         const fileCount = session.hierarchy.traversalOrder.length;
 
         // Activate the session using the service
-        await this.plugin.reviewSessionService.setActiveSession(session.id);
+        this.plugin.reviewSessionService.setActiveSession(session.id);
         await this.plugin.savePluginData(); // Add save call
 
         // Get the first file to review using the service
@@ -361,7 +361,7 @@ export class ContextMenuHandler {
             // Also schedule all files in the session for future review using the service
             // scheduleSessionForReview calls scheduleNotesInOrder, which now requires a save call after it completes.
             // We'll add the save call here after scheduleSessionForReview returns.
-            const scheduledCount = await this.plugin.reviewSessionService.scheduleSessionForReview(session.id);
+            const scheduledCount = this.plugin.reviewSessionService.scheduleSessionForReview(session.id);
             if (scheduledCount > 0) {
                 await this.plugin.savePluginData(); // Add save call
             }
@@ -377,7 +377,7 @@ export class ContextMenuHandler {
         } else {
             new Notice("No files found for review in this folder.");
             // Deactivate session using the service
-            await this.plugin.reviewSessionService.setActiveSession(null);
+            this.plugin.reviewSessionService.setActiveSession(null);
             await this.plugin.savePluginData(); // Add save call
         }
     }

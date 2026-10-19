@@ -109,8 +109,8 @@ export class DataStorage {
     }
 
     // Removed ensureDataLoaded() method
-    // Removed loadData() method (and all localStorage logic within it)
-    // Removed saveData() method (and all localStorage logic within it)
+    // Removed loadData() method (and all local persistence logic within it)
+    // Removed saveData() method (and all local persistence logic within it)
 
     /**
      * Initialize default data when no data is available
@@ -307,8 +307,8 @@ export class DataStorage {
     // but they now simply call the corresponding method on the service instance.
     // REMOVED await this.saveData() from all these methods.
 
-    async scheduleNoteForReview(path: string, daysFromNow = 0): Promise<void> {
-        await this.reviewScheduleService.scheduleNoteForReview(path, daysFromNow);
+    scheduleNoteForReview(path: string, daysFromNow = 0): void {
+        this.reviewScheduleService.scheduleNoteForReview(path, daysFromNow);
         // await this.saveData(); // Removed
     }
 
@@ -329,23 +329,23 @@ export class DataStorage {
         return { interval: result.interval, ease: result.ease };
     }
 
-    async skipNote(path: string, response: ReviewResponse = ReviewResponse.CorrectWithDifficulty): Promise<void> {
-        await this.reviewScheduleService.skipNote(path, response);
+    skipNote(path: string, response: ReviewResponse = ReviewResponse.CorrectWithDifficulty): void {
+        this.reviewScheduleService.skipNote(path, response);
         // await this.saveData(); // Removed
     }
 
-    async postponeNote(path: string, days = 1): Promise<void> {
-        await this.reviewScheduleService.postponeNote(path, days);
+    postponeNote(path: string, days = 1): void {
+        this.reviewScheduleService.postponeNote(path, days);
         // await this.saveData(); // Removed
     }
 
-    async removeFromReview(path: string): Promise<void> {
-        await this.reviewScheduleService.removeFromReview(path);
+    removeFromReview(path: string): void {
+        this.reviewScheduleService.removeFromReview(path);
         // await this.saveData(); // Removed
     }
 
-    async clearAllSchedules(): Promise<void> {
-        await this.reviewScheduleService.clearAllSchedules();
+    clearAllSchedules(): void {
+        this.reviewScheduleService.clearAllSchedules();
         // await this.saveData(); // Removed
     }
 
@@ -371,8 +371,8 @@ export class DataStorage {
         return session;
     }
 
-    async setActiveSession(sessionId: string | null): Promise<boolean> {
-        const success = await this.reviewSessionService.setActiveSession(sessionId);
+    setActiveSession(sessionId: string | null): boolean {
+        const success = this.reviewSessionService.setActiveSession(sessionId);
         // if (success) { // Removed save call
         //      await this.saveData();
         // }
@@ -387,14 +387,14 @@ export class DataStorage {
         return this.reviewSessionService.getNextSessionFile();
     }
 
-    async advanceActiveSession(): Promise<boolean> {
-        const moreFiles = await this.reviewSessionService.advanceActiveSession();
+    advanceActiveSession(): boolean {
+        const moreFiles = this.reviewSessionService.advanceActiveSession();
         // await this.saveData(); // Removed
         return moreFiles;
     }
 
-    async scheduleNotesInOrder(paths: string[], daysFromNow = 0): Promise<number> {
-        const count = await this.reviewScheduleService.scheduleNotesInOrder(paths, daysFromNow);
+    scheduleNotesInOrder(paths: string[], daysFromNow = 0): number {
+        const count = this.reviewScheduleService.scheduleNotesInOrder(paths, daysFromNow);
         // if (count > 0) { // Removed save call
         //      await this.saveData();
         // }
@@ -430,8 +430,8 @@ export class DataStorage {
         return this.mcqService.getLatestMCQSessionForNote(notePath);
     }
 
-    async updateCustomNoteOrder(order: string[]): Promise<void> {
-        await this.reviewScheduleService.updateCustomNoteOrder(order);
+    updateCustomNoteOrder(order: string[]): void {
+        this.reviewScheduleService.updateCustomNoteOrder(order);
         // await this.saveData(); // Removed
     }
 

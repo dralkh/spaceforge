@@ -272,7 +272,7 @@ export class ReviewSidebarView extends ItemView {
         const targetControllerOverrideValue = this.activeListBaseDate ? DateUtils.startOfUTCDay(this.activeListBaseDate) : null;
 
         if (targetControllerOverrideValue !== currentControllerOverrideEpoch) {
-            await this.plugin.reviewController.setReviewDateOverride(targetControllerOverrideValue);
+            this.plugin.reviewController.setReviewDateOverride(targetControllerOverrideValue);
             // If the controller's date context was updated, it's a significant change
             // that warrants treating as `reviewDateChanged` for UI refresh purposes.
             if (!reviewDateChanged) {
@@ -303,7 +303,7 @@ export class ReviewSidebarView extends ItemView {
 
         // Apply scroll position *after* rendering is complete
         if (this.mainContainer) {
-            requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
                 if (this.mainContainer) this.mainContainer.scrollTop = storedScrollPosition;
                 this.lastScrollPosition = storedScrollPosition; // Update state after applying
             });
@@ -438,6 +438,7 @@ export class ReviewSidebarView extends ItemView {
     private enterReviewTab(): void {
         const container = this.reviewViewContentEl;
         if (!container) return;
+        this.mainContainer?.addClass('sf-review-mode');
         container.removeClass('sf-hidden');
         const flow = this.plugin.reviewFlowController;
         if (!flow) return;
@@ -476,6 +477,7 @@ export class ReviewSidebarView extends ItemView {
             const remembered = this.plugin.settings.reviewSessionHost;
             flow.setHost(remembered === 'sidebar' ? 'note' : remembered, null, false);
         }
+        this.mainContainer?.removeClass('sf-review-mode');
         container?.addClass('sf-hidden');
     }
 

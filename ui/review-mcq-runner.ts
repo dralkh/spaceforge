@@ -104,7 +104,7 @@ export class McqRunner {
     /** The choice the arrow keys are pointing at. */
     private highlighted = 0;
     private autoAdvanceMs: number;
-    private autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
+    private autoAdvanceTimer: number | null = null;
     private phase: Phase = 'awaiting';
     private questionShownAt = 0;
     private records: (McqRunAnswer | undefined)[] = [];
@@ -396,7 +396,7 @@ export class McqRunner {
     private scheduleAutoAdvance(): void {
         this.clearAutoAdvance();
         if (this.autoAdvanceMs <= 0) return;
-        this.autoAdvanceTimer = setTimeout(() => {
+        this.autoAdvanceTimer = window.setTimeout(() => {
             this.autoAdvanceTimer = null;
             this.continueAfterFeedback();
         }, this.autoAdvanceMs);
@@ -404,7 +404,7 @@ export class McqRunner {
 
     private clearAutoAdvance(): void {
         if (this.autoAdvanceTimer === null) return;
-        clearTimeout(this.autoAdvanceTimer);
+        window.clearTimeout(this.autoAdvanceTimer);
         this.autoAdvanceTimer = null;
     }
 

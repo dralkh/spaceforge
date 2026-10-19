@@ -582,7 +582,7 @@ export interface ProviderChoice {
 export function listProviders(): ProviderChoice[] {
     return [
         ...cliProviderRows().map(row => ({ id: row.id, label: row.label, kind: 'cli' as const })),
-        ...HTTP_PROVIDERS.map(provider => ({ id: provider.id as ProviderId, label: provider.label, kind: 'http' as const })),
+        ...HTTP_PROVIDERS.map(provider => ({ id: provider.id, label: provider.label, kind: 'http' as const })),
     ];
 }
 
@@ -865,8 +865,7 @@ export async function discoverHttpModels(
 
     let models: CliModelEntry[];
     try {
-        const parse = descriptor.parseModels ?? parseOpenAiStyleList;
-        models = parse(response.json);
+        models = (descriptor.parseModels ?? parseOpenAiStyleList)(response.json);
     } catch {
         return { models: [], error: `${descriptor.label} returned a model list this plugin could not read.` };
     }
@@ -1001,9 +1000,8 @@ export async function detectProviders(
                     ? `${descriptor.label} answered at ${base || 'its endpoint'}.${newestNote(descriptor)}`
                     : `${descriptor.label} answered at ${base || 'its endpoint'}, but its model list could not be read (${probe.status}). Type a model id, or point the URL at the right place.`;
             if (listed) {
-                const parse = descriptor.parseModels ?? parseOpenAiStyleList;
                 models = rankModels(
-                    parse(probe.json).map(model => ({ ...model, source: 'api' as const })),
+                    (descriptor.parseModels ?? parseOpenAiStyleList)(probe.json).map(model => ({ ...model, source: 'api' as const })),
                     descriptor.latestModel
                 );
             }

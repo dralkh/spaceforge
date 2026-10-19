@@ -111,6 +111,19 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         }
         button.setButtonText(label);
     }
+
+    /**
+     * The declarative API's entry point. This tab is imperative on purpose: its
+     * rows are built from state spread across services, and a declarative copy
+     * would be a second source of truth to keep in step. Returning no
+     * definitions keeps Obsidian 1.13+ on the `display()` path, which the
+     * framework documents as the fallback when nothing is declared; the method
+     * is here so the declarative engine can see the tab and skip its warning.
+     */
+    getSettingDefinitions(): [] {
+        return [];
+    }
+
     display(): void {
         const { containerEl } = this;
         // Only the data-wide actions rebuild the tab. Even then the reader keeps
@@ -588,7 +601,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         new Setting(reviewFlowContainer)
             .setName('Lapse checkpoint')
-            .setDesc('After this many lapses a note asks what should happen to it (reset its progress, postpone it for a week, remove it, or carry on). The question returns at each further multiple. 0 turns it off.')
+            .setDesc('After this many lapses a note asks what should happen to it (reset its progress, postpone it for a week, remove it, or carry on); the question returns at each further multiple, and 0 turns it off.')
             .addSlider(slider => slider
                 .setLimits(0, 30, 1)
                 .setValue(this.plugin.settings.leechThreshold)
@@ -1969,7 +1982,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         // One line about this provider, where its key is: what a check found is
         // otherwise a wall of text for twenty-eight rows nobody asked about.
         const keyStatusEl = keyRow.descEl.createDiv({ cls: 'sf-model-status' });
-        const keyStatus = this.providerStatusCache?.find(status => status.id === descriptor.id);
+        const keyStatus = this.providerStatusCache?.find(status => status.id === String(descriptor.id));
         if (keyStatus) setStatusText(keyStatusEl, keyStatus.message, keyStatus.level);
 
         if (descriptor.note) {
@@ -2146,7 +2159,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             ]);
         };
 
-        const cached = this.providerStatusCache?.find(status => status.id === providerId);
+        const cached = this.providerStatusCache?.find(status => status.id === String(providerId));
         if (cached) setStatusText(note, cached.message, cached.level);
         else setStatusText(note, `Checking whether ${agent.name} is installed and signed in…`, 'warn');
         void refresh();
@@ -2194,7 +2207,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
     private renderCliDetection(el: HTMLElement, result: CliDetectionResult): void {
         setStatusText(el, result.message, result.level);
         const id = cliProviderId(result.id);
-        const statuses = this.providerStatusCache?.filter(status => status.id !== id) ?? [];
+        const statuses = this.providerStatusCache?.filter(status => status.id !== String(id)) ?? [];
         this.providerStatusCache = [...statuses, {
             id,
             label: result.name,

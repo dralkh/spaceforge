@@ -90,7 +90,7 @@ export function parsePluginData(raw: string | null): PluginDataShape | null {
     try {
         const parsed = JSON.parse(trimmed) as unknown;
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-        return parsed as PluginDataShape;
+        return parsed;
     } catch {
         return null;
     }

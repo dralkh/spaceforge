@@ -100,7 +100,7 @@ export function buildVisualUserPrompt(request: VisualPackRequest, budget: Visual
  * object and returns it, or null when there is none — the caller treats that as
  * a failed generation.
  */
-export function extractJson(text: string): unknown | null {
+export function extractJson(text: string): unknown {
     const trimmed = text.trim();
     if (!trimmed) return null;
     const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);

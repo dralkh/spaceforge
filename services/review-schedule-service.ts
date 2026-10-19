@@ -294,8 +294,8 @@ export class ReviewScheduleService {
                 // For initial phase, repetitionCount tracks progression through initial steps.
 
                 const step = schedule.repetitionCount ?? 0;
-                const passed = qualityRating >= (ReviewResponse.CorrectWithDifficulty as number);
-                const easy = qualityRating >= (ReviewResponse.PerfectRecall as number);
+                const passed = qualityRating >= Number(ReviewResponse.CorrectWithDifficulty);
+                const easy = qualityRating >= Number(ReviewResponse.PerfectRecall);
 
                 if (easy) {
                     // Easy graduates a learning item on the spot, the way Anki does;
@@ -338,7 +338,7 @@ export class ReviewScheduleService {
                     schedule.consecutive += 1;
                     // Good advances a step; Hard (quality 3) repeats the current one,
                     // which is what makes Hard meaningfully harder than Good here.
-                    if (qualityRating >= (ReviewResponse.CorrectWithHesitation as number)) {
+                    if (qualityRating >= Number(ReviewResponse.CorrectWithHesitation)) {
                         schedule.repetitionCount = step + 1;
                     }
                 } else {
@@ -354,7 +354,7 @@ export class ReviewScheduleService {
                 schedule.ease = ease;
                 schedule.repetitionCount = repetitionCount;
 
-                if (qualityRating >= (ReviewResponse.CorrectWithDifficulty as number)) {
+                if (qualityRating >= Number(ReviewResponse.CorrectWithDifficulty)) {
                     schedule.consecutive += 1;
                 } else {
                     schedule.consecutive = 0;
@@ -388,7 +388,7 @@ export class ReviewScheduleService {
         if (ratingKind === 'fsrs') {
             if (response === FsrsRating.Again || response === FsrsRating.Hard
                 || response === FsrsRating.Good || response === FsrsRating.Easy) {
-                return response as FsrsRating;
+                return response;
             }
             if (response === ReviewResponse.CompleteBlackout) return FsrsRating.Again;
             if (response === ReviewResponse.PerfectRecall) return FsrsRating.Easy;
@@ -602,7 +602,7 @@ export class ReviewScheduleService {
                     schedule.fsrsData.lapses = 0;
                     schedule.fsrsData.scheduled_days = 1;
                     schedule.fsrsData.stability = Math.min(schedule.fsrsData.stability, 1);
-                    schedule.fsrsData.state = FsrsState.Relearning as number;
+                    schedule.fsrsData.state = FsrsState.Relearning;
                 }
                 break;
             }

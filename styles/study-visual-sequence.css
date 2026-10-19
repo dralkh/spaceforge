@@ -106,8 +106,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: var(--sf-space-sm);
-  row-gap: 2px;
+  gap: 2px var(--sf-space-sm);
   min-width: 0;
   padding: var(--sf-space-sm);
   border: 1px solid var(--background-modifier-border);

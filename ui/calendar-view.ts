@@ -115,7 +115,7 @@ export class CalendarView {
 
         await this.loadReviewsData(); // Preloads review data for the current view
         await this.loadDeckCardsData(); // And what the decks owe, day by day
-        await this.loadEventsData(); // Preloads event data for the current view
+        this.loadEventsData(); // Preloads event data for the current view
 
         if (this.calendarGridEl) {
             this.renderCalendarGridContent(this.calendarGridEl); // Renders/updates the grid
@@ -123,7 +123,7 @@ export class CalendarView {
 
         // Render upcoming events
         if (this.upcomingEventsComponent) {
-            await this.upcomingEventsComponent.render();
+            this.upcomingEventsComponent.render();
         }
     }
 
@@ -787,7 +787,7 @@ export class CalendarView {
         // Add fade-in animation using CSS class
         this.tooltipEl.classList.remove('visible');
 
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             if (this.tooltipEl) {
                 this.tooltipEl.classList.add('visible');
             }

@@ -7,7 +7,7 @@ opencode.json
 # Compiled files
 main.js
 styles.css
-docs
+docs/
 
 # Test build output
 .test-build

@@ -274,7 +274,7 @@ export default class SpaceforgePlugin extends Plugin {
                 if (!selected) return false;
                 if (checking) return true;
                 void (async () => {
-                    await this.reviewScheduleService.scheduleNoteForReview(selected.path);
+                    this.reviewScheduleService.scheduleNoteForReview(selected.path);
                     await this.savePluginData();
                     new Notice(`Added "${selected.path}" to review schedule.`);
                 })();
@@ -285,7 +285,7 @@ export default class SpaceforgePlugin extends Plugin {
         this.registerEvent(this.app.workspace.on('file-open', (_file) => { /* ... */ }));
         this.registerEvent(this.app.vault.on('delete', async (file) => {
             if (file instanceof TFile && file.extension === "md") {
-                await this.reviewScheduleService.removeFromReview(file.path);
+                this.reviewScheduleService.removeFromReview(file.path);
                 await this.savePluginData();
             }
             void this.getSidebarView()?.refresh();
@@ -358,7 +358,7 @@ export default class SpaceforgePlugin extends Plugin {
                 };
                 const combinedData = { ...existingData, reviewData };
                 const backupStr = JSON.stringify(combinedData);
-                window.localStorage.setItem('spaceforge-backup', backupStr);
+                this.app.saveLocalStorage('spaceforge-backup', backupStr);
                 void (async () => {
                     try {
                         await this.savePluginData();
@@ -367,7 +367,7 @@ export default class SpaceforgePlugin extends Plugin {
             } catch {
                 try {
                     const minimalBackup = JSON.stringify({ settings: this.settings, reviewData: { schedules: this.reviewScheduleService.schedules || {}, customNoteOrder: this.reviewScheduleService.customNoteOrder || [], lastLinkAnalysisTimestamp: this.reviewScheduleService.lastLinkAnalysisTimestamp, version: this.manifest.version } });
-                    window.localStorage.setItem('spaceforge-minimal-backup', minimalBackup);
+                    this.app.saveLocalStorage('spaceforge-minimal-backup', minimalBackup);
                 } catch { /* handle error */ }
             }
         }; // Removed the extra closing parenthesis and semicolon, and moved the declaration.
@@ -463,7 +463,7 @@ export default class SpaceforgePlugin extends Plugin {
                     version: this.manifest.version
                 };
                 const combinedData = { ...existingData, reviewData };
-                window.localStorage.setItem('spaceforge-backup', JSON.stringify(combinedData));
+                this.app.saveLocalStorage('spaceforge-backup', JSON.stringify(combinedData));
             } catch { /* the plugin data file is the real store; this is a safety copy */ }
 
             try {
@@ -555,10 +555,10 @@ export default class SpaceforgePlugin extends Plugin {
                 await this.app.vault.createFolder(folder).catch(() => undefined);
             }
             const existing = this.app.vault.getAbstractFileByPath(result.report.path);
-            const bytes = result.bytes.buffer.slice(
-                result.bytes.byteOffset,
-                result.bytes.byteOffset + result.bytes.byteLength,
-            ) as ArrayBuffer;
+            // A copied, tightly-sized buffer: `buffer.slice` loses its
+            // ArrayBuffer type on newer TypeScript, and `SharedArrayBuffer`
+            // must never reach the vault API.
+            const bytes = new Uint8Array(result.bytes).buffer;
             if (existing instanceof TFile) await this.app.vault.modifyBinary(existing, bytes);
             else await this.app.vault.createBinary(result.report.path, bytes);
 
@@ -709,7 +709,7 @@ export default class SpaceforgePlugin extends Plugin {
         }
 
         const keptName = raw === null ? null : await this.preserveUnreadableFile(path, raw);
-        const base = parsed ?? ({ settings: this.settings, pluginState: { ...DEFAULT_PLUGIN_STATE_DATA } } as unknown as SpaceforgePluginData);
+        const base = parsed ?? ({ settings: this.settings, pluginState: { ...DEFAULT_PLUGIN_STATE_DATA } });
         const { merged, addedSchedules, addedHistory } = mergePluginStates(base, best.data);
         new Notice(`Spaceforge: recovered ${addedSchedules.length} note(s) and ${addedHistory} review(s) from ${best.name}.${keptName ? ` The unreadable file was kept as ${keptName}.` : ''}`, 12000);
         return merged;
@@ -754,7 +754,7 @@ export default class SpaceforgePlugin extends Plugin {
     async applyRecoveredData(candidate: DataFileCandidate): Promise<{ addedSchedules: number; addedHistory: number }> {
         const current = { settings: this.settings, pluginState: this.pluginState };
         const { merged, addedSchedules, addedHistory } = mergePluginStates(current, candidate.data);
-        this.pluginState = (merged.pluginState as PluginStateData | undefined) ?? this.pluginState;
+        this.pluginState = (merged.pluginState) ?? this.pluginState;
         this.applyLoadedState();
         await this.savePluginData();
         this.reviewController.updateTodayNotes(true);
@@ -764,23 +764,8 @@ export default class SpaceforgePlugin extends Plugin {
     }
 
     async loadPluginData(): Promise<void> {
-        // Step 1: Bootstrap critical path settings from localStorage
-        const lsUseCustomPath = window.localStorage.getItem('spaceforge_useCustomDataPath');
-        const lsCustomPathRelative = window.localStorage.getItem('spaceforge_customDataPathRelative');
-
         // Initialize settings with defaults
         this.settings = { ...DEFAULT_SETTINGS };
-
-        // Override with localStorage values if they exist
-        if (typeof lsUseCustomPath === 'boolean') {
-            this.settings.useCustomDataPath = lsUseCustomPath;
-        }
-        if (typeof lsCustomPathRelative === 'string') {
-            this.settings.customDataPath = lsCustomPathRelative;
-        }
-
-        // Now, this.settings.useCustomDataPath and this.settings.customDataPath reflect the user's
-        // most recent choice from the UI (via localStorage) or defaults if never set.
 
         let rawLoadedData: SpaceforgePluginData | undefined;
         // let preliminarySettingsData: Partial<SpaceforgeSettings> | null = null; // No longer needed
@@ -811,7 +796,7 @@ export default class SpaceforgePlugin extends Plugin {
                 // If data was loaded and settings is an object, use its settings
                 loadedSettings = rawLoadedData.settings;
             }
-            // Merge defaults, loaded settings, and prioritize localStorage path settings
+            // Merge defaults and loaded settings
             this.settings = { ...DEFAULT_SETTINGS, ...loadedSettings };
             // One-time corrections for settings whose meaning changed; see
             // migrateSettings() for what and why.
@@ -820,12 +805,6 @@ export default class SpaceforgePlugin extends Plugin {
             // vault that names an unusual folder must be searched that way before
             // anything (detection included) looks for a binary.
             setCliExtraPath(this.settings.cliExtraPath);
-            if (typeof lsUseCustomPath === 'boolean') {
-                this.settings.useCustomDataPath = lsUseCustomPath;
-            }
-            if (typeof lsCustomPathRelative === 'string') {
-                this.settings.customDataPath = lsCustomPathRelative;
-            }
 
 
             this.pluginState = { ...DEFAULT_APP_DATA.pluginState };
@@ -883,10 +862,10 @@ export default class SpaceforgePlugin extends Plugin {
         } catch (error) {
             console.error("Spaceforge: Error loading data:", error);
 
-            // SIMPLE RECOVERY: Try localStorage backup once, then use defaults
+            // SIMPLE RECOVERY: Try the vault-local backup once, then use defaults
             try {
-                const backupData: string | null = window.localStorage.getItem('spaceforge-backup');
-                if (backupData && typeof backupData === 'string') {
+                const backupData: unknown = this.app.loadLocalStorage('spaceforge-backup');
+                if (typeof backupData === 'string' && backupData) {
                     const parsedBackup = JSON.parse(backupData) as { reviewData?: Partial<PluginStateData>; settings?: Partial<SpaceforgeSettings> };
                     if (parsedBackup.reviewData) {
                         this.settings = { ...DEFAULT_SETTINGS, ...parsedBackup.settings };
@@ -1084,7 +1063,7 @@ export default class SpaceforgePlugin extends Plugin {
                 // new Notice(`Spaceforge: Data saved to default plugin storage.`, 3000); // Removed notice
             }
 
-            // Removed localStorage backup for settings as it's not the source of truth for the path anymore.
+            // Removed the local backup for settings as it's not the source of truth for the path anymore.
             // If user wants to backup settings, they can use the export feature.
 
         } catch {
@@ -1220,7 +1199,7 @@ export default class SpaceforgePlugin extends Plugin {
                 if (!activeFile) return false;
                 if (!checking) {
                     void (async () => {
-                        await this.reviewScheduleService.scheduleNoteForReview(activeFile.path);
+                        this.reviewScheduleService.scheduleNoteForReview(activeFile.path);
                         await this.savePluginData();
                         new Notice(`Added "${activeFile.path}" to review schedule`);
                     })();

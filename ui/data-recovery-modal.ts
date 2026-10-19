@@ -55,9 +55,9 @@ export class DataRecoveryModal extends Modal {
         for (const candidate of this.candidates) {
             const row = container.createDiv({ cls: 'sf-recovery-row' });
             const text = row.createDiv({ cls: 'sf-recovery-text' });
-            text.createEl('div', { text: candidate.name, cls: 'sf-recovery-name' });
+            text.createDiv({ text: candidate.name, cls: 'sf-recovery-name' });
             const when = candidate.mtime > 0 ? new Date(candidate.mtime).toLocaleString() : 'unknown date';
-            text.createEl('div', {
+            text.createDiv({
                 text: `${candidate.schedules} note(s), ${candidate.history} review(s) · ${when}`,
                 cls: 'sf-recovery-meta',
             });

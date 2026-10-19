@@ -171,7 +171,7 @@ export function motionAllowed(): boolean {
         if (typeof matchMedia !== 'function') return false;
         const query = matchMedia('(prefers-reduced-motion: reduce)');
         return !!query && query.matches !== true;
-    } catch (_error) {
+    } catch {
         return false;
     }
 }
@@ -869,7 +869,7 @@ export class StudyVisualGraphView {
                 // Capture keeps the drag alive past the plot's own edge; a host
                 // that has no pointer capture still drags while inside it.
                 plot.setPointerCapture(pointerId);
-            } catch (_error) {
+            } catch {
                 /* nothing to release then */
             }
         }
@@ -941,7 +941,7 @@ export class StudyVisualGraphView {
     // -------------------------------------------------------------- bindings
 
     private bind(el: Element, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.bindings.push({ el, type, handler: listener });
     }

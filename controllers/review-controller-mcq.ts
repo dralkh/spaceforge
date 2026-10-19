@@ -161,10 +161,10 @@ export class MCQController {
                             const ratingKind = schedule.schedulingAlgorithm === 'fsrs' ? 'fsrs' as const : 'auto' as const;
                             if (schedule.schedulingAlgorithm === 'fsrs') {
                                 rating = this.mapScoreToFsrsRating(score);
-                                new Notice(`MCQ complete for FSRS card.Score: ${(score * 100).toFixed(0)}%.Rating: ${FsrsRating[rating]} (${rating as number}).`);
+                                new Notice(`MCQ complete for FSRS card.Score: ${(score * 100).toFixed(0)}%.Rating: ${FsrsRating[rating]} (${rating}).`);
                             } else {
                                 rating = this.mapScoreToSm2Response(score);
-                                new Notice(`MCQ complete for SM - 2 card.Score: ${(score * 100).toFixed(0)}%.Rating: ${ReviewResponse[rating]} (${rating as number}).`);
+                                new Notice(`MCQ complete for SM - 2 card.Score: ${(score * 100).toFixed(0)}%.Rating: ${ReviewResponse[rating]} (${rating}).`);
                             }
                             // Process the review using the determined rating
                             await this.plugin.reviewController.processReviewResponse(path, rating, { ratingKind, navigate: false });
@@ -334,10 +334,10 @@ export class MCQController {
                         const ratingKind = schedule.schedulingAlgorithm === 'fsrs' ? 'fsrs' as const : 'auto' as const;
                         if (schedule.schedulingAlgorithm === 'fsrs') {
                             rating = this.mapScoreToFsrsRating(result.score);
-                            new Notice(`MCQ for ${result.path}(FSRS) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${FsrsRating[rating]} (${rating as number})`);
+                            new Notice(`MCQ for ${result.path}(FSRS) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${FsrsRating[rating]} (${rating})`);
                         } else { // SM-2
                             rating = this.mapScoreToSm2Response(result.score);
-                            new Notice(`MCQ for ${result.path}(SM - 2) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${ReviewResponse[rating]} (${rating as number})`);
+                            new Notice(`MCQ for ${result.path}(SM - 2) - Score: ${(result.score * 100).toFixed(0)}%, Rating: ${ReviewResponse[rating]} (${rating})`);
                         }
                         await this.plugin.reviewController.processReviewResponse(result.path, rating, { ratingKind });
                         reviewsProcessed++;

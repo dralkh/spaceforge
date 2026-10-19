@@ -1306,8 +1306,7 @@
   /* Icon beside its name, blurb underneath: a card two lines tall, not three. */
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 6px;
-  row-gap: 1px;
+  gap: 1px 6px;
   align-items: center;
   text-align: left;
   padding: 6px var(--sf-space-sm);

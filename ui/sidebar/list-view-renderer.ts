@@ -709,7 +709,7 @@ export class ListViewRenderer {
     private async _ensureAndUpdateUpcomingReviewsSection(container: HTMLElement): Promise<void> {
         await this.loadDeckDue();
         const allSchedules = Object.values(this.plugin.reviewScheduleService.schedules);
-        const upcomingGroupedNotes = await this.groupNotesByDate(allSchedules, true);
+        const upcomingGroupedNotes = this.groupNotesByDate(allSchedules, true);
         // Days that owe cards alone are days too.
         const upcomingWithDecks: Record<string, ReviewSchedule[]> = { ...upcomingGroupedNotes };
         for (const key of Object.keys(this.deckDueFuture)) {
@@ -1326,7 +1326,7 @@ export class ListViewRenderer {
          this.dragAndDropInitialized = true;
 
          // Track the current drag target for visual feedback
-         let currentDragTarget: HTMLElement | null = null;
+         let currentDragTarget: Element | null = null;
          
          // Add drag-over event handler - only prevent default to allow drop
          container.addEventListener('dragover', (e) => {
@@ -1387,7 +1387,7 @@ export class ListViewRenderer {
                 currentOrder.splice(insertIndex, 0, draggedPath);
 
                 // Update and save
-                await this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
+                this.plugin.reviewScheduleService.updateCustomNoteOrder(currentOrder);
                 await this.plugin.savePluginData();
 
                 // Refresh view
@@ -1398,7 +1398,7 @@ export class ListViewRenderer {
         // Add drag-enter for visual feedback
          container.addEventListener('dragenter', (e) => {
              const target = e.target as HTMLElement;
-             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+             const noteItem = target.closest('.review-note-item');
              
              if (noteItem && noteItem !== currentDragTarget) {
                  // Clear previous target
@@ -1414,7 +1414,7 @@ export class ListViewRenderer {
          // Add drag-leave event handler
          container.addEventListener('dragleave', (e) => {
              const target = e.target as HTMLElement;
-             const noteItem = target.closest('.review-note-item') as HTMLElement | null;
+             const noteItem = target.closest('.review-note-item');
              
              if (noteItem && noteItem === currentDragTarget) {
                  // Check if we're actually leaving the element, not just entering a child

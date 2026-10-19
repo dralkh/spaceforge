@@ -10,7 +10,7 @@ import {
     TutorPromptSpec,
 } from '../models/study';
 import { StudyDomainProfile, describeDomain, getDomainProfile } from '../models/study-domains';
-import { SpaceforgeSettings } from '../models/settings';
+import { SpaceforgeSettings, StudyExpertise } from '../models/settings';
 import { ChatMessage } from '../api/chat-client';
 import { StudyImageRef, describeImagesForPrompt, markImageLines } from '../utils/study-media';
 
@@ -257,13 +257,13 @@ function buildModeBlock(ctx: TutorPromptContext): string {
     const expertise = ctx.settings.studyExpertise;
     let expertiseLine: string;
     switch (expertise) {
-        case 'beginner':
+        case StudyExpertise.Beginner:
             expertiseLine = 'Assume no background: define terms before using them, and use the smallest possible examples.';
             break;
-        case 'intermediate':
+        case StudyExpertise.Intermediate:
             expertiseLine = 'Assume working familiarity: skip basic definitions unless an answer shows they are missing.';
             break;
-        case 'advanced':
+        case StudyExpertise.Advanced:
             expertiseLine = 'Assume strong background: go straight to the hard cases, limits and trade-offs.';
             break;
         default:

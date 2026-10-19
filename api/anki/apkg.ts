@@ -236,7 +236,7 @@ export function deckOptionsFromAnki(dconf: unknown, collectionConf?: unknown): D
         minimumInterval: numberOf(lapse.minInt, numberOf(review.minSpace, defaults.minimumInterval)),
         maximumInterval: numberOf(review.maxIvl, defaults.maximumInterval),
         leechThreshold: numberOf(lapse.leechFails, defaults.leechThreshold),
-        leechAction: numberOf(lapse.leechAction, defaults.leechAction) === LeechAction.TagOnly ? LeechAction.TagOnly : LeechAction.Suspend,
+        leechAction: numberOf(lapse.leechAction, defaults.leechAction) === Number(LeechAction.TagOnly) ? LeechAction.TagOnly : LeechAction.Suspend,
         buryNewSiblings: newConfig.bury === undefined ? defaults.buryNewSiblings : newConfig.bury !== false,
         buryReviewSiblings: review.bury === true,
         maxAnswerSeconds: numberOf(config.maxTaken, defaults.maxAnswerSeconds),
@@ -543,7 +543,8 @@ function notetypesFromModels(models: Record<string, unknown>, warnings: string[]
             fields: named.map((field) => field.name),
         });
         if (fields.length === 0) {
-            warnings.push(`notetype "${String(model.name ?? id)}" declares no fields`);
+            const name = typeof model.name === 'string' ? model.name : String(id);
+            warnings.push(`notetype "${name}" declares no fields`);
         }
     }
     return out;
@@ -586,17 +587,17 @@ function notetypesFromTables(db: SqliteDatabase, warnings: string[]): Map<string
 
 /** Days from the collection's creation date for review cards, seconds for the rest. */
 function isDayBasedDue(type: number, queue: number): boolean {
-    if (queue === AnkiCardQueue.Review || queue === 3) {
+    if (queue === Number(AnkiCardQueue.Review) || queue === 3) {
         return true;
     }
-    return queue < 0 && type === AnkiCardType.Review;
+    return queue < 0 && type === Number(AnkiCardType.Review);
 }
 
 function isSecondBasedDue(type: number, queue: number): boolean {
-    if (queue === AnkiCardQueue.Learning || queue === 4) {
+    if (queue === Number(AnkiCardQueue.Learning) || queue === 4) {
         return true;
     }
-    return queue < 0 && (type === AnkiCardType.Learning || type === AnkiCardType.Relearning);
+    return queue < 0 && (type === Number(AnkiCardType.Learning) || type === Number(AnkiCardType.Relearning));
 }
 
 /** Anki's stored due value becomes milliseconds since the epoch. */

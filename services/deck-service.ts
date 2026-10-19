@@ -495,7 +495,10 @@ function apkgPathFor(deckPath: string): string {
 
 /** A media entry's own bytes, as an exact ArrayBuffer (no shared tail). */
 function exactBytes(bytes: Uint8Array): ArrayBuffer {
-    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    // A fresh copy is exactly the view's bytes; `buffer.slice` loses its
+    // ArrayBuffer type on newer TypeScript, and a SharedArrayBuffer must
+    // never reach the album writer.
+    return new Uint8Array(bytes).buffer;
 }
 
 /** "1 card", "2 cards" — how Anki's own counts read. */

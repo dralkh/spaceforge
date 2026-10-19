@@ -1,0 +1,49 @@
+name: Build and attest release assets
+
+# Obsidian's review checks release assets for GitHub artifact attestations.
+# This workflow rebuilds the plugin from the tagged source, attests the built
+# files, and uploads them to the release, so every asset can be verified as
+# built from this repository.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the release assets
+        run: npm run build
+
+      - name: Attest the release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            styles.css
+            manifest.json
+
+      - name: Upload the assets to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" main.js styles.css manifest.json --clobber

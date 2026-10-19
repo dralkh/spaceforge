@@ -1141,8 +1141,13 @@ function withDeckLane(shell: FakeShell): DeckLane {
  * mid-test).
  */
 function installDocumentSweep(shell: FakeShell, roots: () => MiniElement[]): void {
-    (shell.document as unknown as { querySelectorAll: (selector: string) => MiniElement[] }).querySelectorAll =
-        selector => roots().flatMap(root => root.querySelectorAll(selector));
+    // Production sweeps through Obsidian's document.body.findAll(); the
+    // stand-in document has no body, so the test supplies one that searches
+    // the roots this test stands the app's panes in for.
+    const doc = shell.document as unknown as { body?: { findAll: (selector: string) => MiniElement[] } };
+    doc.body = {
+        findAll: selector => roots().flatMap(root => root.querySelectorAll(selector)),
+    };
 }
 
 test("the bar's Cards tab sits the deck in the dock, under the grades", async () => {

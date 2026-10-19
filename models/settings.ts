@@ -775,7 +775,7 @@ export function migrateSettings(settings: SpaceforgeSettings): boolean {
         // The step list was never read by the scheduler (ts-fsrs 4.7 owns its steps).
         delete params.learning_steps;
 
-        settings.fsrsParameters = params as SpaceforgeSettings['fsrsParameters'];
+        settings.fsrsParameters = params;
         settings.fsrsShortTermMigrated = true;
         changed = true;
     }

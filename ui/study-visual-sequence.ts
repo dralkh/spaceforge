@@ -286,7 +286,7 @@ export class StudyVisualSequenceView {
     }
 
     private bind(el: EventTarget, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.bindings.push({ el, type, handler: listener });
     }
@@ -298,7 +298,7 @@ export class StudyVisualSequenceView {
     }
 
     private bindCard(el: EventTarget, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.cardBindings.push({ el, type, handler: listener });
     }
@@ -310,7 +310,7 @@ export class StudyVisualSequenceView {
     }
 
     private bindDrag(el: EventTarget, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.dragBindings.push({ el, type, handler: listener });
     }

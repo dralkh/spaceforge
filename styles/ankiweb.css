@@ -110,8 +110,8 @@
   margin-bottom: var(--sf-space-sm);
 }
 
-.sf-ankiweb-browser {
-  height: auto !important;
+.sf-ankiweb-modal .sf-ankiweb-browser {
+  height: auto;
   padding: var(--sf-space-xs) var(--sf-space-md);
   font-size: var(--sf-font-ui);
   background-color: var(--sf-primary);

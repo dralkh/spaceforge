@@ -582,7 +582,7 @@ export class StudyMindMapView {
     // --------------------------------------------------------------- markup
 
     private bind(el: HTMLElement, type: string, handler: (event: Event) => void): void {
-        const listener = handler as EventListener;
+        const listener = handler;
         el.addEventListener(type, listener);
         this.bindings.push({ el, type, handler: listener });
     }
@@ -641,7 +641,7 @@ export class StudyMindMapView {
         close.setAttribute('type', 'button');
         close.setAttribute('title', 'Clear the focus and show the whole map');
         this.bind(close, 'click', () => this.clearFocus());
-        this.detailCloseEl = close as HTMLButtonElement;
+        this.detailCloseEl = close;
         this.detailPathEl = detail.createDiv('sf-mm-detail-path');
         this.detailTextEl = detail.createDiv('sf-mm-detail-text');
     }

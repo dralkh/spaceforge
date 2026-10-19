@@ -226,8 +226,11 @@ export class AnkiWebSearchModal extends Modal {
     }
 
     private openDeck(deck: AnkiWebDeckResult): void {
-        const open = this.host.openExternal ?? ((url: string) => { window.open(url, '_blank', 'noopener'); });
-        open(deck.url);
+        if (this.host.openExternal) {
+            this.host.openExternal(deck.url);
+            return;
+        }
+        window.open(deck.url, '_blank', 'noopener');
     }
 
     private async importDeck(deck: AnkiWebDeckResult): Promise<void> {
@@ -318,8 +321,12 @@ export class AnkiWebSearchModal extends Modal {
 
     /** AnkiWeb's own search page, for the query the reader already typed. */
     private openSearchInBrowser(query: string): void {
-        const open = this.host.openExternal ?? ((url: string) => { window.open(url, '_blank', 'noopener'); });
-        open(`https://ankiweb.net/shared/decks?search=${encodeURIComponent(query)}`);
+        const url = `https://ankiweb.net/shared/decks?search=${encodeURIComponent(query)}`;
+        if (this.host.openExternal) {
+            this.host.openExternal(url);
+            return;
+        }
+        window.open(url, '_blank', 'noopener');
     }
 
     private clearAction(): void {

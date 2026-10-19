@@ -833,8 +833,8 @@ export class ReviewFlowController {
      * handed.
      */
     private watchCardsProgress(container: HTMLElement, mount: (container: HTMLElement) => () => void): () => void {
-        const Observer = (globalThis as { MutationObserver?: typeof MutationObserver }).MutationObserver;
-        const observer = typeof Observer === 'function' && typeof container.querySelectorAll === 'function'
+        const Observer = (window as { MutationObserver?: typeof MutationObserver }).MutationObserver;
+        const observer = typeof Observer === 'function' && typeof container.findAll === 'function'
             ? new Observer(() => this.queueCardSittingChanged())
             : null;
         observer?.observe(container, { childList: true, subtree: true });
@@ -1262,14 +1262,14 @@ export class ReviewFlowController {
     private syncRunPositionMarker(): void {
         // The pin is a decoration, and a decoration must never break a run: a
         // stand-in document (the test harness) has no query at all.
-        if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+        if (typeof document === 'undefined' || !document.body || typeof document.body.findAll !== 'function') return;
         const current = this.model.isActive() ? this.model.currentPath() : null;
         // Renders are frequent and the position rarely moves: only walk the DOM
         // when the note the bar names has actually changed. The list's own
         // render re-applies the pin to rows it has just rebuilt.
         if (current === this.lastMarkedPath) return;
         this.lastMarkedPath = current;
-        for (const row of Array.from(document.querySelectorAll<HTMLElement>('.review-note-item[data-note-path]'))) {
+        for (const row of document.body.findAll('.review-note-item[data-note-path]')) {
             row.toggleClass('is-run-current', current !== null && row.dataset.notePath === current);
         }
     }
@@ -1394,14 +1394,14 @@ export class ReviewFlowController {
      * nothing is removed.
      */
     private clearStaleSurfaces(): void {
-        if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+        if (typeof document === 'undefined' || !document.body || typeof document.body.findAll !== 'function') return;
         // Proof that the sweep is safe: nothing of ours exists yet. The bar has
         // no element, and the dock and the host marker are only ever set by a
         // mount — so if any of them is present, this is not the load path and
         // the sweep is refused rather than risking a live surface.
         if (this.dock !== null || this.strip.getElement() !== null || this.hostClassEl !== null) return;
         for (const selector of ['.sf-strip', '.sf-dock', '.sf-deck', '.modal.sf-deck-modal-host']) {
-            for (const stale of Array.from(document.querySelectorAll<HTMLElement>(selector))) stale.remove();
+            for (const stale of document.body.findAll(selector)) stale.remove();
         }
     }
 

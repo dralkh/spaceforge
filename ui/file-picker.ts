@@ -27,7 +27,7 @@ export interface PickFileOptions {
  */
 export function pickFile(options: PickFileOptions = {}): Promise<PickedFile | null> {
     return new Promise(resolve => {
-        const input = document.createElement('input');
+        const input = createEl('input');
         input.type = 'file';
         input.accept = options.accept ?? '.apkg,.colpkg,.anki2,application/zip,application/octet-stream';
         if (options.hint) input.setAttribute('aria-label', options.hint);

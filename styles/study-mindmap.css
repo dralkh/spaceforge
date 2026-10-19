@@ -526,9 +526,8 @@
   padding-top: var(--sf-mm-link-reach);
   border-left: none;
   border-top: var(--sf-mm-link-width) solid var(--sf-mm-link);
-  /* 760px is the widest host the wide band is chosen for, inset: a fallback for
-     an engine that cannot measure the row against its own scroller. */
-  max-width: 760px;
+  /* Container queries are available on every supported Obsidian build, so the
+     row is measured against its own scroller and never touches the edge. */
   max-width: calc(100cqw - var(--sf-space-xl));
 }
 

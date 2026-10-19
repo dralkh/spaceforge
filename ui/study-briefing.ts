@@ -659,8 +659,8 @@ export class StudyBriefingView {
         for (const profile of STUDY_DOMAINS) {
             const option = select.createEl('option', { text: profile.label });
             // `value` is not set by createEl for options in every Obsidian build.
-            (option as HTMLOptionElement).value = profile.id;
-            (option as HTMLOptionElement).selected = profile.id === host.briefing.domainId;
+            option.value = profile.id;
+            option.selected = profile.id === host.briefing.domainId;
         }
         const notes = editor.createEl('textarea', { cls: 'sf-study-domain-school' });
         notes.value = host.briefing.domainNotes;

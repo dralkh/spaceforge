@@ -643,7 +643,7 @@ export class StudyPlanService {
             totalObjectives: plan.objectives.length,
             mastered,
             masteryScore: this.overallMastery(plan, store),
-            errorCounts: session.errorCounts as StudyDigest['errorCounts'],
+            errorCounts: session.errorCounts,
             dueObjectives: this.dueObjectives(plan, store),
             nextSuggestions: store.scheduleSuggestions.slice(-6),
             webLookups: session.webLookups,
