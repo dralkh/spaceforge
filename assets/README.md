@@ -11,7 +11,7 @@ and nothing is model-generated imagery.
 | `spaceforge-capabilities.png` | Capability card, six real UI panels (2400×1930) | `make-marketing-images.py` |
 | `spaceforge-preview-poster.png` | Poster — the film's Study scene (1920×1080) | `make-marketing-images.py` |
 | `spaceforge-preview-thumbnail.png` | YouTube thumbnail (1280×720) | `make-marketing-images.py` |
-| `spaceforge-preview-1440p.mp4` | **The 1:50 product film** — 2560×1440, narration + original music | `render.py --stage finish` |
+| `spaceforge-preview-1080p.mp4` | **The 1:50 product film** — 1920×1080, narration + original music, 7 MB | `render.py --stage finish` |
 
 The film is recorded from the plugin itself (an isolated Obsidian instance driven over CDP) with a
 seeded example vault; its AI scenes run against a local OpenAI-compatible endpoint that returns
@@ -34,5 +34,6 @@ node scripts/capture-settings-cli.mjs
 /usr/bin/python3 scripts/render.py --stage clips && /usr/bin/python3 scripts/render.py --stage finish
 /usr/bin/python3 scripts/make-marketing-images.py
 /usr/bin/python3 scripts/verify.py
-cp output/spaceforge-preview-master-1440p.mp4 ../../assets/spaceforge-preview-1440p.mp4
+ffmpeg -y -i output/spaceforge-preview-master-1440p.mp4 -vf scale=1920:1080 -c:v libx264 -preset slow -crf 26 \
+  -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart ../../assets/spaceforge-preview-1080p.mp4
 ```

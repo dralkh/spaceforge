@@ -8,7 +8,8 @@ Spaceforge transforms your Obsidian notes into a powerful learning and revision 
 
 ## Preview
 
-[![Spaceforge preview](assets/spaceforge-preview-poster.png)](assets/spaceforge-preview-1440p.mp4)
+https://github.com/user-attachments/assets/42cdccfe-6865-4942-bc6d-cd9e0376e071
+
 
 ![Spaceforge](assets/spaceforge-capabilities.png)
 
