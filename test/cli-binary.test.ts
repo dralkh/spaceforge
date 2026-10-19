@@ -138,10 +138,10 @@ test('a CLI that is nowhere is reported as missing, with where we looked', async
     const savedPath = process.env.PATH;
     process.env.PATH = '';
     try {
-        const result = await detectCliAgent('gemini', { home });
+        const result = await detectCliAgent('copilot', { home });
         assert.equal(result.installed, false);
         assert.equal(result.resolvedPath, undefined);
-        assert.match(result.message, /Searched .* for `gemini`/, 'it says what was searched');
+        assert.match(result.message, /Searched .* for `copilot`/, 'it says what was searched');
         assert.match(result.message, /Local CLI extra path/, 'and how to point at an unusual install');
     } finally {
         process.env.PATH = savedPath;

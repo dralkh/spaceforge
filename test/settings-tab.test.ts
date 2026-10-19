@@ -308,15 +308,16 @@ test('every provider in the dropdown has rows of its own, and they stay put', as
     assert.ok(dropdown, 'the provider choice is a dropdown');
     const options = dropdown.options.map(option => option.value);
     assert.ok(options.length >= 28, `expected every company and every CLI, found ${options.length}`);
-    for (const agentId of ['claude', 'codex', 'cursor', 'hermes', 'gemini', 'openclaw']) {
+    for (const agentId of ['antigravity', 'claude', 'codex', 'copilot', 'cursor', 'hermes', 'openclaw', 'opencode']) {
         assert.ok(options.includes(`cli:${agentId}`), `${agentId} is offered under its own id`);
     }
     assert.ok(!options.includes(ApiProvider.Cli), 'there is no converged "local CLI" row to narrow down');
+    assert.ok(!options.includes('cli:gemini'), 'the deprecated Gemini CLI is no longer offered');
     // The CLIs lead the list: they need no key and no account, so they are the
     // shortest path from a fresh install to a working provider.
     assert.deepEqual(
-        options.slice(0, 7),
-        ['cli:antigravity', 'cli:claude', 'cli:codex', 'cli:cursor', 'cli:gemini', 'cli:hermes', 'cli:openclaw'],
+        options.slice(0, 8),
+        ['cli:antigravity', 'cli:claude', 'cli:codex', 'cli:copilot', 'cli:cursor', 'cli:hermes', 'cli:openclaw', 'cli:opencode'],
         'every CLI is listed first',
     );
 

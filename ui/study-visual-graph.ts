@@ -649,7 +649,12 @@ export class StudyVisualGraphView {
 
     /** One svg element, with its class and attributes, on the element it belongs to. */
     private shape<K extends keyof SVGElementTagNameMap>(parent: Element, tag: K, cls: string, attrs: Record<string, string>): SVGElementTagNameMap[K] {
-        return parent.createSvg(tag, { cls, attr: attrs });
+        // Classes go on one token at a time: Obsidian's `createSvg` passes a
+        // `cls` string straight to `classList.add`, which rejects any token
+        // containing a space (the tests' miniature DOM is more forgiving).
+        const element = parent.createSvg(tag, { attr: attrs });
+        for (const token of cls.split(/\s+/).filter(Boolean)) element.classList.add(token);
+        return element;
     }
 
     private tickLabel(parent: Element, cls: string, text: string, x: number, y: number, anchor: string): SVGTextElement {

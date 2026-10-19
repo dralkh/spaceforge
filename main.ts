@@ -10,6 +10,7 @@ import { MCQController } from './controllers/review-controller-mcq';
 import { ContextMenuHandler } from './ui/context-menu';
 import { ReviewSidebarView } from './ui/sidebar-view';
 import { REVIEW_WINDOW_VIEW, ReviewWindowView } from './ui/review-window-view';
+import { STATS_VIEW, StatsView } from './ui/stats-view';
 import { SpaceforgeSettingTab } from './ui/settings-tab';
 import { DEFAULT_SETTINGS, SpaceforgeSettings, ApiProvider, migrateSettings } from './models/settings';
 import { GradeBucket } from './models/review-flow';
@@ -43,6 +44,7 @@ import { setCliExtraPath } from './api/cli/cli-runner';
 import { IMCQGenerationService } from './api/mcq-generation-service';
 import { ReviewScheduleService } from './services/review-schedule-service';
 import { ReviewHistoryService } from './services/review-history-service';
+import { StatsService } from './services/stats-service';
 import { ReviewSessionService } from './services/review-session-service';
 import { MCQService } from './services/mcq-service';
 import { PomodoroService } from './services/pomodoro-service';
@@ -84,6 +86,8 @@ export default class SpaceforgePlugin extends Plugin {
     dataStorage: DataStorage;
     reviewScheduleService: ReviewScheduleService;
     reviewHistoryService: ReviewHistoryService;
+    /** Progress statistics: permanent day counters and the deck review log. */
+    statsService: StatsService;
     reviewSessionService: ReviewSessionService;
     mcqService: MCQService;
     pomodoroService: PomodoroService;
@@ -124,10 +128,6 @@ export default class SpaceforgePlugin extends Plugin {
     studyChartQueue: StudyChartQueueService;
 
 
-    private readonly stylesheetPath: string = "styles.css";
-    private readonly stylesheetId: string = "spaceforge-styles";
-    private lastStylesModTime: number | null = null;
-    private cssHotReloadIntervalId: number | null = null;
     private beforeUnloadHandler: (event: Event) => void; // Declared as a class property
     /** The save that is currently writing, and whether state changed while it ran. */
     private saveInFlight: Promise<void> | null = null;
@@ -163,6 +163,7 @@ export default class SpaceforgePlugin extends Plugin {
             this.pluginState.history
         );
         this.reviewHistoryService = new ReviewHistoryService(this.pluginState.history);
+        this.statsService = new StatsService(this, this.pluginState.reviewDayStats, this.pluginState.deckHistory);
         this.reviewSessionService = new ReviewSessionService(this, this.pluginState.reviewSessions);
         this.mcqService = new MCQService(this.pluginState.mcqSets, this.pluginState.mcqSessions);
         this.studyPlanService = new StudyPlanService(
@@ -228,6 +229,13 @@ export default class SpaceforgePlugin extends Plugin {
         this.registerView(
             REVIEW_WINDOW_VIEW,
             (leaf) => new ReviewWindowView(leaf, () => this.reviewFlowController?.handleSessionWindowClosed())
+        );
+
+        // Progress statistics, in a leaf of its own so it can use the width a
+        // grid of charts needs.
+        this.registerView(
+            STATS_VIEW,
+            (leaf) => new StatsView(leaf, this)
         );
 
         this.dataStorage = new DataStorage(
@@ -307,25 +315,8 @@ export default class SpaceforgePlugin extends Plugin {
         // whole file, and this gives that moment a chance to land.
         this.registerDomEvent(window, 'pagehide', () => { void this.savePluginData(); });
 
-        // this.app.workspace.onLayoutReady(() => this.activateSidebarView()); // Removed automatic activation
-        this.addStylesheet();
-
-        // The adapter, not the Vault API: this path is the plugin's own stylesheet
-        // inside `.obsidian/plugins/`, which the vault does not index.
-        if (this.app.vault.adapter.stat && typeof this.app.vault.adapter.stat === 'function') {
-            this.cssHotReloadIntervalId = window.setInterval(() => {
-                void (async () => {
-                    try {
-                        const stats = await this.app.vault.adapter.stat(this.stylesheetPath);
-                        if (stats && (this.lastStylesModTime === null || this.lastStylesModTime < stats.mtime)) {
-                            this.lastStylesModTime = stats.mtime;
-                            this.addStylesheet();
-                        }
-                    } catch { /* handle error */ }
-                })();
-            }, 1000);
-            this.registerInterval(this.cssHotReloadIntervalId);
-        }
+        // Styles come from the styles.css Obsidian loads for the plugin; there is
+        // no manual stylesheet or filesystem watcher to keep alive here.
 
         if (this.settings.notifyBeforeDue > 0) {
             this.registerInterval(window.setInterval(() => this.checkForDueNotes(), 5 * 60 * 1000));
@@ -423,13 +414,6 @@ export default class SpaceforgePlugin extends Plugin {
      * reported where it can be seen.
      */
     onunload(): void {
-        if (this.cssHotReloadIntervalId !== null) {
-            window.clearInterval(this.cssHotReloadIntervalId);
-            this.cssHotReloadIntervalId = null;
-        }
-        const styleEl = document.getElementById(this.stylesheetId);
-        if (styleEl) styleEl.remove();
-
         // The review bar and the dock are ours; without this they outlive the
         // plugin and the next enable puts a second copy beside the first.
         this.reviewFlowController?.dispose();
@@ -653,6 +637,10 @@ export default class SpaceforgePlugin extends Plugin {
         this.studyPlanService.sessions = this.pluginState.studySessions || {};
         this.reviewScheduleService.customNoteOrder = this.pluginState.customNoteOrder || [];
         this.reviewScheduleService.lastLinkAnalysisTimestamp = typeof this.pluginState.lastLinkAnalysisTimestamp === 'number' ? this.pluginState.lastLinkAnalysisTimestamp : null;
+        // The statistics counters live across the whole file's lifetime; this
+        // also seeds them from the review log the first time a file that
+        // predates them is loaded.
+        this.statsService.applyLoadedState(this.pluginState);
         this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
     }
 
@@ -1005,6 +993,10 @@ export default class SpaceforgePlugin extends Plugin {
                 // the run the reader was in the middle of.
                 noteRun: this.pluginState.noteRun ?? null,
                 deckSitting: this.pluginState.deckSitting ?? null,
+                // The statistics counters and the deck review log, likewise
+                // named here or the save would drop them.
+                reviewDayStats: this.statsService.reviewDayStats ?? {},
+                deckHistory: this.statsService.deckHistory ?? [],
                 version: this.manifest.version,
             };
             this.pluginState = currentPluginState; // Update the live pluginState
@@ -1092,6 +1084,31 @@ export default class SpaceforgePlugin extends Plugin {
     }
 
     /**
+     * Open (or reveal) the statistics view.
+     *
+     * The view lives in the main area on purpose: the charts need more width
+     * than the sidebar has, and a leaf of its own can sit on a second monitor
+     * or in a popout window. One leaf is reused; opening again just reveals
+     * it and asks it to re-read the data.
+     */
+    async openStatsView(): Promise<void> {
+        const existing = this.app.workspace.getLeavesOfType(STATS_VIEW);
+        if (existing.length > 0) {
+            void this.app.workspace.revealLeaf(existing[0]);
+            const view = existing[0].view;
+            if (view instanceof StatsView) await view.refresh();
+            return;
+        }
+        const leaf = this.app.workspace.getLeaf('tab');
+        if (!leaf) {
+            new Notice('Could not open the statistics view');
+            return;
+        }
+        await leaf.setViewState({ type: STATS_VIEW, active: true });
+        void this.app.workspace.revealLeaf(leaf);
+    }
+
+    /**
      * The Markdown file the user is looking at, or null. One place for the
      * checkCallbacks above, so "is there a note to act on?" has one answer.
      */
@@ -1144,6 +1161,14 @@ export default class SpaceforgePlugin extends Plugin {
             name: 'Previous review note',
             callback: () => {
                 void this.navigationController.navigateToPreviousNote();
+            },
+        });
+
+        this.addCommand({
+            id: 'open-statistics',
+            name: 'Open statistics',
+            callback: () => {
+                void this.openStatsView();
             },
         });
 
@@ -1497,7 +1522,6 @@ export default class SpaceforgePlugin extends Plugin {
     }
 
     checkForDueNotes(): void { /* ... */ }
-    private addStylesheet(): void { /* ... */ }
     exportPluginData(): void { /* ... */ }
     importPluginData(_fileContent: string): void { /* ... */ }
 

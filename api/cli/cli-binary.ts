@@ -63,6 +63,27 @@ export interface CliSearchOptions {
     extra?: string;
 }
 
+/**
+ * The reader's own extra path, set from the settings.
+ *
+ * It lives here rather than in `cli-runner` so every search — the spawn path,
+ * the detection probe and the model list — sees the same directories. An
+ * install outside the usual places is only found if all of them agree on where
+ * to look.
+ */
+let extraPath = '';
+
+export function setCliSearchExtra(value: string): void {
+    const next = (value ?? '').trim();
+    if (next === extraPath) return;
+    extraPath = next;
+    cached = null;
+}
+
+export function getCliSearchExtra(): string {
+    return extraPath;
+}
+
 const IS_WINDOWS = nodeProcess()?.platform === 'win32';
 
 /** Relative to the home directory: npm/yarn/bun/deno/cargo/pnpm installs and shims. */
@@ -81,6 +102,8 @@ const HOME_BIN_DIRS = [
     '.volta/bin',
     '.cargo/bin',
     'go/bin',
+    // The official installer for OpenCode puts the binary here.
+    '.opencode/bin',
     '.asdf/shims',
     '.nodenv/shims',
     '.anyenv/envs/nodenv/shims',
@@ -183,7 +206,7 @@ export function cliPathDirs(options: CliSearchOptions = {}): string[] {
     const modules = nodeModules();
     if (!modules) return [];
     const home = options.home ?? safeHomeDir();
-    const extra = options.extra ?? '';
+    const extra = options.extra ?? extraPath;
     const key = `${home}\u0000${extra}`;
     const now = Date.now();
     if (cached && cached.key === key && now - cached.at < CACHE_MS) return cached.dirs;

@@ -37,6 +37,9 @@ https://github.com/user-attachments/assets/42cdccfe-6865-4942-bc6d-cd9e0376e071
 *   **Comprehensive Review Management:**
     *   A dedicated sidebar view displays upcoming reviews, estimated completion times, and allows for easy navigation with configurable hotkey support.
     *   Calendar view for visualizing your review schedule with standardized UTC date calculations.
+*   **Progress Statistics:**
+    *   A statistics page (run "Spaceforge: Open statistics", or click the chart button in the sidebar header) puts the whole vault in one dashboard: reviews today, streaks and days studied, an activity heatmap (the last six months, or a year on the wide windows) with a weekday-rhythm card and a click-through day breakdown, a 30-day due forecast for notes and Anki decks, Anki-style **true retention** by maturity, the answer-button mix, interval/ease/stability/difficulty distributions, a memory-now estimate for FSRS cards, the leeches worth refactoring, per-deck summaries, and the tutor and quiz summaries.
+    *   Built to last: each review folds into a permanent per-day counter, so year-long heatmaps, streaks and all-time retention survive even though the detailed review log keeps only the newest 1000 entries. Deck answers (with their answer times) are written to an Anki-style review log, which is what lets deck retention and answer-time figures exist at all.
 *   **📅 Calendar Events Organization:**
     *   **Full Event Management**: Create, edit, and delete calendar events with comprehensive CRUD operations
     *   **Event Categories**: Color-coded categories (Work, Personal, Study, Meeting, Health, Social, Other) for visual organization
@@ -110,6 +113,23 @@ Keyboard while a session is running: `1`-`4` grade (FSRS), `0`-`5` grade (SM-2),
 
 Reviews are always docked: the note stays in view and the grades sit in a bar under it. (The older dialog that opened *over* the note is gone; a vault that still had it selected is moved to the bar the next time its settings load.)
 
+#### Reviewing Your Progress (Statistics)
+Run **"Spaceforge: Open statistics"**, or click the chart button beside the List | Calendar | Review toggle in the sidebar header. The page opens in a tab of its own (usable in a second pane or a popout window) and is a compact grid of charts, in the spirit of Anki's statistics screen:
+
+1.  **Six figures up top**: reviews today (with the 7-day average), the streak and its best, retention over the last 30 days, what is due today and overdue, the share of days studied in the chosen window, and — for FSRS material — how much of it is recallable right now, with the estimated number of items behind that percentage.
+2.  **Activity**: the heatmap of the last six months (a year on the wide windows), one cell per day, darker with more reviews, plus a legend. Hover any cell for its count; click one to turn the card beside it into that day's full breakdown — notes and deck cards, and the Again/Hard/Good/Easy split — with one click back to the weekday rhythm.
+3.  **Details**: the weekday rhythm of the chosen window by default (which days carry the studying), or the picked day's breakdown.
+4.  **Next 30 days**: a forecast of due reviews, notes under and deck cards over, with overdue folded into today, today's column marked, the average per day, Anki's daily-load estimate, and the new cards waiting to be introduced. Hover a bar for that day's numbers.
+5.  **Retention**: true retention by maturity — learning steps, young (scheduled under 21 days) and mature (21+ days) cards, plus the two combined — over today, a week, a month and all time. Again is the only failure, exactly as FSRS counts it, so a Hard grade is a pass here as it is there.
+6.  **Answer buttons**: the Again/Hard/Good/Easy mix for the window, with the Again rate split by maturity — the closest thing to a "this material is not sticking" alarm.
+7.  **Collection health**: the distribution of intervals, ease, FSRS stability and FSRS difficulty across notes and decks, with the median marked; a long tail pools into a single `Nd+` bar instead of flattening the shape. Switch metrics with one click.
+8.  **Decks** and **Study**: per-deck summaries (due, queue mix, maturity, 30-day retention, answer time) that open the deck on click; and the tutor's objectives, session minutes, average score and recurring error categories beside the quiz accuracy.
+9.  **Needs attention**: the leechy notes (lapses and recent Again counts) and decks (cards at the leech threshold), each with a severity dot, clickable so the note or deck is one click away.
+
+The window selector (1 month / 3 months / 1 year / All) drives the activity, button-mix and days-studied figures; retention and the distributions are already period-based and snapshot-based respectively.
+
+Two honesty notes about the data: when you first upgrade, the day counters are seeded once from the *existing* review log (up to the newest 1000 reviews — older history that the log no longer holds cannot be recovered), and the deck review log only starts with the first deck card you answer afterwards. Everything is computed locally from your vault; nothing leaves your machine.
+
 #### Studying a Note (Adaptive Tutor)
 1.  Start a review (or right-click a note, or click the graduation-cap button on its sidebar row, or use "Spaceforge: Study current note"). During a review, **Study** is a button in the dock under the bar, beside **MCQs**: study mode expands below the bar, and the note you are being tested on stays on screen the whole time. Nothing opens on top of what you are already looking at.
 2.  The first time a note is charted it is done in the background, a few sections at a time — a long clinical chapter is several model calls, and none of them block the editor. The sidebar shows what is being charted and can pause or retry it. Charting resumes where it stopped if Obsidian is closed mid-way, and one section failing does not lose the others.
@@ -157,8 +177,11 @@ deck as an Anki package**. Cards are scheduled with Anki's own rules — learnin
 ease, lapses, leeches, daily limits, burying — so a deck imported from Anki keeps the due dates it
 arrived with, and a deck exported to Anki behaves there as it did here. An exported package carries
 the deck's notes, cards, media and each card's schedule (including the review history that decides
-it); Anki's own per-review log — the table its statistics screens read — is not rebuilt. The calendar shows what the
-notes owe and what the decks owe side by side, so a day with both is never a surprise.
+it); the per-review log Spaceforge keeps for its own statistics screen is not rebuilt into the
+package — Anki writes a fresh log for the reviews you do on its side. Every card you answer here is
+logged (grade, intervals, ease, answer time), which is what the statistics page's deck figures read.
+The calendar shows what the notes owe and what the decks owe side by side, so a day with both is
+never a surprise.
 
 ## Core Concepts
 
@@ -195,12 +218,13 @@ Spaceforge → Study, and it stays on.
 Deck commands: **Import an Anki deck (.apkg file)**, **Study a deck**, **Study a deck in a new
 window**, **Export a deck as an Anki package**, **Find a deck on AnkiWeb**.
 
-Spaceforge adds these commands to the Obsidian command palette (21 in all). Every one is bindable
+Spaceforge adds these commands to the Obsidian command palette (22 in all). Every one is bindable
 under Settings → Hotkeys, search "Spaceforge"; **none ship with a default hotkey**, so nothing you
 have already bound can be taken over.
 
 *   `Spaceforge: Next note` / `Spaceforge: Previous note`
 *   `Spaceforge: Start review session`
+*   `Spaceforge: Open statistics`
 *   `Spaceforge: Review this note` / `Spaceforge: Study this note`
 *   `Spaceforge: Chart this note` / `Spaceforge: Chart scheduled notes`
 *   `Spaceforge: Open the study dock` / `Spaceforge: Open the questions dock`
@@ -227,16 +251,17 @@ provider you selected for a feature):
 
 | Service | Used for | When |
 | --- | --- | --- |
-| OpenRouter, OpenAI, Google Gemini, Anthropic Claude, Together AI, or any OpenAI-compatible server you configure | Writing questions from a note, and the adaptive tutor's explanations, questions and grading | Only while a generation, study session or charting run is in progress |
+| Any model provider you choose in Settings — OpenRouter, OpenAI, Google Gemini, Anthropic Claude, Together AI, xAI, Mistral, DeepSeek, Groq, Fireworks, Cohere, MiniMax, MiMo, Z.AI, Moonshot, NanoGPT, OpenCode Zen/Go, Azure OpenAI, a local LM Studio or Hermes gateway, or any OpenAI-compatible server you configure | Writing questions from a note, and the adaptive tutor's explanations, questions and grading | Only while a generation, study session or charting run is in progress |
 | The model-list endpoint of that same provider (`/models`) | Filling the model picker in the settings so you do not have to type a model id from memory | Only when you press **Find models** or **Detect** |
 | Ollama or another local server you point the plugin at (`localhost`) | Same as above, but nothing leaves your machine | Only when you press the buttons above |
 | Tavily, Brave or SearXNG | Web lookups the tutor may make when a session allows them (off by default) | Only during a study session that has web lookup enabled |
-| The agent CLI you select, if you use **Local agent CLI** as the provider | Same tasks, run through a CLI on your machine | Only while a task runs |
+| The agent CLI you select, if you use **Local agent CLI** as the provider (the CLI then contacts whichever service it is signed in to, under its own account) | Same tasks, run through a CLI on your machine | Only while a task runs |
 | AnkiWeb (`ankiweb.net`) | Searching shared decks, reading a deck's page, and fetching a deck you ask to import | Only while the AnkiWeb search window is open, or when you press **Import** on a deck in it |
 
 **Access outside your vault.** The optional **Local agent CLI** provider runs a program that is
-already installed and signed in on your computer (for example `claude`, `codex`, `cursor-agent`,
-`gemini`, `hermes` or `openclaw`). To do that it looks the program up on your `PATH` — which means
+already installed and signed in on your computer (for example `claude`, `codex`, `copilot`,
+`cursor-agent`, `agy`, `hermes`, `openclaw` or `opencode`). To do that it looks the program up on
+your `PATH` — which means
 reading directories such as `~/.local/bin` — runs it with the task's prompt, and reads what it
 prints. The program it starts inherits this application's environment, so anything already exported
 in your shell is visible to it exactly as it would be in a terminal.
@@ -287,8 +312,7 @@ zstd-compressed collections inside a modern `.apkg` from Anki. Both are compiled
 *   **Context-Aware Generation:** Optionally use content from linked notes to create questions that test understanding of connections and interdisciplinary knowledge.
 
 **II. Advanced Spaced Repetition & Learning Analytics:**
-*   **"Leech" Management:** Detect and provide special handling for notes that are consistently difficult for the user (e.g., options to suspend, reset, or refactor for improved learning).
-*   **Advanced Statistics & Visualizations:** Gain deeper insights into your learning progress with review heatmaps, success rate charts over time, forecasted workload visualizations, and ease/difficulty distribution charts.
+*   **Statistics Depth:** Per-deck and per-topic history beyond the capped review logs, an hourly breakdown, a report you can save as a note, and export of the charts as images.
 *   **FSRS Parameter Optimization Helper:** An in-plugin tool to help users fine-tune FSRS weights based on their personal review history, maximizing memory retention.
 *   **Flexible Manual Rescheduling:** More options to manually set a specific next review date for a note, offering greater control over your study schedule.
 *   **"Deck" / Topic-Based Reviews:** Allow focusing review sessions on specific topics (e.g., via tags or folders) or interleaving notes from different topics for comprehensive study.

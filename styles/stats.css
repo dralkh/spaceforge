@@ -1,0 +1,869 @@
+/* Spaceforge statistics — the progress dashboard.
+ *
+ * A twelve-column canvas that stops growing at a comfortable reading width,
+ * with each card taking the width its content needs. Charts are SVG drawn by
+ * `ui/stats-charts.ts`; this file decides how all of it looks.
+ *
+ * Three conventions hold here. Colours and type sizes come from the house
+ * tokens (`_variables.css`), never from a literal except the one-off tints
+ * that have no token. Every class the markup renders has a rule below. And
+ * nothing positions itself with an inline style: the two values that must
+ * move at runtime — the shared tooltip's place, a bar's width — travel as
+ * custom properties.
+ */
+
+/* ============================== Shell ============================== */
+
+.sf-stats-view-content {
+  padding: 0;
+}
+
+.sf-stats {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--sf-space-lg) var(--sf-space-lg) var(--sf-space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  min-width: 0;
+}
+
+.sf-stats-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sf-space-sm);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.sf-stats-header-text {
+  min-width: 0;
+}
+
+.sf-stats-title {
+  font-size: var(--sf-font-title);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-normal);
+}
+
+.sf-stats-subtitle {
+  margin-top: 2px;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-ranges {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-secondary);
+}
+
+.sf-stats-range-btn {
+  padding: 4px 12px;
+  font-size: var(--sf-font-ui);
+  border-radius: var(--sf-radius-sm);
+  color: var(--sf-text-muted);
+  cursor: pointer;
+  transition: var(--sf-transition-fast);
+}
+
+.sf-stats-range-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.sf-stats-range-btn.is-active {
+  color: var(--sf-text-on-primary);
+  background: var(--sf-primary);
+}
+
+.sf-stats-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-md);
+  min-width: 0;
+}
+
+.sf-stats-empty-state {
+  padding: var(--sf-space-xl);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  font-size: var(--sf-font-text);
+  color: var(--sf-text-muted);
+  text-align: center;
+}
+
+/* ============================== Tiles ============================== */
+
+.sf-stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: var(--sf-space-sm);
+}
+
+.sf-stats-tile {
+  min-width: 0;
+  padding: var(--sf-space-sm) var(--sf-space-md) 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-top: 2px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+}
+
+.sf-stats-tile.is-good {
+  border-top-color: var(--sf-success);
+}
+
+.sf-stats-tile.is-warn {
+  border-top-color: var(--sf-warning);
+}
+
+.sf-stats-tile-value {
+  font-size: calc(var(--sf-font-title) * 1.2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  color: var(--text-normal);
+}
+
+.sf-stats-tile.is-good .sf-stats-tile-value {
+  color: var(--sf-success);
+}
+
+.sf-stats-tile.is-warn .sf-stats-tile-value {
+  color: var(--sf-warning);
+}
+
+.sf-stats-tile-label {
+  margin-top: 3px;
+  font-size: var(--sf-font-ui);
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.sf-stats-tile-sub {
+  margin-top: 2px;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ============================== Grid ============================== */
+
+.sf-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--sf-space-md);
+  align-items: start;
+}
+
+.sf-stats-card.is-span-4 { grid-column: span 4; }
+.sf-stats-card.is-span-5 { grid-column: span 5; }
+.sf-stats-card.is-span-7 { grid-column: span 7; }
+.sf-stats-card.is-span-8 { grid-column: span 8; }
+.sf-stats-card.is-span-12 { grid-column: span 12; }
+
+/* The layout classes are set by the view from the pane's measured width:
+   below ~1060px the rows pair up six/six and the wide charts go solo, and
+   below ~720px everything is one column. A media query cannot know a pane's
+   width, which is why this is not one. */
+.sf-stats.is-layout-mid .sf-stats-card.is-span-7,
+.sf-stats.is-layout-mid .sf-stats-card.is-span-8 {
+  grid-column: span 12;
+}
+
+.sf-stats.is-layout-mid .sf-stats-card.is-span-4,
+.sf-stats.is-layout-mid .sf-stats-card.is-span-5 {
+  grid-column: span 6;
+}
+
+.sf-stats.is-layout-narrow .sf-stats-card {
+  grid-column: span 12;
+}
+
+.sf-stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  padding: var(--sf-space-sm) var(--sf-space-md) var(--sf-space-md);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background: var(--background-primary);
+}
+
+/* The two activity cards are also the anchors the day click repaints; the
+   rule keeps a long weekday row from widening its grid column. */
+.sf-stats-activity-card,
+.sf-stats-details-card {
+  min-width: 0;
+}
+
+.sf-stats-card-head {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sf-stats-card-title {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sf-stats-card-hint {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-stats-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-stats-chart {
+  position: relative;
+  min-width: 0;
+}
+
+.sf-stats-svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Strokes and labels may sit right on the viewBox edge (today's outline, the
+   median callout); letting them overflow keeps them whole. */
+.sf-stats-heatmap-svg,
+.sf-stats-forecast-svg,
+.sf-stats-histogram-svg {
+  overflow: visible;
+}
+
+.sf-stats-empty {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-note {
+  font-size: var(--sf-font-small);
+  line-height: 1.45;
+  color: var(--sf-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.sf-stats-muted {
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-link {
+  font-size: var(--sf-font-small);
+  color: var(--sf-primary);
+  cursor: pointer;
+}
+
+.sf-stats-link:hover {
+  text-decoration: underline;
+}
+
+/* ============================== Tooltip ============================== */
+
+/* One layer per chart, positioned from the pointer's place in the host. The
+   values travel as custom properties, and the layer never takes the pointer:
+   a tooltip that swallowed it would end the hover it was reporting. */
+.sf-stats-tip {
+  position: absolute;
+  z-index: 3;
+  left: var(--sf-stats-tip-x, 0);
+  top: var(--sf-stats-tip-y, 0);
+  transform: translate(-50%, calc(-100% - 10px));
+  display: none;
+  max-width: 18em;
+  padding: 4px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-sm);
+  background: var(--background-primary);
+  box-shadow: var(--sf-shadow);
+  font-size: var(--sf-font-small);
+  line-height: 1.35;
+  color: var(--text-normal);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-stats-tip.is-visible {
+  display: block;
+}
+
+/* ============================== Heatmap ============================== */
+
+.sf-stats-cell {
+  fill: var(--background-modifier-border);
+  fill-opacity: 0.45;
+}
+
+.sf-stats-cell.is-l1 {
+  fill: var(--sf-success);
+  fill-opacity: 0.26;
+}
+
+.sf-stats-cell.is-l2 {
+  fill: var(--sf-success);
+  fill-opacity: 0.48;
+}
+
+.sf-stats-cell.is-l3 {
+  fill: var(--sf-success);
+  fill-opacity: 0.72;
+}
+
+.sf-stats-cell.is-l4 {
+  fill: var(--sf-success);
+  fill-opacity: 0.95;
+}
+
+.sf-stats-cell.is-clickable {
+  cursor: pointer;
+}
+
+.sf-stats-cell.is-clickable:hover {
+  stroke: var(--sf-text-muted);
+  stroke-width: 1.5;
+}
+
+.sf-stats-cell.is-today {
+  stroke: var(--text-normal);
+  stroke-width: 1;
+}
+
+.sf-stats-cell.is-selected {
+  stroke: var(--text-normal);
+  stroke-width: 2;
+}
+
+.sf-stats-cell:focus-visible {
+  stroke: var(--sf-primary);
+  stroke-width: 2;
+}
+
+.sf-stats-heatmap-month,
+.sf-stats-heatmap-weekday {
+  fill: var(--sf-text-muted);
+  font-size: var(--sf-font-small);
+}
+
+.sf-stats-heat-legend {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-heat-legend-label {
+  margin: 0 3px;
+}
+
+.sf-stats-heat-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+}
+
+.sf-stats-heat-swatch.is-l1 {
+  background: color-mix(in srgb, var(--sf-success) 26%, transparent);
+}
+
+.sf-stats-heat-swatch.is-l2 {
+  background: color-mix(in srgb, var(--sf-success) 48%, transparent);
+}
+
+.sf-stats-heat-swatch.is-l3 {
+  background: color-mix(in srgb, var(--sf-success) 72%, transparent);
+}
+
+.sf-stats-heat-swatch.is-l4 {
+  background: var(--sf-success);
+}
+
+/* ============================== Forecast ============================== */
+
+.sf-stats-gridline {
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.sf-stats-tick-label {
+  fill: var(--sf-text-muted);
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-stats-forecast-today {
+  fill: var(--sf-primary);
+  fill-opacity: 0.08;
+}
+
+.sf-stats-bar.is-notes {
+  fill: var(--sf-primary);
+}
+
+.sf-stats-bar.is-decks {
+  fill: var(--sf-info);
+}
+
+.sf-stats-bar.is-empty {
+  fill: var(--background-modifier-border);
+}
+
+.sf-stats-cumulative-line {
+  stroke: var(--sf-text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+
+/* ============================== Histogram ============================== */
+
+.sf-stats-histogram-bar {
+  fill: var(--sf-primary);
+  fill-opacity: 0.7;
+}
+
+.sf-stats-histogram-bar:hover {
+  fill-opacity: 0.95;
+}
+
+.sf-stats-median-line {
+  stroke: var(--sf-warning);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.sf-stats-median-label {
+  fill: var(--sf-warning);
+  font-size: var(--sf-font-small);
+}
+
+/* ============================== Tables ============================== */
+
+.sf-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-stats-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sf-stats-table tr:last-child td {
+  border-bottom: none;
+}
+
+.sf-stats-table td:first-child {
+  padding-left: 0;
+  text-align: left;
+  color: var(--text-normal);
+}
+
+.sf-stats-table thead td {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-pct {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sf-stats-pct.is-good {
+  color: var(--sf-success);
+}
+
+.sf-stats-pct.is-low {
+  color: var(--sf-warning);
+}
+
+.sf-stats-count {
+  margin-left: 5px;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Details ============================== */
+
+.sf-stats-day-head {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sf-stats-day-date {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sf-stats-day-total {
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+}
+
+.sf-stats-weekday-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 30px;
+  gap: var(--sf-space-sm);
+  align-items: center;
+}
+
+.sf-stats-weekday-label {
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-weekday-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+}
+
+.sf-stats-weekday-fill {
+  height: 100%;
+  width: var(--sf-stats-bar-width, 0%);
+  border-radius: 4px;
+  background: var(--sf-primary);
+}
+
+.sf-stats-weekday-count {
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+  text-align: right;
+}
+
+/* ============================== Answer buttons ============================== */
+
+.sf-stats-grades {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sf-stats-grade-row {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  gap: var(--sf-space-sm);
+  align-items: center;
+}
+
+.sf-stats-grade-name {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: var(--sf-font-small);
+}
+
+.sf-stats-grade-name::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sf-stats-grade-name.is-again {
+  color: var(--sf-danger);
+}
+
+.sf-stats-grade-name.is-hard {
+  color: var(--sf-warning);
+}
+
+.sf-stats-grade-name.is-good {
+  color: var(--sf-success);
+}
+
+.sf-stats-grade-name.is-easy {
+  color: var(--sf-info);
+}
+
+.sf-stats-grade-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+}
+
+.sf-stats-grade-fill {
+  height: 100%;
+  width: var(--sf-stats-bar-width, 0%);
+  border-radius: 4px;
+}
+
+.sf-stats-grade-fill.is-again {
+  background: var(--sf-danger);
+}
+
+.sf-stats-grade-fill.is-hard {
+  background: var(--sf-warning);
+}
+
+.sf-stats-grade-fill.is-good {
+  background: var(--sf-success);
+}
+
+.sf-stats-grade-fill.is-easy {
+  background: var(--sf-info);
+}
+
+.sf-stats-grade-count {
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+  white-space: nowrap;
+}
+
+/* ============================== Segmented control ============================== */
+
+.sf-stats-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sf-stats-seg-btn {
+  padding: 3px 9px;
+  font-size: var(--sf-font-small);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  color: var(--sf-text-muted);
+  cursor: pointer;
+}
+
+.sf-stats-seg-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.sf-stats-seg-btn.is-active {
+  border-color: var(--sf-primary);
+  background: var(--sf-primary);
+  color: var(--sf-text-on-primary);
+}
+
+.sf-stats-health-body {
+  min-width: 0;
+}
+
+/* ============================== Decks ============================== */
+
+.sf-stats-decks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sf-stats-deck-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 6px;
+  border-radius: var(--sf-radius-sm);
+}
+
+.sf-stats-deck-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sf-stats-deck-name {
+  font-size: var(--sf-font-ui);
+  font-weight: 600;
+  color: var(--text-normal);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-stats-deck-name:hover {
+  color: var(--sf-primary);
+  text-decoration: underline;
+}
+
+.sf-stats-deck-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px 0;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-deck-stats > span + span::before {
+  content: "·";
+  margin: 0 5px;
+  color: var(--text-faint);
+}
+
+.sf-stats-deck-due.is-due {
+  font-weight: 600;
+  color: var(--sf-warning);
+}
+
+/* ============================== Attention ============================== */
+
+.sf-stats-attention {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sf-stats-attention-row {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 5px 6px 5px 14px;
+  border-radius: var(--sf-radius-sm);
+  cursor: pointer;
+  position: relative;
+}
+
+.sf-stats-attention-row::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sf-warning);
+}
+
+.sf-stats-attention-row.is-severe::before {
+  background: var(--sf-danger);
+}
+
+.sf-stats-attention-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sf-stats-attention-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--sf-font-ui);
+  color: var(--text-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-stats-attention-meta {
+  flex: 0 0 auto;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+/* ============================== Study ============================== */
+
+.sf-stats-study {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: var(--sf-space-md);
+}
+
+.sf-stats-study-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+}
+
+.sf-stats-block-title {
+  font-size: var(--sf-font-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-segbar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--background-modifier-border);
+}
+
+.sf-stats-segbar-part {
+  display: block;
+  flex-grow: var(--sf-stats-share, 1);
+  flex-basis: 0;
+}
+
+.sf-stats-segbar-part.is-mastered {
+  background: var(--sf-success);
+}
+
+.sf-stats-segbar-part.is-stable {
+  background: var(--sf-info);
+}
+
+.sf-stats-segbar-part.is-fragile {
+  background: var(--sf-warning);
+}
+
+.sf-stats-segbar-part.is-learning {
+  background: var(--sf-primary);
+}
+
+.sf-stats-segbar-part.is-unseen {
+  background: var(--background-modifier-border);
+}
+
+.sf-stats-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--sf-space-sm);
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-stats-legend-item {
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-stats-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sf-stats-chip {
+  padding: 1px 7px;
+  font-size: var(--sf-font-small);
+  border-radius: 8px;
+  background: var(--sf-danger-light);
+  color: var(--sf-danger);
+}

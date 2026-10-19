@@ -5,7 +5,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 import tsparser from "@typescript-eslint/parser";
 
 export default [
-    { ignores: ["dist/", "node_modules/", "main.js", ".eslintrc.js", "esbuild.config.mjs", "version-bump.mjs", "eslint-plugin/", "install.js", ".test-build/", "test/", "live-test-vault/", "media/"] },
+    { ignores: ["dist/", "node_modules/", "main.js", ".eslintrc.js", "esbuild.config.mjs", "version-bump.mjs", "eslint-plugin/", "install.js", "scripts/", ".test-build/", "test/", "live-test-vault/", "media/"] },
 
     pluginJs.configs.recommended,
     ...tseslint.configs.recommended,

@@ -1,11 +1,11 @@
-import { Notice, requestUrl } from 'obsidian';
+import { Notice } from 'obsidian';
 import { API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQSet } from '../models/mcq';
 import { IMCQGenerationService } from './mcq-generation-service';
 import { buildMcqPrompt, parseMcqResponse, questionsToGenerate } from './mcq-prompt';
 import { MCQDifficulty, SpaceforgeSettings } from '../models/settings';
-import { buildOpenAiChatRequest } from './chat-client';
+import { buildOpenAiChatRequest, chatModelKey, postOpenAiChat } from './chat-client';
 import { describeProviderGap, HttpProviderDescriptor } from './provider-registry';
 
 /**
@@ -73,13 +73,12 @@ export class OpenAIHttpService implements IMCQGenerationService {
         });
 
         try {
-            const response = await requestUrl({
-                url: request.url,
-                method: 'POST',
-                headers: request.headers,
-                body: JSON.stringify(request.body),
-                throw: false,
-            });
+            const response = await postOpenAiChat(
+                request.url,
+                request.headers,
+                request.body,
+                chatModelKey(this.descriptor.label, String(request.body.model ?? ''))
+            );
 
             if (response.status < 200 || response.status >= 300) {
                 const detail = response.text?.slice(0, 400) ?? '';

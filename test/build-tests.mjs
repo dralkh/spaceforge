@@ -42,6 +42,7 @@ await esbuild.build({
         'test/study-material-section.test.ts',
         'test/study-autopilot.test.ts',
         'test/study-briefing.test.ts',
+        'test/study-session.test.ts',
         'test/study-visual-gallery.test.ts',
         'test/study-visual-diagram.test.ts',
         'test/study-visual-sequence.test.ts',
@@ -49,6 +50,7 @@ await esbuild.build({
         'test/bundle-load.test.ts',
     'test/data-file.test.ts',
     'test/cli-providers.test.ts',
+    'test/chat-client.test.ts',
     'test/cli-binary.test.ts',
     'test/upgrade-1-1-0.test.ts',
     'test/anki-package.test.ts',
@@ -73,6 +75,12 @@ await esbuild.build({
     // sitting's keys stay the sitting's (appended after the lanes above so
     // each keeps the anchor it registered against).
     'test/card-editor.test.ts',
+    // The statistics lane: the service's day counters and reads, the dashboard
+    // over the miniature DOM, and the chart layer's own arithmetic (appended
+    // after the lanes above so each keeps the anchor it registered against).
+    'test/stats-service.test.ts',
+    'test/stats-view.test.ts',
+    'test/stats-charts.test.ts',
     ],
     bundle: true,
     platform: 'node',

@@ -8,6 +8,7 @@
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "install-plugin": "node install.js",
+    "verify-release": "node scripts/verify-release.mjs",
     "lint": "ESLINT_USE_FLAT_CONFIG=true eslint .",
     "typecheck": "tsc -noEmit -skipLibCheck",
     "test": "node test/build-tests.mjs && node --test .test-build/*.test.js"

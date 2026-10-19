@@ -747,6 +747,22 @@ export function migrateSettings(settings: SpaceforgeSettings): boolean {
         changed = true;
     }
 
+    // The Gemini CLI is deprecated in favour of Antigravity (`agy`), which is
+    // the same Google account on the successor CLI. A vault that had chosen
+    // Gemini moves to the Antigravity row; only the one model id both CLIs took
+    // is carried across, and anything else falls back to Antigravity's default
+    // so the next run cannot fail on a slug the new CLI never had.
+    if (settings.mcqApiProvider === 'cli:gemini') {
+        settings.mcqApiProvider = 'cli:antigravity';
+        const models = { ...(settings.providerModels ?? {}) };
+        if (!models['cli:antigravity'] && models['cli:gemini'] === 'gemini-3.8-flash') {
+            models['cli:antigravity'] = 'gemini-3.8-flash-medium';
+        }
+        delete models['cli:gemini'];
+        settings.providerModels = models;
+        changed = true;
+    }
+
     // Background charting used to default to on, so every vault saved by 1.0.x
     // carries `true` whether or not anyone chose it. Turn it off once — the new
     // default — and let the marker keep any later choice: flip it back on and it

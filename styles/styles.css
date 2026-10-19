@@ -17,6 +17,7 @@
 @import url('./deck-session.css');
 @import './deck-list.css';
 @import './review-window.css';
+@import url('./stats.css');
 @import url('./ankiweb.css');
 @import url('./pomodoro.css'); /* Added Pomodoro styles */
 @import url('./responsive.css');

@@ -29,12 +29,13 @@ import {
     CLI_AGENTS,
     claudeAgent,
     codexAgent,
+    copilotAgent,
     cursorAgent,
-    geminiAgent,
     getCliAgent,
     hermesAgent,
     listCliAgents,
     openclawAgent,
+    opencodeAgent,
 } from '../api/cli/cli-agents';
 import { CliTurnError, isCliExecAvailable, parseCliOutput, runCliTurn } from '../api/cli/cli-runner';
 import { CliChatClient, flattenMessages } from '../api/cli/cli-chat-client';
@@ -160,6 +161,25 @@ test('codexAgent.buildArgs: exec json mode with read-only sandbox, model appende
     assert.equal(codexAgent.stdinPrompt, true);
 });
 
+test('codexAgent.listModels reads the current JSON document and the old line format', () => {
+    const current = JSON.stringify({
+        models: [
+            { slug: 'gpt-6.1-sol', display_name: 'GPT-6.1-Sol' },
+            { slug: 'gpt-6-astra', display_name: 'GPT-6 Astra' },
+        ],
+    });
+    assert.deepEqual(codexAgent.listModels?.parse(current), [
+        { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol' },
+        { id: 'gpt-6-astra', label: 'GPT-6 Astra' },
+    ], 'the model list is a JSON document now');
+
+    assert.deepEqual(
+        codexAgent.listModels?.parse('gpt-5.5\ngpt-5.4\n'),
+        [{ id: 'gpt-5.5' }, { id: 'gpt-5.4' }],
+        'the older one-line format still reads',
+    );
+});
+
 test('cursorAgent.buildArgs: one-shot ask mode, --model appended when set', () => {
     const bare = cursorAgent.buildArgs({ prompt: 'x' });
     const modeAt = bare.indexOf('--mode');
@@ -176,10 +196,32 @@ test('hermesAgent.buildArgs: -z one-shot with the prompt in argv and stdinPrompt
     assert.equal(hermesAgent.stdinPrompt, false);
 });
 
-test('geminiAgent.buildArgs: prompt in argv after -p, wrapped by -o json', () => {
-    const args = geminiAgent.buildArgs({ prompt: 'the prompt' });
-    assert.deepEqual(args, ['-p', 'the prompt', '-o', 'json']);
-    assert.equal(args.includes('the prompt'), true);
+test('opencodeAgent.buildArgs: one-shot run, json events, prompt on stdin', () => {
+    assert.deepEqual(opencodeAgent.buildArgs({ prompt: 'the prompt' }), ['run', '--format', 'json']);
+    assert.deepEqual(
+        opencodeAgent.buildArgs({ prompt: 'x', model: 'opencode-go/deepseek-v4.1-flash' }),
+        ['run', '--format', 'json', '--model', 'opencode-go/deepseek-v4.1-flash'],
+    );
+    assert.equal(opencodeAgent.stdinPrompt !== false, true, 'the note travels on stdin');
+});
+
+test('copilotAgent.buildArgs: silent non-interactive turn, prompt on stdin, side-effect tools denied', () => {
+    const args = copilotAgent.buildArgs({ prompt: 'the prompt' });
+    assert.ok(args.includes('-s'), 'only the response reaches stdout');
+    assert.ok(args.includes('--no-ask-user'), 'a headless turn never pauses for a question');
+    assert.ok(args.includes('--allow-all-tools'), 'non-interactive mode refuses to run without tool permission');
+    assert.ok(
+        args.some(arg => arg.startsWith('--deny-tool=') && /write/.test(arg) && /shell/.test(arg)),
+        'the tools that could touch the vault or the network are denied',
+    );
+    assert.ok(args.includes('--no-custom-instructions'), 'the vault instructions do not compete with the task');
+    assert.equal(args.includes('the prompt'), false, 'the prompt does not travel in argv');
+    assert.equal(copilotAgent.stdinPrompt !== false, true, 'the note travels on stdin');
+
+    assert.deepEqual(
+        copilotAgent.buildArgs({ prompt: 'x', model: 'gpt-5.4' }).slice(-2),
+        ['--model', 'gpt-5.4'],
+    );
 });
 
 test('openclawAgent.buildArgs: prompt in argv after --message, --json on', () => {
@@ -253,8 +295,22 @@ test('parseCliOutput: claude final JSON result, error results, and plain text', 
     assert.equal(parseCliOutput(claudeAgent, 'just text'), 'just text');
 });
 
-test('parseCliOutput: gemini final JSON response', () => {
-    assert.equal(parseCliOutput(geminiAgent, '{"response":"hi"}'), 'hi');
+test('parseCliOutput: opencode json-lines yields the text events and reports errors', () => {
+    assert.equal(
+        parseCliOutput(
+            opencodeAgent,
+            '{"type":"step_start","part":{}}\n' +
+            '{"type":"text","part":{"type":"text","text":"hel"}}\n' +
+            '{"type":"text","part":{"type":"text","text":"lo"}}\n' +
+            '{"type":"step_finish","part":{"tokens":1}}'
+        ),
+        'hello',
+        'text events concatenate; protocol events are ignored',
+    );
+    assert.throws(
+        () => parseCliOutput(opencodeAgent, '{"type":"error","error":{"message":"boom"}}'),
+        (error: unknown) => error instanceof CliTurnError && error.message === 'boom'
+    );
 });
 
 // ------------------------------------------------- 5. spawn, end to end (real)
@@ -944,6 +1000,31 @@ test('a saved single-CLI choice moves onto that CLI\u2019s own row, model and al
     assert.equal(settings.cliModel, '', 'the shared field is no longer read');
 });
 
+test('a vault on the deprecated Gemini CLI moves onto Antigravity, model and all', () => {
+    const settings = settingsWith({
+        mcqApiProvider: 'cli:gemini',
+        providerModels: { 'cli:gemini': 'gemini-3.8-flash' },
+    } as Partial<SpaceforgeSettings>);
+
+    migrateSettings(settings);
+
+    assert.equal(settings.mcqApiProvider, 'cli:antigravity', 'the successor row');
+    assert.deepEqual(
+        settings.providerModels,
+        { 'cli:antigravity': 'gemini-3.8-flash-medium' },
+        'the one model both CLIs take is carried across',
+    );
+    assert.equal(getCliAgent('gemini'), undefined, 'the old row is gone from the registry');
+
+    const unknownModel = settingsWith({
+        mcqApiProvider: 'cli:gemini',
+        providerModels: { 'cli:gemini': 'gemini-3.1-pro-preview' },
+    } as Partial<SpaceforgeSettings>);
+    migrateSettings(unknownModel);
+    assert.deepEqual(unknownModel.providerModels, {}, 'a slug the successor never had is dropped, not carried');
+    assert.equal(unknownModel.mcqApiProvider, 'cli:antigravity');
+});
+
 test('detection, model listing and Study all read a CLI by its provider id', async () => {
     const settings = settingsWith({ mcqApiProvider: 'cli:hermes' });
 
@@ -1032,10 +1113,17 @@ test('each CLI names the models it actually takes today', () => {
     assert.ok(idsOf(codexAgent).includes('gpt-6.1-sol'), 'Codex offers the current model');
     assert.ok(idsOf(codexAgent).includes('default'));
 
-    // Gemini CLI has its own set: the newest it is optimised for is 3.8 Flash, and
-    // Gemini 4 Argon is deliberately absent — Google points at Antigravity for it.
-    assert.ok(idsOf(geminiAgent).includes('gemini-3.8-flash'));
-    assert.equal(idsOf(geminiAgent).some(id => /argon/i.test(id)), false, 'not a Gemini CLI model');
+    // Copilot CLI has no model-list command, so the curated ids are the ones its
+    // own documentation uses for `--model`.
+    assert.ok(idsOf(copilotAgent).includes('gpt-5.4'));
+    assert.ok(idsOf(copilotAgent).includes('gpt-5.3-codex'));
+    assert.ok(idsOf(copilotAgent).includes('claude-haiku-4.5'));
+    assert.ok(idsOf(copilotAgent).includes('default'));
+
+    // OpenCode prints its own list at run time (`opencode models`), so the live
+    // list is the truth and the catalog only needs the default.
+    assert.deepEqual(idsOf(opencodeAgent), ['default']);
+    assert.ok(opencodeAgent.listModels, 'OpenCode is asked for its list rather than guessed at');
 
     // Cursor prints its own list at run time (`--list-models`), so it needs no
     // curated ids: the default is enough, and the live list is the truth.
@@ -1072,36 +1160,41 @@ test('Antigravity is offered like every other CLI, and driven over stream-json',
     });
 });
 
-test('Antigravity’s event stream is read into the answer', () => {
+test('Antigravity’s stream is read into the answer exactly once', () => {
     const agent = getCliAgent('antigravity');
-    const parse = (line: string): string[] => {
-        const result = agent?.parseLine?.(line);
-        const list = Array.isArray(result) ? result : [result];
-        return list.flatMap(one => (one && one.kind === 'text' ? [one.text] : []));
-    };
+    assert.ok(agent);
 
-    assert.deepEqual(parse('{"event":"init","session":{}}'), [], 'init says nothing to us');
-    assert.deepEqual(
-        parse('{"event":"step_update","step_update":{"step_type":"agent_response","state":"ACTIVE","text_delta":"1. What is "}}'),
-        ['1. What is '],
-        'a text delta is part of the answer',
-    );
-    assert.deepEqual(
-        parse('{"event":"step_update","step_update":{"step_type":"tool","state":"ACTIVE","tool_name":"grep"}}'),
-        [],
-        'tool activity is the CLI’s business, not the answer',
-    );
-    assert.deepEqual(
-        parse('{"event":"result","result":{"status":"SUCCESS","response":"1. What is ATP?"}}'),
-        ['1. What is ATP?'],
-        'the result carries the final text',
-    );
-    // A failed post-turn step can still carry the answer, so it is not thrown away.
-    const errorLine = agent?.parseLine?.('{"event":"result","result":{"status":"ERROR","error":"checkpoint failed","response":"1. What is ATP?"}}');
-    assert.deepEqual(Array.isArray(errorLine) ? errorLine : [errorLine], [{ kind: 'text', text: '1. What is ATP?' }]);
+    const stream = [
+        '{"event":"init","conversation_id":"c1","init":{"model":"gemini-3.8-flash-medium"}}',
+        '{"event":"step_update","step_update":{"step_type":"user_input","state":"DONE"}}',
+        '{"event":"step_update","step_update":{"step_type":"agent_response","state":"ACTIVE","text_delta":"1. What is "}}',
+        '{"event":"step_update","step_update":{"step_type":"agent_response","state":"ACTIVE","text_delta":"ATP?"}}',
+        '{"event":"step_update","step_update":{"step_type":"tool","state":"ACTIVE","tool_name":"grep"}}',
+        '{"event":"step_update","step_update":{"step_type":"agent_response","state":"DONE","text_delta":"\\n"}}',
+        '{"event":"result","result":{"status":"SUCCESS","response":"1. What is ATP?\\n"}}',
+    ].join('\n');
 
-    const failed = agent?.parseLine?.('{"event":"result","result":{"status":"FAILED","error":"quota"}}');
-    assert.deepEqual(Array.isArray(failed) ? failed : [failed], [{ kind: 'error', message: 'quota' }]);
+    // The result event carries the whole turn, and the deltas are the same text
+    // in fragments: the answer must not arrive twice.
+    assert.equal(parseCliOutput(agent, stream), '1. What is ATP?');
+    assert.equal(parseCliOutput(agent, '{"event":"init","session":{}}'), null, 'init says nothing to us');
+
+    // A stream that ends without a result still yields the deltas.
+    const truncated = [
+        '{"event":"step_update","step_update":{"step_type":"agent_response","state":"ACTIVE","text_delta":"half "}}',
+        '{"event":"step_update","step_update":{"step_type":"agent_response","state":"ACTIVE","text_delta":"an answer"}}',
+    ].join('\n');
+    assert.equal(parseCliOutput(agent, truncated), 'half an answer');
+
+    // A failed step with a response still carries the answer; one without is an error.
+    assert.equal(
+        parseCliOutput(agent, '{"event":"result","result":{"status":"ERROR","error":"checkpoint failed","response":"1. What is ATP?"}}'),
+        '1. What is ATP?',
+    );
+    assert.throws(
+        () => parseCliOutput(agent, '{"event":"result","result":{"status":"FAILED","error":"quota"}}'),
+        (error: unknown) => error instanceof CliTurnError && error.message === 'quota',
+    );
 });
 
 test('Antigravity’s own model list is read from `agy models`', () => {

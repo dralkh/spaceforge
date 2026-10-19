@@ -137,12 +137,33 @@ export const codexAgent: CliAgentDef = {
     listModels: {
         args: ['debug', 'models'],
         parse: (output: string): CliModelEntry[] => {
+            // Current versions print one JSON document (`{ models: [{ slug,
+            // display_name, … }] }`); older ones printed one line per model.
+            const trimmed = output.trim();
+            if (trimmed.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+                    const list = Array.isArray(parsed.models) ? parsed.models : [];
+                    const models: CliModelEntry[] = [];
+                    for (const entry of list) {
+                        if (!entry || typeof entry !== 'object') continue;
+                        const record = entry as Record<string, unknown>;
+                        const id = typeof record.slug === 'string' ? record.slug : '';
+                        const label = typeof record.display_name === 'string' ? record.display_name : '';
+                        if (id) models.push(label && label !== id ? { id, label } : { id });
+                    }
+                    if (models.length > 0) return models;
+                } catch {
+                    // Fall through to the line parser.
+                }
+            }
+
             const models: CliModelEntry[] = [];
             const seen = new Set<string>();
             for (const line of output.split(/\r?\n/)) {
-                const trimmed = line.trim();
-                if (!trimmed || /^(error|usage|available|models?)\b/i.test(trimmed)) continue;
-                const id = trimmed.split(/\s+/)[0] ?? '';
+                const lineTrimmed = line.trim();
+                if (!lineTrimmed || /^(error|usage|available|models?)\b/i.test(lineTrimmed)) continue;
+                const id = lineTrimmed.split(/\s+/)[0] ?? '';
                 if (!id || id.startsWith('-') || seen.has(id)) continue;
                 seen.add(id);
                 models.push({ id });
@@ -224,6 +245,9 @@ export const hermesAgent: CliAgentDef = {
         return ['-z', options.prompt ?? ''];
     },
     versionArgs: ['--version'],
+    // `hermes auth list` prints the pooled credentials and exits 0; an empty
+    // list is not a configured install.
+    authProbe: { args: ['auth', 'list'], requireOutput: true },
     streamFormat: 'raw-text',
     stdinPrompt: false,
     authFailurePatterns: COMMON_AUTH_FAILURE_PATTERNS,
@@ -235,44 +259,120 @@ export const hermesAgent: CliAgentDef = {
     catalogModels: [{ id: 'default', label: 'Default (Hermes chooses from its own config)' }],
 };
 
-// ------------------------------------------------------------------------- Gemini
+// ----------------------------------------------------------------------- OpenCode
 
-export const geminiAgent: CliAgentDef = {
-    id: 'gemini',
-    name: 'Gemini CLI',
-    bin: 'gemini',
+export const opencodeAgent: CliAgentDef = {
+    id: 'opencode',
+    name: 'OpenCode',
+    bin: 'opencode',
     buildArgs: (options: CliInvokeOptions) => {
-        // The prompt is an argument here, and -o json wraps the reply.
-        const args = ['-p', options.prompt ?? '', '-o', 'json'];
+        // `run` is the non-interactive one-shot and `--format json` prints one
+        // event per line. The prompt travels on stdin, so a long note is not an
+        // argv-limit problem and a prompt that starts with '-' is not a flag.
+        const args = ['run', '--format', 'json'];
+        if (wantsModel(options.model)) args.push('--model', options.model);
+        return args;
+    },
+    versionArgs: ['--version'],
+    streamFormat: 'json-lines',
+    parseLine: (line: string): CliParseResult => {
+        const trimmed = line.trim();
+        if (!trimmed) return { kind: 'ignore' };
+        try {
+            const event = JSON.parse(trimmed) as Record<string, unknown>;
+            const type = typeof event.type === 'string' ? event.type : '';
+            if (type === 'text') {
+                const part = event.part as { text?: unknown } | undefined;
+                const text = typeof part?.text === 'string' ? part.text : '';
+                return text ? { kind: 'text', text } : { kind: 'ignore' };
+            }
+            if (type === 'error') {
+                const error = event.error as { message?: unknown } | undefined;
+                const message = typeof error?.message === 'string' ? error.message : '';
+                return { kind: 'error', message: message || 'OpenCode reported an error.' };
+            }
+        } catch {
+            // A CLI that printed plain text anyway: keep it.
+            return { kind: 'text', text: trimmed };
+        }
+        return { kind: 'ignore' };
+    },
+    listModels: {
+        args: ['models'],
+        parse: (output: string): CliModelEntry[] => {
+            const models: CliModelEntry[] = [];
+            const seen = new Set<string>();
+            for (const line of output.split(/\r?\n/)) {
+                const id = line.trim();
+                if (!id || seen.has(id)) continue;
+                // `opencode models` prints one `provider/model` per line; a line
+                // with whitespace is a label or a diagnostic, not an id.
+                if (!/^[A-Za-z0-9][\w./#:-]*$/.test(id)) continue;
+                seen.add(id);
+                models.push({ id });
+            }
+            return models;
+        },
+    },
+    // `opencode auth list` prints one credential per line and exits 0; an empty
+    // list is not a sign-in.
+    authProbe: { args: ['auth', 'list'], requireOutput: true },
+    authFailurePatterns: [
+        ...COMMON_AUTH_FAILURE_PATTERNS,
+        /no (credentials|providers?) (found|configured)/i,
+        /not logged into/i,
+    ],
+    loginCommand: 'opencode auth login',
+    loginGuidance:
+        'OpenCode is not signed in. Run `opencode auth login` in a terminal (or press /connect in the TUI) and finish the provider sign-in, then Detect again.',
+    notFoundGuidance:
+        'The `opencode` CLI was not found on your PATH. Install it (curl -fsSL https://opencode.ai/install | bash), or put its folder (usually ~/.opencode/bin) in "Local CLI extra path", then Detect again.',
+    catalogModels: [{ id: 'default', label: 'Default (as configured in OpenCode)' }],
+};
+
+// --------------------------------------------------------- GitHub Copilot CLI
+
+export const copilotAgent: CliAgentDef = {
+    id: 'copilot',
+    name: 'GitHub Copilot CLI',
+    bin: 'copilot',
+    buildArgs: (options: CliInvokeOptions) => {
+        // -s prints only the agent's response. Non-interactive mode requires
+        // tool permission, so everything with a side effect is denied instead
+        // of granted; the prompt travels on stdin, which Copilot accepts as a
+        // prompt mode of its own.
+        const args = [
+            '-s',
+            '--no-ask-user',
+            '--allow-all-tools',
+            '--deny-tool=write,shell,url,memory,read',
+            '--no-custom-instructions',
+            '--disable-builtin-mcps',
+            '--no-auto-update',
+        ];
         if (wantsModel(options.model)) args.push('--model', options.model);
         return args;
     },
     versionArgs: ['--version'],
     streamFormat: 'raw-text',
-    stdinPrompt: false,
-    parseFinal: (raw: string): CliParseResult => {
-        try {
-            const parsed = JSON.parse(raw) as Record<string, unknown>;
-            const response = typeof parsed.response === 'string' ? parsed.response : '';
-            if (response.trim()) return { kind: 'text', text: response };
-        } catch {
-            // fall through to the raw text
-        }
-        return rawTextResult(raw);
-    },
-    authFailurePatterns: COMMON_AUTH_FAILURE_PATTERNS,
-    loginCommand: 'gemini',
+    stdinPrompt: true,
+    authFailurePatterns: [
+        ...COMMON_AUTH_FAILURE_PATTERNS,
+        /no copilot (access|seat|subscription)/i,
+        /copilot requests/i,
+        /authentication (failed|required|timed out)/i,
+    ],
+    loginCommand: 'copilot login',
     loginGuidance:
-        'Gemini CLI is not signed in. Run `gemini` in a terminal and complete the sign-in (Google account or API key), then Detect again.',
+        'GitHub Copilot CLI is not signed in. Run `copilot login` in a terminal (or export COPILOT_GITHUB_TOKEN, GH_TOKEN or GITHUB_TOKEN), then Detect again.',
     notFoundGuidance:
-        'The `gemini` CLI was not found on your PATH. Install Gemini CLI (`npm install -g @google/gemini-cli`), run `gemini` once, then Detect again.',
-    // The CLI's own active set. Gemini 4 Argon is deliberately absent: Google
-    // says the CLI is not optimised for it and points at Antigravity instead.
+        'The `copilot` CLI was not found on your PATH. Install it (npm install -g @github/copilot), run `copilot login`, then Detect again.',
     catalogModels: [
-        { id: 'default', label: 'Default (Gemini CLI chooses)' },
-        { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (newest for this CLI)' },
-        { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
-        { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (preview)' },
+        { id: 'default', label: 'Default (as configured in Copilot CLI)' },
+        { id: 'gpt-5.4', label: 'GPT-5.4' },
+        { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+        { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
+        { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
     ],
 };
 
@@ -343,46 +443,60 @@ function stringField(record: Record<string, unknown> | null, ...keys: string[]):
     return '';
 }
 
-/** One line of `agy --output-format stream-json`: init / step_update / result. */
-export function parseAntigravityEventLine(line: string): CliParseResult | CliParseResult[] {
-    const trimmed = line.trim();
-    if (!trimmed) return { kind: 'ignore' };
-    let event: Record<string, unknown> | null;
-    try {
-        event = asRecord(JSON.parse(trimmed));
-    } catch {
-        return { kind: 'ignore' };
-    }
-    const kind = stringField(event, 'event');
+/**
+ * The whole `agy --output-format stream-json` document, read once.
+ *
+ * The stream carries the answer twice: as `agent_response` text deltas and,
+ * again, in the final `result` event. Per-line concatenation would answer with
+ * the turn duplicated, so the result wins and the deltas are the fallback for a
+ * stream that ends without one.
+ */
+export function parseAntigravityFinal(raw: string): CliParseResult {
+    let deltas = '';
+    let resultText: string | null = null;
+    let resultError: string | null = null;
 
-    if (kind === 'step_update') {
-        const step = asRecord(event?.step_update);
-        if (!step) return { kind: 'ignore' };
-        const stepType = stringField(step, 'step_type');
-        if (stepType === 'agent_response') {
-            // Deliberately untrimmed: a delta is a fragment, and its leading and
-            // trailing spaces are what join it to the fragments around it.
-            const delta = typeof step.text_delta === 'string' ? step.text_delta : '';
-            return delta ? { kind: 'text', text: delta } : { kind: 'ignore' };
+    for (const line of String(raw ?? '').split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let event: Record<string, unknown> | null;
+        try {
+            event = asRecord(JSON.parse(trimmed));
+        } catch {
+            continue;
         }
-        // Tool activity is the CLI's business, not ours: this plugin asks for an
-        // answer, and the answer is what it reads.
-        return { kind: 'ignore' };
+        const kind = stringField(event, 'event');
+
+        if (kind === 'step_update') {
+            const step = asRecord(event?.step_update);
+            if (step && stringField(step, 'step_type') === 'agent_response') {
+                // Deliberately untrimmed: a delta is a fragment, and its leading
+                // and trailing spaces are what join it to its neighbours.
+                deltas += typeof step.text_delta === 'string' ? step.text_delta : '';
+            }
+            // Tool activity is the CLI's business, not ours: this plugin asks
+            // for an answer, and the answer is what it reads.
+            continue;
+        }
+
+        if (kind === 'result') {
+            const result = asRecord(event?.result);
+            if (!result) continue;
+            const response = stringField(result, 'response');
+            if (response) {
+                // A failed post-turn step can still carry the answer; keep it.
+                resultText = response;
+                resultError = null;
+                continue;
+            }
+            const status = stringField(result, 'status');
+            resultError = stringField(result, 'error') || `Antigravity ended with status ${status || 'UNKNOWN'}`;
+        }
     }
 
-    if (kind === 'result') {
-        const result = asRecord(event?.result);
-        if (!result) return { kind: 'ignore' };
-        const status = stringField(result, 'status');
-        const response = stringField(result, 'response');
-        if (status === 'SUCCESS' || response) return response ? { kind: 'text', text: response } : { kind: 'ignore' };
-        // A failed post-turn step can still carry the answer; report it either way.
-        return {
-            kind: 'error',
-            message: stringField(result, 'error') || `Antigravity ended with status ${status || 'UNKNOWN'}`,
-        };
-    }
-
+    if (resultText !== null && resultText.trim()) return { kind: 'text', text: resultText.trim() };
+    if (deltas.trim()) return { kind: 'text', text: deltas };
+    if (resultError) return { kind: 'error', message: resultError };
     return { kind: 'ignore' };
 }
 
@@ -418,8 +532,13 @@ export const antigravityAgent: CliAgentDef = {
     wrapStdin: (prompt: string) => `${JSON.stringify({ event: 'user', message: { content: prompt } })}\n`,
     versionArgs: ['--version'],
     streamFormat: 'json-lines',
-    parseLine: parseAntigravityEventLine,
+    // Whole-output, because the stream repeats the answer in its deltas and its
+    // result event; the result is the authoritative copy.
+    parseFinal: parseAntigravityFinal,
     listModels: { args: ['models'], parse: parseAntigravityModels },
+    // `agy models` is the cheap signed-in check: an unsigned install cannot
+    // fetch the account's slugs, and the output must be non-empty to count.
+    authProbe: { args: ['models'], requireOutput: true },
     authFailurePatterns: [
         /not logged into antigravity/i,
         /authentication (required|timed out)/i,
@@ -448,10 +567,11 @@ export const CLI_AGENTS: CliAgentDef[] = [
     antigravityAgent,
     claudeAgent,
     codexAgent,
+    copilotAgent,
     cursorAgent,
-    geminiAgent,
     hermesAgent,
     openclawAgent,
+    opencodeAgent,
 ];
 
 const BY_ID = new Map(CLI_AGENTS.map(agent => [agent.id, agent]));

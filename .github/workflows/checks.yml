@@ -1,0 +1,37 @@
+name: Checks
+
+# The same checks the release workflow runs, on every push and pull request, so
+# a release is never the first time a lint error, a failing test or a broken
+# build is seen.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint the source
+        run: npm run lint
+
+      # Built before the tests so the bundle-load and stylesheet checks run
+      # against the real artifact instead of skipping a missing main.js.
+      - name: Build the plugin
+        run: npm run build
+
+      - name: Run the test suite
+        run: npm test

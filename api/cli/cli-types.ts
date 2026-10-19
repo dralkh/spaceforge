@@ -44,14 +44,27 @@ export interface CliAgentDef {
     buildArgs(options: CliInvokeOptions): string[];
     versionArgs: string[];
     /** A cheap command whose failure means "not signed in", when one exists. */
-    authProbe?: { args: string[] };
+    authProbe?: {
+        args: string[];
+        /**
+         * The probe must also print something. A command that lists
+         * credentials exits 0 and prints nothing when the list is empty, which
+         * would otherwise read as "signed in".
+         */
+        requireOutput?: boolean;
+    };
     /** How to read stdout: one JSON document per line, or the final text as-is. */
     streamFormat: 'json-lines' | 'raw-text';
-    /** Required for 'json-lines': one stdout line -> one or more results. */
+    /**
+     * For 'json-lines' without a `parseFinal`: one stdout line -> one or more
+     * results. Ignored when `parseFinal` is set.
+     */
     parseLine?(line: string): CliParseResult | CliParseResult[];
     /**
-     * For 'raw-text' CLIs that print a single JSON document at the end instead
-     * of the answer itself. Takes precedence over using stdout verbatim.
+     * A parser for the whole output, for a CLI that prints a single JSON
+     * document at the end, or one whose stream repeats the same text in deltas
+     * and in a final result event. Takes precedence over `parseLine` and over
+     * using stdout verbatim.
      */
     parseFinal?(raw: string): CliParseResult;
     /**

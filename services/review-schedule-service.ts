@@ -1,6 +1,7 @@
 import { Notice, TFile } from 'obsidian';
 import { isDeckPath } from '../models/anki';
 import { ReviewSchedule, ReviewResponse, RatingKind, ScheduleRepairReport, ScheduleRepairSnapshot, toSM2Quality, FsrsRating } from '../models/review-schedule';
+import { HistoryScheduler, ReviewGrade, gradeOfFsrsRating, gradeOfSm2Quality } from '../models/stats';
 import { lapseInfoFromSchedule, LeechAction, UndoRecord } from '../models/review-flow';
 import { State as FsrsState } from 'ts-fsrs';
 import SpaceforgePlugin from '../main';
@@ -210,6 +211,13 @@ export class ReviewScheduleService {
         const reviewDateObj = new Date(effectiveReviewDate);
         const effectiveUTCDayStart = DateUtils.startOfUTCDay(reviewDateObj);
 
+        // Which scheduler is grading this review, read before the branches
+        // below can move the note (a first review can graduate out of the
+        // initial steps within this call, but it was an initial-step review).
+        const schedulerBefore: HistoryScheduler = schedule.schedulingAlgorithm === 'fsrs'
+            ? 'fsrs'
+            : schedule.scheduleCategory === 'initial' ? 'initial' : 'sm2';
+
         // Determine historyResponse for logging
         let historyResponseValue: ReviewResponse;
         if (Object.values(FsrsRating).includes(response as FsrsRating) && typeof response === "number") {
@@ -230,18 +238,26 @@ export class ReviewScheduleService {
         }
         schedule.lastReviewDate = effectiveUTCDayStart;
 
-        // Log to history
+        // Log to history. The entry is completed *after* the scheduler runs,
+        // so it can carry what the grade actually did (`nextInterval`, and the
+        // real button behind the response). The statistics counters fold it in
+        // at the same moment, which is why they only see non-preview reviews.
+        let historyEntry: ReviewHistoryItem | null = null;
         if (!this.suppressSideEffects) {
-            this.history.push({
+            historyEntry = {
                 path,
                 timestamp: effectiveReviewDate,
                 response: historyResponseValue,
                 interval: schedule.interval ?? schedule.fsrsData?.scheduled_days ?? 0,
                 ease: schedule.ease ?? (schedule.fsrsData?.difficulty ? Math.round(schedule.fsrsData.difficulty * 10) : this.plugin.settings.baseEase),
-                isSkipped: isSkipped
-            });
+                isSkipped: isSkipped,
+                scheduler: schedulerBefore,
+            };
+            this.history.push(historyEntry);
             if (this.history.length > 1000) this.history.splice(0, this.history.length - 1000);
         }
+
+        let pressedGrade: ReviewGrade | null = null;
 
         if (schedule.schedulingAlgorithm === 'fsrs') {
             if (!schedule.fsrsData) { // Should not happen if card is properly initialized
@@ -251,6 +267,7 @@ export class ReviewScheduleService {
             }
 
             const actualFsrsRating = this.toFsrsRating(response, ratingKind);
+            pressedGrade = gradeOfFsrsRating(actualFsrsRating);
 
             const { updatedData, nextReviewDate: newNextReviewDateFsrs } = this.fsrsService.recordReview(
                 schedule.fsrsData,
@@ -265,6 +282,7 @@ export class ReviewScheduleService {
 
         } else { // SM-2
             const qualityRating = toSM2Quality(response as ReviewResponse);
+            pressedGrade = gradeOfSm2Quality(qualityRating);
 
             // Initialize SM-2 fields if they are somehow missing (should not happen for SM-2 cards)
             schedule.ease = schedule.ease ?? this.plugin.settings.baseEase;
@@ -366,6 +384,15 @@ export class ReviewScheduleService {
         }
 
         // Data saving is now handled by main.ts after this method returns
+
+        // Complete the log entry with what the grade did, and count it into the
+        // permanent day statistics. Skipped reviews are activity only; the
+        // counters decide that themselves from `isSkipped`.
+        if (historyEntry) {
+            historyEntry.nextInterval = schedule.interval ?? schedule.fsrsData?.scheduled_days ?? 0;
+            if (pressedGrade) historyEntry.grade = pressedGrade;
+            this.plugin.statsService?.recordNoteReview(historyEntry);
+        }
 
         // Notify any listeners (for UI updates)
         if (this.plugin.events && !this.suppressSideEffects) {
@@ -572,7 +599,10 @@ export class ReviewScheduleService {
         const boundary = Math.max(0, Math.min(snapshot.historyLength, this.history.length));
         for (let i = this.history.length - 1; i >= boundary; i--) {
             if (this.history[i].path === snapshot.path) {
-                this.history.splice(i, 1);
+                const [removed] = this.history.splice(i, 1);
+                // The day counters outlive the log, so an undone grade has to
+                // be taken back out of them by hand.
+                if (removed) this.plugin.statsService?.removeNoteReview(removed);
             }
         }
     }
@@ -822,9 +852,14 @@ export class ReviewScheduleService {
         const effectiveReviewDate = currentReviewDate || Date.now();
         const reviewDateObj = new Date(effectiveReviewDate);
 
+        const schedulerBefore: HistoryScheduler = schedule.schedulingAlgorithm === 'fsrs'
+            ? 'fsrs'
+            : schedule.scheduleCategory === 'initial' ? 'initial' : 'sm2';
+
         // Record as a skipped review (isSkipped = true)
         // The 'response' for a skip is less critical but can be used for penalty in SM-2.
         // For FSRS, skipReview in FsrsService handles it as 'Again'.
+        let skipEntry: ReviewHistoryItem | null = null;
         if (schedule.schedulingAlgorithm === 'fsrs') {
             if (!schedule.fsrsData) { // Should not happen
                 schedule.fsrsData = this.fsrsService.createNewFsrsCardData(reviewDateObj);
@@ -837,19 +872,23 @@ export class ReviewScheduleService {
             schedule.nextReviewDate = newNextReviewDateFsrs; // Already a UTC timestamp
             schedule.lastReviewDate = DateUtils.startOfUTCDay(reviewDateObj); // FSRS skip is a review, set last review to UTC midnight
 
-            this.history.push({ // Log FSRS skip
+            skipEntry = { // Log FSRS skip
                 path, timestamp: effectiveReviewDate, response: ReviewResponse.IncorrectResponse, // Approx. for log
-                interval: schedule.fsrsData.scheduled_days, ease: Math.round(schedule.fsrsData.difficulty * 10), isSkipped: true
-            });
+                interval: schedule.fsrsData.scheduled_days, ease: Math.round(schedule.fsrsData.difficulty * 10), isSkipped: true,
+                scheduler: schedulerBefore,
+            };
+            this.history.push(skipEntry);
 
         } else { // SM-2
             let qualityRating = toSM2Quality(response as ReviewResponse);
             qualityRating = Math.max(0, qualityRating - 1); // Apply skip penalty for SM-2
 
-            this.history.push({
+            skipEntry = {
                 path, timestamp: effectiveReviewDate, response: qualityRating,
-                interval: schedule.interval || 0, ease: schedule.ease || 0, isSkipped: true
-            });
+                interval: schedule.interval || 0, ease: schedule.ease || 0, isSkipped: true,
+                scheduler: schedulerBefore,
+            };
+            this.history.push(skipEntry);
 
             const effectiveUTCDayStart = DateUtils.startOfUTCDay(reviewDateObj);
             schedule.lastReviewDate = effectiveUTCDayStart; // Set last review to UTC midnight
@@ -873,6 +912,11 @@ export class ReviewScheduleService {
         }
 
         // Data saving is now handled by main.ts after this method returns
+
+        if (skipEntry) {
+            skipEntry.nextInterval = schedule.interval ?? schedule.fsrsData?.scheduled_days ?? 0;
+            this.plugin.statsService?.recordNoteReview(skipEntry);
+        }
 
         // Notify any listeners (for UI updates)
         if (this.plugin.events) {

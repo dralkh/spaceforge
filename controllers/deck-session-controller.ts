@@ -18,6 +18,7 @@ import { Notice, TFile, WorkspaceLeaf } from 'obsidian';
 import type SpaceforgePlugin from '../main';
 import { AnkiCard, AnkiCardQueue, AnkiGrade, AnkiId, AnkiNote, AnswerResult, DeckBundle, DeckScheduler } from '../models/anki';
 import { answerCard, answerFsrs, burySiblings, buildQueue, dueCounts, intervalPreview } from '../models/anki-scheduler';
+import { deckAnswerKind } from '../models/stats';
 import { CardView, isClozeNote, resolvePresentation } from '../models/card-presentation';
 import { DeckSummary, DeckStore } from '../services/deck-store';
 import {
@@ -112,6 +113,8 @@ export class DeckSessionController {
     /** Multiple-choice picks, for the grade the sitting suggests at the end. */
     private picks = new Map<AnkiId, { index: number; correct: boolean }>();
     private startedAt = 0;
+    /** When the card on screen appeared, for the answer time in the log. */
+    private cardShownAt = 0;
     /** How a surface is made; a test replaces this with a stand-in. */
     private createView: (handlers: DeckSessionHandlers) => DeckSessionView;
     /** The teardown the current surface's mount returned, when one owns it. */
@@ -320,6 +323,24 @@ export class DeckSessionController {
         this.answered.set(result.card.id, grade);
         await this.store.updateCardStates(path, [result.card]);
 
+        // Anki's statistics read a review log; the deck lane writes one now.
+        // The time is capped at a minute, the way Anki caps it, so a card left
+        // on screen cannot enter the log as an hour of work.
+        this.plugin.statsService?.recordDeckReview({
+            deckPath: path,
+            cardId: result.card.id,
+            timestamp: now,
+            grade,
+            priorInterval: current.card.interval,
+            nextInterval: result.card.interval,
+            factor: result.card.easeFactor ?? null,
+            timeMs: this.cardShownAt > 0 ? Math.min(60_000, Math.max(0, now - this.cardShownAt)) : null,
+            kind: deckAnswerKind(result.reason),
+            leeched: result.leeched,
+            stability: result.card.memory?.stability ?? null,
+            difficulty: result.card.memory?.difficulty ?? null,
+        });
+
         // A sibling of the card just answered waits until tomorrow, as in Anki.
         const buried = burySiblings(bundle.cards, result.card, options, now, dayBase);
         if (buried.length > 0) {
@@ -459,6 +480,9 @@ export class DeckSessionController {
                     total: this.answered.size + this.queue.length,
                     counts: dueCounts(own.cards, own.deck.options, now, dayBase),
                 };
+                // The answer-time clock starts when the card reaches the
+                // screen, and restarts every time a new card does.
+                this.cardShownAt = now;
                 this.view?.show(this.current, this.summary());
                 // Every card that reaches the screen is the sitting's position:
                 // saving it here means the pane can close at any point.

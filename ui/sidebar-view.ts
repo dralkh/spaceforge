@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf, Setting } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, Setting, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { PomodoroUIManager } from "./sidebar/pomodoro-ui-manager";
 import { NoteItemRenderer } from "./sidebar/note-item-renderer";
@@ -135,7 +135,10 @@ export class ReviewSidebarView extends ItemView {
         if (!this.persistentHeaderEl) {
             this.persistentHeaderEl = this.mainContainer.createDiv("review-header");
             new Setting(this.persistentHeaderEl).setHeading().setName("Review schedule");
-            const viewToggle = this.persistentHeaderEl.createDiv("review-view-toggle");
+            // The toggle and the statistics button share one row: the toggle
+            // takes the width, the button keeps its own small square.
+            const headerRow = this.persistentHeaderEl.createDiv("review-header-row");
+            const viewToggle = headerRow.createDiv("review-view-toggle");
 
             const listViewBtn = viewToggle.createDiv("review-view-btn");
             listViewBtn.setText("List");
@@ -156,6 +159,16 @@ export class ReviewSidebarView extends ItemView {
             reviewViewBtn.setText("Review");
             reviewViewBtn.addEventListener("click", () => {
                 void this.switchMode('review');
+            });
+
+            // The statistics page is a leaf of its own, not a fourth pane: the
+            // charts need more width than this sidebar has.
+            const statsBtn = headerRow.createDiv("review-stats-btn");
+            setIcon(statsBtn, "trending-up");
+            statsBtn.setAttribute("aria-label", "Statistics");
+            statsBtn.setAttribute("title", "Statistics");
+            statsBtn.addEventListener("click", () => {
+                void this.plugin.openStatsView();
             });
         }
         this.updateViewToggleButtonsState();

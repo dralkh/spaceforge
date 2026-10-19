@@ -103,7 +103,9 @@ export async function detectCliAgent(
     if (agent.authProbe) {
         const status = await runCliCapture(agent.bin, agent.authProbe.args, 12_000, { search });
         const statusText = `${status.stdout}\n${status.stderr}`;
-        const signedIn = status.exitCode === 0 && !isAuthFailureText(agent, statusText);
+        const signedIn = status.exitCode === 0
+            && !isAuthFailureText(agent, statusText)
+            && (!agent.authProbe.requireOutput || statusText.trim().length > 0);
         if (!signedIn) {
             return {
                 id: agent.id,

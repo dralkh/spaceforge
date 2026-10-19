@@ -193,6 +193,39 @@
   overflow: hidden;
 }
 
+/* The toggle and the statistics button share a row; the toggle takes the
+   width and the button keeps a small square of its own. */
+.review-header-row {
+  display: flex;
+  gap: var(--sf-space-sm);
+  align-items: stretch;
+}
+
+.review-header-row .review-view-toggle {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-stats-btn {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  margin-top: var(--sf-space-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--sf-radius-md);
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--sf-transition);
+}
+
+.review-stats-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
 .review-view-btn {
   flex: 1;
   text-align: center;

@@ -4,6 +4,7 @@ import { ReviewSessionStore } from './review-session';
 import { MCQSet, MCQSession } from './mcq';
 import { CalendarEvent } from './calendar-event';
 import { StudyPlan, StudyProgressStore, StudySessionRecord } from './study';
+import { DayReviewStats, DeckReviewLogItem } from './stats';
 
 /**
  * A card sitting as it was left, so closing the pane, switching tabs or
@@ -81,6 +82,23 @@ export interface PluginStateData {
      * the note it was on, and which notes it had already handled.
      */
     noteRun?: SavedNoteRun | null;
+
+    /**
+     * The statistics screen's permanent counters: one record per day studied,
+     * for notes and for decks. Unlike the review log (which keeps the newest
+     * 1000 entries), these are never trimmed, which is what lets a year-long
+     * heatmap or an all-time retention figure stay honest.
+     *
+     * Left absent in the defaults on purpose: `undefined` is how a file that
+     * has never been through the statistics code is recognized and seeded
+     * from its review log, once. An empty object means "seeded, nothing yet".
+     */
+    reviewDayStats?: Record<string, DayReviewStats>;
+    /**
+     * The deck lane's review log, newest last, capped. Anki's statistics read
+     * `revlog`; this is the same idea for decks that live as vault files.
+     */
+    deckHistory?: DeckReviewLogItem[];
 }
 
 /**
@@ -125,6 +143,10 @@ export const DEFAULT_PLUGIN_STATE_DATA: PluginStateData = {
     // Nothing is being sat, and nothing is being walked, at a fresh start.
     deckSitting: null,
     noteRun: null,
+
+    // No deck review log yet; the day counters stay absent until a file that
+    // predates them is seeded from its review log (see StatsService).
+    deckHistory: [],
 };
 
 /**

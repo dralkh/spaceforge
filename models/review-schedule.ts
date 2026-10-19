@@ -1,6 +1,8 @@
 /**
  * Represents a note's review schedule in the spaced repetition system
  */
+import type { HistoryScheduler, ReviewGrade } from './stats';
+
 export interface ReviewSchedule {
     /**
      * Path to the note file - unique identifier
@@ -215,4 +217,26 @@ export interface ReviewHistoryItem {
      * Whether this review was explicitly skipped by the user
      */
     isSkipped?: boolean;
+
+    /**
+     * Which scheduler produced this review ("initial" while the note walks its
+     * first steps). Newer entries say so; older entries are read from `ease`
+     * (FSRS stores difficulty * 10, SM-2 stores permille, and the ranges do not
+     * overlap).
+     */
+    scheduler?: HistoryScheduler;
+
+    /**
+     * The actual answer, folded onto the four Anki buttons. Newer entries say
+     * so; without it the response is translated through the scheduler.
+     */
+    grade?: ReviewGrade;
+
+    /**
+     * The interval (days) this review scheduled — the value Anki's revlog calls
+     * `ivl`. The `interval` field above is the one to compute an interval
+     * growth curve against; this one answers "what did pressing that button
+     * do". Absent on older entries.
+     */
+    nextInterval?: number;
 }

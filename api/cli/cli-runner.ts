@@ -1,5 +1,12 @@
 import { CliAgentDef, CliInvokeOptions, CliParseResult, isAuthFailureText } from './cli-types';
-import { clearCliBinaryCache, CliSearchOptions, cliPathDirs, findCliBinary } from './cli-binary';
+import {
+    clearCliBinaryCache,
+    CliSearchOptions,
+    cliPathDirs,
+    findCliBinary,
+    getCliSearchExtra,
+    setCliSearchExtra,
+} from './cli-binary';
 import { loadNodeModule, nodeProcess } from './node-modules';
 
 /**
@@ -44,14 +51,11 @@ export function isCliExecAvailable(): boolean {
     return nodeChildProcess() !== null;
 }
 
-/** Directories the reader added themselves, so an odd install is still found. */
-let extraPath = '';
-
 /** Set from the settings; clears the caches so the next search uses it at once. */
 export function setCliExtraPath(value: string | undefined): void {
     const next = (value ?? '').trim();
-    if (next === extraPath) return;
-    extraPath = next;
+    if (next === getCliSearchExtra()) return;
+    setCliSearchExtra(next);
     clearCliPathCaches();
 }
 
@@ -74,7 +78,8 @@ let cachedPath: string | null = null;
 export function resolveShellPath(): string | null {
     if (cachedPath !== null) return cachedPath;
     const base = nodeProcess()?.env?.PATH ?? '/usr/bin:/bin';
-    cachedPath = [...cliPathDirs({ extra: extraPath }), base].join(':');
+    // No explicit extra: `cliPathDirs` falls back to the reader's own path.
+    cachedPath = [...cliPathDirs(), base].join(':');
     return cachedPath;
 }
 
@@ -84,7 +89,9 @@ export function resolveShellPath(): string | null {
  * Resolving here, rather than trusting PATH, is the whole point of the search.
  */
 export function resolveCliBinary(bin: string, search?: CliSearchOptions): string {
-    return findCliBinary(bin, { extra: extraPath, ...search }) ?? bin;
+    // `findCliBinary` already consults the reader's extra path when the caller
+    // did not name one, so a bare search is enough here.
+    return findCliBinary(bin, search) ?? bin;
 }
 
 export function getEnvVar(name: string): string | undefined {
@@ -252,6 +259,16 @@ export function formatDuration(ms: number): string {
 export function parseCliOutput(def: CliAgentDef, raw: string): string | null {
     if (!raw.trim()) return null;
 
+    // A whole-output parser wins: it can see that a stream repeated the same
+    // text (deltas plus a final result) and pick the authoritative copy, which
+    // a per-line parser cannot know.
+    if (def.parseFinal) {
+        const result = def.parseFinal(raw);
+        if (result.kind === 'text') return result.text;
+        if (result.kind === 'error') throw new CliTurnError(result.message, raw.trim().slice(0, 2000));
+        return null;
+    }
+
     if (def.streamFormat === 'json-lines' && def.parseLine) {
         let text = '';
         let error: string | null = null;
@@ -264,13 +281,6 @@ export function parseCliOutput(def: CliAgentDef, raw: string): string | null {
         }
         if (text.trim()) return text;
         if (error) throw new CliTurnError(error, raw.trim().slice(0, 2000));
-        return null;
-    }
-
-    if (def.parseFinal) {
-        const result = def.parseFinal(raw);
-        if (result.kind === 'text') return result.text;
-        if (result.kind === 'error') throw new CliTurnError(result.message, raw.trim().slice(0, 2000));
         return null;
     }
 

@@ -117,7 +117,6 @@ export function extractJson(text: string): unknown {
 
 export class StudyVisualService {
     private readonly plugin: SpaceforgePlugin;
-    private chatClient: ChatClient | null = null;
     /** One generation per note at a time: two presses are one artifact. */
     private inFlight = new Map<string, Promise<StudyVisualPack | null>>();
 
@@ -153,8 +152,10 @@ export class StudyVisualService {
 
     private client(): ChatClient | null {
         if (this.clientFactory) return this.clientFactory();
-        this.chatClient ??= createChatClient(this.plugin.settings);
-        return this.chatClient;
+        // Read the settings for every generation. The service lives for the
+        // plugin's lifetime, so a cached client would keep talking to whichever
+        // provider happened to be selected the first time material was made.
+        return createChatClient(this.plugin.settings);
     }
 
     private async runGeneration(request: VisualPackRequest): Promise<StudyVisualPack | null> {

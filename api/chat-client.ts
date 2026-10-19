@@ -94,6 +94,13 @@ function describeError(status: number, body: string): string {
 
 interface ProviderDescriptor {
     label: string;
+    /**
+     * True when the body is OpenAI's chat shape. Only there can the
+     * token-limit fallback retry a rejected `max_tokens`: Gemini has no such
+     * field, and Claude *requires* it, so stripping or renaming it would turn
+     * a clear error into a confusing one.
+     */
+    openAiBody: boolean;
     /** Returns a human-readable reason when the provider is not usable. */
     missing(settings: SpaceforgeSettings): string | null;
     model(settings: SpaceforgeSettings): string;
@@ -141,6 +148,155 @@ const openAiMessageExtract = (response: Record<string, unknown>): string => {
 
 const trimSlash = (value: string): string => (value.endsWith('/') ? value.slice(0, -1) : value);
 
+/**
+ * Provider/model pairs observed to reject every token-limit spelling.
+ *
+ * A router can serve one model from several upstreams, some of which reject
+ * the cap while others accept it. Once the uncapped request has succeeded for
+ * a model, retrying the rejected spellings on every later turn would only add
+ * latency and failed requests; remember the fact for this session.
+ */
+const tokenLimitUnsupported = new Set<string>();
+
+/** Identity of a provider/model pair, for the token-cap capability cache. */
+export const chatModelKey = (label: string, model: string): string => `${label}\u0000${model}`;
+
+/**
+ * Whether the model belongs to an OpenAI reasoning family.
+ *
+ * o-series and GPT-5+ models replaced `max_tokens` with
+ * `max_completion_tokens`, and reject a non-default temperature while they
+ * reason. Routers keep the vendor prefix (`openai/gpt-6.1-sol`), so only the
+ * last path segment is inspected.
+ */
+function isReasoningModel(model: string): boolean {
+    const name = model.trim().toLowerCase().split('/').pop() ?? '';
+    return /^(o[1-9]|gpt-[5-9])(?:[.\-_]|$)/.test(name);
+}
+
+/**
+ * The sampling and output-limit fields a model accepts.
+ *
+ * Sending the wrong token-limit spelling rejects the whole request, so the
+ * model id decides the shape rather than the provider: the same endpoint can
+ * serve a model that wants each one.
+ */
+function openAiRequestFields(model: string, request: ChatRequest): Record<string, unknown> {
+    const reasoning = isReasoningModel(model);
+    const fields: Record<string, unknown> = {};
+    if (typeof request.temperature === 'number' && !reasoning) {
+        fields.temperature = request.temperature;
+    }
+    if (typeof request.maxTokens === 'number') {
+        fields[reasoning ? 'max_completion_tokens' : 'max_tokens'] = request.maxTokens;
+    }
+    return fields;
+}
+
+/**
+ * The same body with the other token-limit spelling, when the provider's
+ * complaint names the one that was sent.
+ *
+ * `max_tokens` and `max_completion_tokens` express the same intent, and which
+ * one a route accepts can differ from the endpoint's own documentation — a
+ * router may hand the request to an upstream with different rules. One retry
+ * costs a rejected request; refusing to retry costs the feature.
+ */
+function alternateTokenLimit(
+    body: Record<string, unknown>,
+    status: number,
+    text: string
+): Record<string, unknown> | null {
+    if (status !== 400) return null;
+    if (typeof body.max_tokens === 'number' && /max_tokens/i.test(text)) {
+        const retry = { ...body };
+        delete retry.max_tokens;
+        retry.max_completion_tokens = body.max_tokens;
+        return retry;
+    }
+    if (typeof body.max_completion_tokens === 'number' && /max_completion_tokens/i.test(text)) {
+        const retry = { ...body };
+        delete retry.max_completion_tokens;
+        retry.max_tokens = body.max_completion_tokens;
+        return retry;
+    }
+    return null;
+}
+
+/**
+ * The same body with no token-limit field at all.
+ *
+ * Some routers forward requests to several upstreams, and only some of them
+ * accept either spelling. The same endpoint can reject `max_tokens`, reject
+ * `max_completion_tokens`, and then accept the identical request with no cap.
+ * When that happens, dropping the cap is the difference between a working
+ * feature and a 400; the provider's own default applies.
+ */
+function withoutTokenLimit(
+    body: Record<string, unknown>,
+    status: number,
+    text: string
+): Record<string, unknown> | null {
+    if (status !== 400) return null;
+    if (!/max_(completion_)?tokens/i.test(text)) return null;
+    if (typeof body.max_tokens !== 'number' && typeof body.max_completion_tokens !== 'number') return null;
+    const retry = { ...body };
+    delete retry.max_tokens;
+    delete retry.max_completion_tokens;
+    return retry;
+}
+
+/**
+ * POST an OpenAI-shaped chat request, retrying only the parts of the body the
+ * provider has just told us it cannot take.
+ *
+ * Shared by the Study client and the multiple-choice generator so a router's
+ * token-cap quirk is learned once for both, and a model that rejects the cap
+ * does not keep failing on every feature.
+ */
+export async function postOpenAiChat(
+    url: string,
+    headers: Record<string, string>,
+    requestBody: Record<string, unknown>,
+    cacheKey: string | null = null,
+    tokenFallback = true
+): Promise<Awaited<ReturnType<typeof requestUrl>>> {
+    const body = { ...requestBody };
+    if (cacheKey && tokenLimitUnsupported.has(cacheKey)) {
+        delete body.max_tokens;
+        delete body.max_completion_tokens;
+    }
+    const post = (payload: Record<string, unknown>) => requestUrl({
+        url,
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        throw: false,
+    });
+
+    let response = await post(body);
+    if (!tokenFallback) return response;
+
+    // A model can reject the token-limit spelling its endpoint's
+    // documentation promised (an upstream route with different rules). Ask
+    // once more with the other spelling before failing.
+    const retry = alternateTokenLimit(body, response.status, response.text ?? '');
+    if (retry) {
+        response = await post(retry);
+        // The route may reject both spellings outright. The cap is an
+        // optimisation, not part of the answer: drop it and let the
+        // provider's default apply rather than lose the turn.
+        const bare = withoutTokenLimit(retry, response.status, response.text ?? '');
+        if (bare) {
+            response = await post(bare);
+            if (cacheKey && response.status >= 200 && response.status < 300) {
+                tokenLimitUnsupported.add(cacheKey);
+            }
+        }
+    }
+    return response;
+}
+
 /** Stop reason out of an OpenAI-shaped response. */
 const openAiFinishReason = (response: Record<string, unknown>): string | null => {
     const choices = response.choices as Array<{ finish_reason?: string }> | undefined;
@@ -167,6 +323,7 @@ const claudeFinishReason = (response: Record<string, unknown>): string | null =>
 const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     [ApiProvider.OpenRouter]: {
         label: OPENROUTER,
+        openAiBody: true,
         missing: s => (s.openRouterApiKey ? null : `${OPENROUTER} API key is not set`),
         model: s => s.openRouterModel,
         build: (s, r) => ({
@@ -180,8 +337,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
             body: {
                 model: s.openRouterModel,
                 messages: r.messages,
-                temperature: r.temperature,
-                max_tokens: r.maxTokens,
+                ...openAiRequestFields(s.openRouterModel, r),
             },
         }),
         extract: openAiMessageExtract,
@@ -189,6 +345,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     },
     [ApiProvider.OpenAI]: {
         label: OPENAI,
+        openAiBody: true,
         missing: s => (s.openaiApiKey ? null : `${OPENAI} API key is not set`),
         model: s => s.openaiModel,
         build: (s, r) => ({
@@ -200,8 +357,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
             body: {
                 model: s.openaiModel,
                 messages: r.messages,
-                temperature: r.temperature,
-                max_tokens: r.maxTokens,
+                ...openAiRequestFields(s.openaiModel, r),
                 ...(r.json ? { response_format: { type: 'json_object' } } : {}),
             },
         }),
@@ -210,6 +366,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     },
     [ApiProvider.OpenAICompatible]: {
         label: OPENAI_COMPATIBLE,
+        openAiBody: true,
         missing: s => {
             if (!s.openaiCompatibleApiUrl) return `${OPENAI_COMPATIBLE} API URL is not set`;
             if (!s.openaiCompatibleModel) return `${OPENAI_COMPATIBLE} model is not set`;
@@ -227,8 +384,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
                 body: {
                     model: s.openaiCompatibleModel,
                     messages: r.messages,
-                    temperature: r.temperature,
-                    max_tokens: r.maxTokens,
+                    ...openAiRequestFields(s.openaiCompatibleModel, r),
                 },
             };
         },
@@ -237,6 +393,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     },
     [ApiProvider.Ollama]: {
         label: OLLAMA,
+        openAiBody: false,
         missing: s => {
             if (!s.ollamaApiUrl) return `${OLLAMA} URL is not set`;
             if (!s.ollamaModel) return `${OLLAMA} model is not set`;
@@ -279,6 +436,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     },
     [ApiProvider.Gemini]: {
         label: GEMINI,
+        openAiBody: false,
         missing: s => {
             if (!s.geminiApiKey) return `${GEMINI} API key is not set`;
             if (!s.geminiModel) return `${GEMINI} model is not set`;
@@ -319,6 +477,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     },
     [ApiProvider.Claude]: {
         label: CLAUDE,
+        openAiBody: false,
         missing: s => {
             if (!s.claudeApiKey) return `${CLAUDE} API key is not set`;
             if (!s.claudeModel) return `${CLAUDE} model is not set`;
@@ -356,6 +515,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
     },
     [ApiProvider.Together]: {
         label: TOGETHER_AI,
+        openAiBody: true,
         missing: s => {
             if (!s.togetherApiKey) return `${TOGETHER_AI} API key is not set`;
             if (!s.togetherModel) return `${TOGETHER_AI} model is not set`;
@@ -371,8 +531,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
             body: {
                 model: s.togetherModel,
                 messages: r.messages,
-                temperature: r.temperature,
-                max_tokens: r.maxTokens,
+                ...openAiRequestFields(s.togetherModel, r),
             },
         }),
         extract: openAiMessageExtract,
@@ -395,6 +554,7 @@ export function buildOpenAiChatRequest(
     request: ChatRequest
 ): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
     const key = resolveHttpKey(descriptor, settings);
+    const model = providerModel(descriptor, settings);
     return {
         url: httpProviderChatUrl(descriptor, settings),
         headers: {
@@ -402,10 +562,9 @@ export function buildOpenAiChatRequest(
             ...(key && descriptor.authHeaders ? descriptor.authHeaders(key) : {}),
         },
         body: {
-            model: providerModel(descriptor, settings),
+            model,
             messages: request.messages,
-            temperature: request.temperature,
-            max_tokens: request.maxTokens,
+            ...openAiRequestFields(model, request),
         },
     };
 }
@@ -422,6 +581,7 @@ function registryDescriptor(id: ApiProvider): ProviderDescriptor | null {
     if (!http || !providerIsOpenAiShaped(http)) return null;
     return {
         label: http.label,
+        openAiBody: true,
         missing: settings => describeProviderGap(http, settings),
         model: settings => providerModel(http, settings),
         build: (settings, request) => buildOpenAiChatRequest(http, settings, request),
@@ -518,17 +678,17 @@ export function createChatClient(settings: SpaceforgeSettings): ChatClient | nul
         model,
         send: async (request: ChatRequest): Promise<ChatResult> => {
             const started = Date.now();
-            const { url, headers, body } = descriptor.build(settings, request);
+            const built = descriptor.build(settings, request);
 
             let response;
             try {
-                response = await requestUrl({
-                    url,
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(body),
-                    throw: false,
-                });
+                response = await postOpenAiChat(
+                    built.url,
+                    built.headers,
+                    built.body,
+                    chatModelKey(label, model),
+                    descriptor.openAiBody
+                );
             } catch (error) {
                 const msg = error instanceof Error ? error.message : String(error);
                 throw new ChatClientError(`${label} could not be reached: ${msg}`);
