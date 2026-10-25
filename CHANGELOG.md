@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.5
+
+### Fixes
+
+- **Calendar estimates come from the note's words.** The estimate is the real word count — markdown and
+  code blocks stripped — divided by your reading speed. File size is no longer consulted anywhere: two
+  notes of identical size now get the time their text implies.
+- **No ceiling.** A long note reports its own reading time; a 12,000-word note is an hour, because it is.
+- **Still instant.** Each note is counted once and kept against its modification stamp, so the month
+  draws from memory (2 ms for 400 scheduled notes) and recounts a note only after it changes. Day
+  totals now equal the sum of the rows they are made of.
+- Every estimate in the plugin — calendar, list totals, rows, pomodoro — reads from that one count.
+
 ## 1.2.3
 
 ### Fixes
