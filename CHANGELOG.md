@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.3
+
+### Fixes
+
+- **Calendar estimates are minutes again, not days.** 1.2.1 stopped reading every note to draw a
+  month and estimated from file size instead — but that size branch divided bytes by 38.5 and called
+  the quotient *minutes*, i.e. about seven words a minute. Nine notes showed as 53 hours. The size
+  estimate now converts bytes to words (5.5 bytes a word) and words to time at your reading speed,
+  and a single note is capped at 20 minutes. Nine average notes read as about 15 minutes.
+- The size estimate and the text estimate (what a note row shows) now agree within 10% for the same
+  note, so a day's total matches the rows it is made of.
+
 ## 1.2.2
 
 ### Fixes
