@@ -26,6 +26,14 @@ export class EstimationUtils {
      */
     private static readonly MIN_REVIEW_TIME = 30;
 
+    /**
+     * Ceiling for a single note, in seconds.
+     *
+     * Without it a large file produces a number nobody would ever schedule — a
+     * 100 KB note claims over two hours, and nine of them claimed fifty-three
+     * hours on the calendar, because bytes were being read as minutes.
+     */
+    private static readonly MAX_REVIEW_TIME = 20 * 60;
 
     /**
      * Reference to the plugin (for access to settings)
@@ -84,11 +92,10 @@ export class EstimationUtils {
             // `size / AVG_WORD_LENGTH` words, and words are read at the reader's
             // speed per minute — the old arithmetic divided bytes by 38.5 and
             // called the quotient *minutes*, i.e. seven words a minute, which is
-            // how nine notes came to claim fifty-three hours. The arithmetic was
-            // the whole bug; nothing about the answer needed truncating.
+            // how nine notes came to claim fifty-three hours.
             const words = Math.max(1, Math.round(file.stat.size / this.AVG_WORD_LENGTH));
             const readingSpeed = this.getReadingSpeed(contentType);
-            return this.atLeastOneNote((words / readingSpeed) * 60);
+            return this.clamp((words / readingSpeed) * 60);
         }
 
         // Count words in content
@@ -99,18 +106,13 @@ export class EstimationUtils {
         const readingTimeMinutes = wordCount / readingSpeed;
 
         // Add some buffer time for actual review (thinking, interacting)
-        return this.atLeastOneNote(readingTimeMinutes * 60);
+        return this.clamp(readingTimeMinutes * 60);
     }
 
-    /**
-     * Floor only. A note is never worth less than the moment it takes to open it,
-     * and it is never worth less than its own text: a 400 KB note really is a six
-     * hour read, and saying twenty minutes would make every total that contains it
-     * wrong. There is no ceiling — the estimate reports, it does not negotiate.
-     */
-    private static atLeastOneNote(seconds: number): number {
+    /** Keep an estimate between one note's floor and a number a person could act on. */
+    private static clamp(seconds: number): number {
         if (!Number.isFinite(seconds) || seconds <= 0) return this.MIN_REVIEW_TIME;
-        return Math.max(this.MIN_REVIEW_TIME, Math.ceil(seconds));
+        return Math.min(this.MAX_REVIEW_TIME, Math.max(this.MIN_REVIEW_TIME, Math.ceil(seconds)));
     }
 
     /**

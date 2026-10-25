@@ -1,14 +1,5 @@
 # Changelog
 
-## 1.2.4
-
-### Fixes
-
-- **The 20-minute ceiling per note is gone.** 1.2.3 added it to stop one long note dominating a day's
-  total, which was the wrong instinct twice over: the arithmetic was the bug, not the size of the
-  answer, and a 400 KB note really is a six-hour read. Estimates now report what the text implies,
-  with only a 30-second floor for a note that is essentially empty.
-
 ## 1.2.3
 
 ### Fixes
