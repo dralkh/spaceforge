@@ -11,7 +11,8 @@
     "verify-release": "node scripts/verify-release.mjs",
     "lint": "ESLINT_USE_FLAT_CONFIG=true eslint .",
     "typecheck": "tsc -noEmit -skipLibCheck",
-    "test": "node test/build-tests.mjs && node --test .test-build/*.test.js"
+    "test": "node test/build-tests.mjs && node --test .test-build/*.test.js",
+    "soak": "node scripts/soak-progress.mjs"
   },
   "keywords": [
     "obsidian",
