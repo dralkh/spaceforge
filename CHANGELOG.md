@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.6
+
+### Fixes
+
+- **The matrix's name column no longer collapses to one letter per line.** The corner header was
+  `width: 1%` under automatic table layout, so the column shrank to its narrowest possible cell — one
+  character — and "Acute pericarditis" rendered as a vertical stack of letters while every row grew to
+  match. The table now lays out from its header (`table-layout: fixed`), gives the name column 22%, and
+  breaks names between words rather than within them.
+- A narrow pane scrolls the table sideways (minimum width 640 px) instead of squeezing the columns.
+- Three tests read the stylesheet and fail if the corner returns to a tiny percentage or the fixed
+  layout is dropped.
+
 ## 1.2.5
 
 ### Fixes
