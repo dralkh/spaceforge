@@ -111,6 +111,14 @@
 
 .sf-vb-table {
   width: 100%;
+  /* The first column holds a name, not a word to be broken. With auto layout the
+     `width: 1%` corner below made the browser shrink that column to its narrowest
+     possible cell, which `overflow-wrap: anywhere` then filled one character per
+     line — a 25 px column and a 336 px row in a 900 px pane. Fixed layout takes the
+     widths from the header row; the minimum width means a narrow pane scrolls
+     sideways instead of stacking letters. */
+  min-width: 640px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--sf-font-ui);
 }
@@ -136,9 +144,10 @@
   color: var(--sf-text-muted);
 }
 
-/* The corner above the row labels carries nothing, and must not claim width. */
+/* The corner above the row labels carries nothing, but the column under it holds
+   the row's name — wide enough for "Constrictive pericarditis" on one or two lines. */
 .sf-vb-th-label {
-  width: 1%;
+  width: 22%;
 }
 
 .sf-vb-table-body {
@@ -157,7 +166,7 @@
   text-align: left;
   color: var(--text-normal);
   vertical-align: top;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .sf-vb-cell {

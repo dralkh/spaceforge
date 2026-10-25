@@ -53,6 +53,7 @@ await esbuild.build({
         'test/calendar-date-pick.test.ts',
   'test/estimation.test.ts',
   'test/word-count-cache.test.ts',
+  'test/matrix-layout.test.ts',
     'test/data-file.test.ts',
     'test/cli-providers.test.ts',
     'test/chat-client.test.ts',
