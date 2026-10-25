@@ -211,6 +211,32 @@ export class MiniElement {
         this.attrs[name] = value;
     }
 
+    /** The whole class list, as the DOM spells it. Writing it replaces it. */
+    get className(): string {
+        return Array.from(this.classes).join(' ');
+    }
+
+    set className(value: string) {
+        this.classes.clear();
+        for (const token of value.split(/\s+/)) if (token) this.classes.add(token);
+    }
+
+    /**
+     * `el.dataset.x` as the DOM keeps it: one `data-x` attribute, with the
+     * camelCase key written as kebab-case. Surfaces that tag their elements this
+     * way (the calendar hangs a date key on every cell) need it to exist.
+     */
+    get dataset(): Record<string, string> {
+        const attrs = this.attrs;
+        const keyOf = (key: string): string => `data-${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`;
+        return new Proxy({} as Record<string, string>, {
+            get: (_target, key: string) => attrs[keyOf(key)],
+            set: (_target, key: string, value: string) => { attrs[keyOf(key)] = String(value); return true; },
+            deleteProperty: (_target, key: string) => { delete attrs[keyOf(key)]; return true; },
+            has: (_target, key: string) => keyOf(key) in attrs,
+        });
+    }
+
     removeAttribute(name: string): void {
         delete this.attrs[name];
     }

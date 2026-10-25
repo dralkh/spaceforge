@@ -50,6 +50,7 @@ await esbuild.build({
         'test/study-visual-sequence.test.ts',
         'test/review-flow-fuzz.test.ts',
         'test/bundle-load.test.ts',
+        'test/calendar-date-pick.test.ts',
     'test/data-file.test.ts',
     'test/cli-providers.test.ts',
     'test/chat-client.test.ts',

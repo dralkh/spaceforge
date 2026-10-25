@@ -31,7 +31,6 @@ import { DataRecoveryModal } from './ui/data-recovery-modal';
 import {
     mergeProgress,
     newDeviceId,
-    parseProgress,
     projectProgress,
     readNewestProgress,
     retireConflictCopies,
@@ -1748,11 +1747,14 @@ export default class SpaceforgePlugin extends Plugin {
 
     getSidebarView(): ReviewSidebarView | null {
         const leaves = this.app.workspace.getLeavesOfType('spaceforge-review-schedule');
-        if (leaves.length > 0) {
-            const view = leaves[0].view;
-            if (view instanceof ReviewSidebarView) {
-                return view;
-            }
+        for (const leaf of leaves) {
+            // `instanceof` is false for a view built by the previous module load,
+            // and a reload leaves exactly that in the leaf: every caller — the
+            // minute tick, file events, the save hooks — then got null and did
+            // nothing while the reader pressed buttons that changed the mode and
+            // never repainted. Ask for the contract, not the class.
+            const view = leaf.view as unknown as ReviewSidebarView | null;
+            if (view && typeof (view as { refresh?: unknown }).refresh === 'function') return view;
         }
         return null;
     }

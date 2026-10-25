@@ -1064,6 +1064,22 @@ export class ReviewScheduleService {
     }
 
     /**
+     * The same estimate, from the file's size instead of its text.
+     *
+     * The calendar sums this over every scheduled note on every render, and a
+     * `vault.read()` per note made a month take seconds on a real vault — the
+     * pane looked disabled while it chewed through files nobody had opened.
+     * Reading is what a *review* needs; a cell only needs a number, and the size
+     * proxy is the same estimate the note row already shows for a file it has
+     * not loaded.
+     */
+    estimateReviewTimeFromSize(path: string): number {
+        const file = this.plugin.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) return 60;
+        return EstimationUtils.estimateReviewTime(file);
+    }
+
+    /**
      * Schedule multiple notes for review in a specific order
      *
      * @param paths Array of note paths in the order they should be processed

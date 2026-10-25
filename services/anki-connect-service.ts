@@ -611,12 +611,6 @@ function ankiIdFor(deck: { id: string; name: string }, ankiDecks: Record<string,
     return null;
 }
 
-/** Does an add-on error mean this build simply does not have the action? */
-function isMissingAction(error: unknown): boolean {
-    return /unsupported action|unexpected keyword|does not exist|not (?:available|supported|implemented)|unknown action/i.test(
-        error instanceof Error ? error.message : String(error),
-    );
-}
 
 function summarize(results: AnkiDeckSyncResult[], errors: string[]): string {
     if (results.length === 0) {

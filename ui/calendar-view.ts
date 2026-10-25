@@ -44,6 +44,18 @@ function splitDuration(text: string): [string, string] {
 }
 
 /**
+ * How the calendar answers a date the reader picked.
+ *
+ * The view that owns the calendar supplies this, and it is the only route: the
+ * sidebar cannot be looked up through the workspace, because a reloaded plugin
+ * leaves a live view of an older class in the leaf and the lookup returns null.
+ */
+export interface CalendarHost {
+    /** The reader picked a day: show it as a list. */
+    onDatePicked?: (date: Date) => void;
+}
+
+/**
  * Calendar view component for review schedule
  */
 export class CalendarView {
@@ -51,6 +63,9 @@ export class CalendarView {
      * Reference to the main plugin
      */
     plugin: SpaceforgePlugin;
+
+    /** The sidebar that draws this calendar; a date pick goes through it. */
+    private host: CalendarHost;
 
     /**
      * Calendar container element
@@ -98,10 +113,16 @@ export class CalendarView {
      * 
      * @param containerEl Container element
      * @param plugin Reference to the main plugin
+     * @param host The sidebar this calendar is drawn inside. A date pick is
+     *   answered by the view that owns it, never by looking the sidebar up in
+     *   the workspace: after a plugin reload the live view belongs to the
+     *   previous module load, so `getSidebarView()` answers null and the click
+     *   ends in a notice about a sidebar that never updates.
      */
-    constructor(containerEl: HTMLElement, plugin: SpaceforgePlugin) {
+    constructor(containerEl: HTMLElement, plugin: SpaceforgePlugin, host: CalendarHost = {}) {
         this.containerEl = containerEl;
         this.plugin = plugin;
+        this.host = host;
         this.currentDate = new Date();
     }
 
@@ -113,7 +134,7 @@ export class CalendarView {
 
         this.updateCalendarHeader(); // Updates month title
 
-        await this.loadReviewsData(); // Preloads review data for the current view
+        this.loadReviewsData(); // Preloads review data for the current view
         await this.loadDeckCardsData(); // And what the decks owe, day by day
         this.loadEventsData(); // Preloads event data for the current view
 
@@ -199,7 +220,7 @@ export class CalendarView {
     /**
      * Load and organize review data by date
      */
-    async loadReviewsData(): Promise<void> {
+    loadReviewsData(): void {
         this.reviewsByDate = new Map();
         const allSchedules = Object.values(this.plugin.reviewScheduleService.schedules);
 
@@ -218,7 +239,9 @@ export class CalendarView {
             const dateReviews = this.reviewsByDate.get(dateKey);
             if (dateReviews) {
                 dateReviews.notes.push(schedule);
-                dateReviews.totalTime += await this.plugin.reviewScheduleService.estimateReviewTime(schedule.path);
+                // Size, not text: this loop covers every scheduled note on every
+                // render, and a read per note is what made the pane feel dead.
+                dateReviews.totalTime += this.plugin.reviewScheduleService.estimateReviewTimeFromSize(schedule.path);
             }
         }
     }
@@ -433,17 +456,12 @@ export class CalendarView {
                     dayCell.onclick = () => {
                         this.plugin.settings.sidebarViewType = 'list';
                         this.plugin.clickedDateFromCalendar = currentDateObj;
-
-                        void (async () => {
-                            await this.plugin.savePluginData();
-                            const sidebarView = this.plugin.getSidebarView();
-                            if (sidebarView && typeof sidebarView.refresh === 'function') {
-                                await sidebarView.refresh();
-                            } else {
-                                this.plugin.app.workspace.requestSaveLayout();
-                                new Notice("Switched to list view. Sidebar will update.");
-                            }
-                        })();
+                        // The sidebar that owns this calendar answers, in the same
+                        // instance that drew it. Looking it up through the
+                        // workspace answered null after a reload, so the click
+                        // wrote the mode, found no view, and told the reader the
+                        // sidebar "will update" — forever.
+                        this.host.onDatePicked?.(currentDateObj);
                     };
 
                     if (dateReviews.notes.length > 10) dayCell.addClass("heavy-load");

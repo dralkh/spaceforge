@@ -206,7 +206,12 @@ export class ReviewSidebarView extends ItemView {
         }
         // Ensure CalendarView is instantiated here, once, with the persistent container
         if (!this.calendarView && this.calendarViewContentEl) {
-            this.calendarView = new CalendarView(this.calendarViewContentEl, this.plugin);
+            this.calendarView = new CalendarView(this.calendarViewContentEl, this.plugin, {
+                // The date pick is answered here, by the view that drew the
+                // calendar. A workspace lookup answers null once the plugin has
+                // been reloaded, and the reader's click then went nowhere.
+                onDatePicked: () => { void this.switchMode('list'); },
+            });
         }
     }
 
@@ -428,7 +433,7 @@ export class ReviewSidebarView extends ItemView {
      * the refresh that follows them, where showCorrectViewPane does the same.
      */
     private async switchMode(mode: SidebarPaneMode): Promise<void> {
-        if (this.plugin.settings.sidebarViewType === mode) return;
+        const already = this.plugin.settings.sidebarViewType === mode;
         if (mode === 'review') {
             // Being here is the choice; showCorrectViewPane reveals the pane.
             this.plugin.settings.sidebarViewType = mode;
@@ -437,7 +442,13 @@ export class ReviewSidebarView extends ItemView {
             this.plugin.settings.sidebarViewType = mode;
             if (mode === 'list') this.activeListBaseDate = null;
         }
-        await this.plugin.savePluginData();
+        if (!already) await this.plugin.savePluginData();
+        // A press on the tab that already names the mode is still a request to
+        // *see* that pane. The mode can name it while the pane on screen is
+        // another one — a date picked in the calendar writes the mode, and a
+        // sidebar that missed the render left the reader pressing List with
+        // nothing happening, then pressing Review, which worked because that
+        // mode differed. Paint every press.
         await this.refresh();
     }
 
