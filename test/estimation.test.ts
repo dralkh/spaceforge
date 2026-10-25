@@ -45,9 +45,12 @@ test('a day of notes adds up to minutes, which is the number that was wrong', ()
     assert.ok(day < 15 * 60, `nine notes should be minutes, got ${Math.round(day / 60)} min`);
 });
 
-test('an enormous file is capped at something a person could sit through', () => {
+test('a long note reports its own reading time, with no ceiling', () => {
+    // 400 KB is about 72,000 words: six hours at 200 wpm. A cap here would quietly
+    // make every day total that contains this note wrong.
     const seconds = EstimationUtils.estimateReviewTime(fileOf(400_000));
-    assert.equal(seconds, 20 * 60);
+    const minutes = seconds / 60;
+    assert.ok(minutes > 300 && minutes < 400, `expected about 6 hours, got ${Math.round(minutes)} min`);
 });
 
 test('an almost empty note is floored, never zero', () => {
