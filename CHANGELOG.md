@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.1
+
+### Fixes
+
+- **Picking a date in the calendar now takes you to that day's list.** The click asked the
+  workspace for the sidebar; after a plugin reload that lookup answers null, so the mode changed
+  and nothing was redrawn — with a notice claiming the sidebar would update. The calendar now
+  answers through the panel that drew it.
+- **The List tab always responds.** Pressing the tab that already named the current mode did
+  nothing, which is exactly the state a date pick left behind.
+- **A month no longer reads every note.** Each cell's time estimate read the note's text, so a
+  vault with hundreds of scheduled notes spent seconds before drawing; the estimate now comes
+  from the file's size. Measured: 400 scheduled notes, 2 ms to draw the month.
+- The sidebar finds its live view after a plugin reload (it asked for the class, which is a
+  different class object after a reload, and got null — so file events and the minute tick had
+  quietly stopped refreshing the panel).
+
 ## 1.2.0
 
 ### Decks and Anki
