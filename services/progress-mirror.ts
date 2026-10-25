@@ -420,10 +420,13 @@ async function readOrNull(adapter: ProgressAdapter, path: string): Promise<strin
 }
 
 /**
- * Write the projection, atomically, and only when it says something new.
+ * Write the projection, unless the text is the one already there.
  *
- * The temp-file-then-rename is the same guard the data file uses: a sync tool
- * reading the folder mid-write must never see half a JSON document.
+ * In place, with the previous copy kept under a permanent name. The temp-then-
+ * rename dance this used to do is atomic, and it is exactly what makes a sync
+ * client complain: the file appears, is uploaded, and is renamed away while the
+ * upload is in flight, so Nextcloud, iCloud and the rest log an error on every
+ * save. Both names here are permanent — nothing appears and vanishes.
  */
 export async function writeProgress(
     adapter: ProgressAdapter,
@@ -437,24 +440,22 @@ export async function writeProgress(
         if (adapter.mkdir) {
             try { await adapter.mkdir(PROGRESS_DIR); } catch { /* exists */ }
         }
-        const temp = `${PROGRESS_FILE}.tmp`;
-        await adapter.write(temp, text);
-        // `rename` over an existing file is not guaranteed by every adapter —
-        // Obsidian's own vault adapter can refuse it — so a refused rename falls
-        // back to replacing the file in place rather than losing the write.
-        let renamed = false;
-        if (adapter.rename) {
-            try {
-                await adapter.rename(temp, PROGRESS_FILE);
-                renamed = true;
-            } catch {
-                renamed = false;
+        const previous = `${PROGRESS_FILE}.previous`;
+        try {
+            if (await adapter.exists(PROGRESS_FILE)) {
+                const current = await adapter.read(PROGRESS_FILE);
+                if (typeof current === 'string' && current.length > 0) await adapter.write(previous, current);
             }
+        } catch {
+            /* the copy is a courtesy; the write below is the job */
         }
-        if (!renamed) {
-            await adapter.write(PROGRESS_FILE, text);
-            await adapter.remove?.(temp);
-        }
+        await adapter.write(PROGRESS_FILE, text);
+        // A temp file left by an earlier version would be retried by a sync
+        // client forever; clear it on the way past.
+        try {
+            const legacy = `${PROGRESS_FILE}.tmp`;
+            if (await adapter.exists(legacy)) await adapter.remove?.(legacy);
+        } catch { /* nothing to clear */ }
         return { written: true, hash, path: PROGRESS_FILE };
     } catch (error) {
         throw new Error(`could not write ${PROGRESS_FILE}: ${error instanceof Error ? error.message : String(error)}`);

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.2
+
+### Fixes
+
+- **No more sync errors about `data.json.tmp`.** Every save wrote a temporary file and renamed it
+  into place. That is atomic, and it is precisely what a sync client cannot cope with: Nextcloud,
+  iCloud, Dropbox and OneDrive start uploading the file the moment it appears, lose it to the rename,
+  and report an error — on every save. Saves now write `data.json.previous` (the state being
+  replaced) and then `data.json`, both under names that stay put, so nothing a sync client sees ever
+  appears and vanishes. The same change applies to the progress projection
+  (`spaceforge/state/progress.json`). A temp file left by an older version is cleaned up on the next
+  save.
+- The safety net is unchanged in effect: if a write is interrupted, `data.json` may be partial but
+  `data.json.previous` holds the last complete state, and the loader prefers it. Verified by
+  truncating a 400-note vault's data file to 120 bytes: 400 schedules and 1600 reviews came back.
+
 ## 1.2.1
 
 ### Fixes

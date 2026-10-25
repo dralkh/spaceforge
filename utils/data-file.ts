@@ -109,19 +109,26 @@ export function historyOf(data: PluginDataShape | null): unknown[] {
 }
 
 /**
- * Write JSON so the target is never observed half-written.
+ * Write JSON so a crash cannot cost the state, without ever leaving a file that
+ * appears and vanishes.
  *
- * Obsidian's adapter refuses to rename onto an existing file ("Destination file
- * already exists"), so the swap is done in steps that each keep a complete copy of
- * the state on disk:
+ * The old swap wrote `<path>.tmp`, moved the live file aside and renamed the temp
+ * into place. That is atomic, and it is wrong for a synced folder: Nextcloud,
+ * iCloud, Dropbox and OneDrive all try to upload the file the moment it appears,
+ * lose it to the rename a millisecond later, and report an error — every save, for
+ * every reader who keeps `.obsidian` in a synced folder. The reader's words: the
+ * notifications were "not acceptable".
  *
- *   write <path>.tmp            a full new copy
- *   rename <path> -> .previous  the old copy moves aside
- *   rename <path>.tmp -> <path> the new copy takes the name
+ * So the write is now a plain in-place write, guarded by a complete copy of the
+ * file it is about to replace:
  *
- * A crash at any point leaves either the old file, the old file as `.previous`, or
- * the new file as `.tmp` - all of which the loader can find. Nothing is ever opened
- * and truncated in place.
+ *   write <path>.previous   the state that is on disk right now, in full
+ *   write <path>            the new state
+ *
+ * Both names are permanent, so a sync client only ever sees files change (which it
+ * handles), never files disappear. A crash during the second write leaves `.previous`
+ * holding the last complete state, and the loader already prefers it over a file it
+ * cannot parse.
  */
 export async function writeJsonAtomically(
     adapter: DataFileAdapter,
@@ -130,28 +137,35 @@ export async function writeJsonAtomically(
     onWarning?: (message: string) => void,
 ): Promise<void> {
     const body = JSON.stringify(value, null, 2);
-    const tempPath = `${path}.tmp`;
     const previousPath = `${path}.previous`;
 
+    // Keep what is on disk before overwriting it. A failure here is not fatal —
+    // the write below is what the reader is waiting for — but it is worth saying.
     try {
-        await adapter.write(tempPath, body);
         if (await adapter.exists(path)) {
-            // Clearing the previous copy first: rename will not overwrite either.
-            if (await adapter.exists(previousPath)) await adapter.remove(previousPath);
-            await adapter.rename(path, previousPath);
+            const current = await adapter.read(path);
+            if (typeof current === 'string' && current.length > 0) {
+                await adapter.write(previousPath, current);
+            }
         }
-        await adapter.rename(tempPath, path);
-        return;
     } catch (error) {
-        onWarning?.(`Atomic save failed (${String(error)}); falling back to a direct write.`);
+        onWarning?.(`Could not refresh ${previousPath} (${String(error)}); keeping the older copy.`);
     }
 
     try {
         await adapter.write(path, body);
     } catch (error) {
-        // Last resort: the temp file may still hold the data.
-        onWarning?.(`Direct save failed as well: ${String(error)}`);
+        onWarning?.(`Save failed: ${String(error)}`);
         throw error;
+    }
+
+    // Leftovers from the temp-file era: the file may still be on disk from an
+    // earlier version, and a sync client would keep retrying it forever.
+    try {
+        const legacyTemp = `${path}.tmp`;
+        if (await adapter.exists(legacyTemp)) await adapter.remove(legacyTemp);
+    } catch {
+        /* nothing to clean, or the adapter refused; not a save failure */
     }
 }
 
