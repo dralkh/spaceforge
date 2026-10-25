@@ -194,6 +194,16 @@ rebuilt by Anki's own scheduler from its state, so a card can shift by a day whe
 answered there. Nothing leaves the machine — the add-on answers on the loopback interface — and the
 bridge is offered only in the desktop app, since a phone has no Anki to talk to.
 
+**Progress can travel inside the vault too.** A vault can be synced without its `.obsidian`
+folder — which is where every plugin's settings live — and then nothing about your reviews would
+follow you to another device. Turn on **Carrying progress between devices → Carry progress with the
+vault** and a copy of your review progress and shared preferences is kept at
+`spaceforge/state/progress.json`, inside the vault, and merged on load. Merging is per note, so two
+devices keep each other's reviews and the newest review of a note wins; the settings that name your
+machine (Anki's address, a custom data path) and anything that holds a credential never travel. A
+device that opens the vault without a data file of its own adopts the copy, so a reinstall or a new
+phone starts where you left off rather than empty.
+
 ## Core Concepts
 
 ### Scheduling Algorithms: Optimize Your Learning
