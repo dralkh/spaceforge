@@ -52,6 +52,7 @@ import { getCliAgent } from './api/cli/cli-agents';
 import { setCliExtraPath } from './api/cli/cli-runner';
 import { IMCQGenerationService } from './api/mcq-generation-service';
 import { ReviewScheduleService } from './services/review-schedule-service';
+import { WordCountCache } from './services/word-count-cache';
 import { ReviewHistoryService } from './services/review-history-service';
 import { StatsService } from './services/stats-service';
 import { ReviewSessionService } from './services/review-session-service';
@@ -96,6 +97,9 @@ export default class SpaceforgePlugin extends Plugin {
     pluginState: PluginStateData;
     dataStorage: DataStorage;
     reviewScheduleService: ReviewScheduleService;
+
+    /** Word counts by note path, kept until the note changes */
+    wordCounts: WordCountCache;
     reviewHistoryService: ReviewHistoryService;
     /** Progress statistics: permanent day counters and the deck review log. */
     statsService: StatsService;
@@ -179,6 +183,25 @@ export default class SpaceforgePlugin extends Plugin {
 
 
         // Now services can be initialized, they will use the default settings initially
+        // How many words each note holds, counted from its text and kept until the
+        // note changes. The calendar asks for this by the hundred; reading the files
+        // every time is what made it slow, and guessing from the file's size is what
+        // made it wrong.
+        this.wordCounts = new WordCountCache({
+            read: async (path) => {
+                try {
+                    return await this.app.vault.adapter.read(path);
+                } catch {
+                    return null;
+                }
+            },
+            stamp: (path) => {
+                const file = this.app.vault.getAbstractFileByPath(path);
+                if (!(file instanceof TFile)) return null;
+                return `${file.stat.mtime}:${file.stat.size}`;
+            },
+        });
+
         this.reviewScheduleService = new ReviewScheduleService(
             this,
             this.pluginState.schedules,
@@ -291,6 +314,7 @@ export default class SpaceforgePlugin extends Plugin {
         // anything to resume into, and the resume would be silently skipped.
         this.app.workspace.onLayoutReady(() => {
             this.reviewFlowController?.resumeSavedRunIfAny();
+            void this.primeWordCounts();
         });
         this.contextMenuHandler = new ContextMenuHandler(this);
 
@@ -324,8 +348,12 @@ export default class SpaceforgePlugin extends Plugin {
         });
 
         this.registerEvent(this.app.workspace.on('file-open', (_file) => { /* ... */ }));
+        this.registerEvent(this.app.vault.on('modify', (file) => {
+            if (file instanceof TFile) this.wordCounts.forget(file.path);
+        }));
         this.registerEvent(this.app.vault.on('delete', async (file) => {
             if (file instanceof TFile && file.extension === "md") {
+                this.wordCounts.forget(file.path);
                 this.reviewScheduleService.removeFromReview(file.path);
                 await this.savePluginData();
             }
@@ -333,6 +361,8 @@ export default class SpaceforgePlugin extends Plugin {
         }));
         this.registerEvent(this.app.vault.on('rename', async (file, oldPath) => {
             if (file instanceof TFile && file.extension === "md") {
+                this.wordCounts.forget(oldPath);
+                this.wordCounts.forget(file.path);
                 this.reviewScheduleService.handleNoteRename(oldPath, file.path);
                 await this.savePluginData();
             }
@@ -1744,6 +1774,20 @@ export default class SpaceforgePlugin extends Plugin {
     checkForDueNotes(): void { /* ... */ }
     exportPluginData(): void { /* ... */ }
     importPluginData(_fileContent: string): void { /* ... */ }
+
+    /**
+     * Count the words of every scheduled note once the workspace is up.
+     *
+     * Done here rather than inside a render so the calendar, the list totals and the
+     * rows all find their numbers already counted. Six at a time, and only for notes
+     * that have changed since they were last counted.
+     */
+    async primeWordCounts(): Promise<void> {
+        const paths = Object.keys(this.reviewScheduleService?.schedules ?? {});
+        if (paths.length === 0) return;
+        const known = await this.wordCounts.prime(paths);
+        if (known > 0) void this.getSidebarView()?.refresh();
+    }
 
     getSidebarView(): ReviewSidebarView | null {
         const leaves = this.app.workspace.getLeavesOfType('spaceforge-review-schedule');

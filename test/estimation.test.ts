@@ -5,70 +5,64 @@ import type { TFile } from 'obsidian';
 import { EstimationUtils } from '../utils/estimation';
 
 /**
- * The calendar draws a day's total from the file's *size*, because reading every
- * note to draw a month cost seconds. That number and the one a note row shows (which
- * does read the text) have to agree — the reader sees both.
+ * Estimates are reading time, so they come from the words in the note.
  *
- * The size branch used to divide bytes by 38.5 and call the quotient minutes: seven
- * words a minute, so a 9-note day read as 53 hours. These tests pin the arithmetic.
+ * There is no size-based path any more, and no ceiling: a note costs what its text
+ * costs. The same-size test below is the guard — if anyone reintroduces "bytes ÷
+ * something", two notes of equal size stop being told apart and it fails.
  */
 
 const fileOf = (size: number): TFile => ({ stat: { size } } as unknown as TFile);
+const words = (count: number): string => Array.from({ length: count }, (_, index) => `w${index % 13}`).join(' ');
 
-/**
- * A note of `words` words whose byte size is what prose of that length weighs
- * (AVG_WORD_LENGTH bytes a word). The padding is spaces, which `countWords`
- * ignores, so both estimates should land on the same number.
- */
-const noteOf = (words: number): { file: TFile; text: string } => {
-    const text = Array.from({ length: words }, (_, index) => `w${index % 9}`).join(' ')
-        .padEnd(Math.round(words * 5.5), ' ');
-    return { file: fileOf(text.length), text };
-};
-
-test('a kilobyte of note is about a minute of reading, not an hour', () => {
-    const seconds = EstimationUtils.estimateReviewTime(fileOf(1_100));
-    assert.ok(seconds >= 50 && seconds <= 70, `expected about 60 s for 1.1 KB, got ${seconds}`);
+test('200 words take a minute at the default reading speed', () => {
+    assert.equal(EstimationUtils.estimateReviewTime(fileOf(1_100), words(200)), 60);
 });
 
-test('reading speed setting moves the size estimate in the right direction', () => {
-    const file = fileOf(4_400);
-    const normal = EstimationUtils.estimateReviewTime(file);
-    // 200 wpm by default: 800 words ≈ 4 minutes.
-    assert.ok(normal >= 225 && normal <= 255, `expected about 240 s, got ${normal}`);
+test('400 words take two minutes, 1,200 words take six', () => {
+    assert.equal(EstimationUtils.estimateReviewTime(fileOf(1), words(400)), 120);
+    assert.equal(EstimationUtils.estimateReviewTime(fileOf(1), words(1_200)), 360);
 });
 
-test('a day of notes adds up to minutes, which is the number that was wrong', () => {
-    // Nine average notes — the reader's screenshot showed 53 hr 34 min for nine.
-    const day = Array.from({ length: 9 }, () => EstimationUtils.estimateReviewTime(fileOf(1_640)))
-        .reduce((total, seconds) => total + seconds, 0);
-    assert.ok(day < 15 * 60, `nine notes should be minutes, got ${Math.round(day / 60)} min`);
-});
-
-test('an enormous file is capped at something a person could sit through', () => {
-    const seconds = EstimationUtils.estimateReviewTime(fileOf(400_000));
-    assert.equal(seconds, 20 * 60);
+test('a long note reports its own reading time, with no ceiling', () => {
+    // 12,000 words: an hour at 200 wpm. Capping this would make every day total that
+    // contains it wrong, which is the mistake 1.2.3 made.
+    assert.equal(EstimationUtils.estimateReviewTime(fileOf(1), words(12_000)), 3_600);
 });
 
 test('an almost empty note is floored, never zero', () => {
-    assert.equal(EstimationUtils.estimateReviewTime(fileOf(10)), 30);
+    assert.equal(EstimationUtils.estimateReviewTime(fileOf(1), ''), 30);
+    assert.equal(EstimationUtils.estimateReviewTimeFromWords(0), 30);
 });
 
-test('the size estimate and the text estimate describe the same note', () => {
-    for (const words of [40, 120, 400, 1_200]) {
-        const { file, text } = noteOf(words);
-        const fromSize = EstimationUtils.estimateReviewTime(file);
-        const fromText = EstimationUtils.estimateReviewTime(file, text);
-        const drift = Math.abs(fromSize - fromText) / fromText;
-        assert.ok(drift < 0.1, `${words} words: size said ${fromSize}s, text said ${fromText}s`);
-    }
+test('two notes of identical size get different estimates when their text differs', () => {
+    // The proof that size is not consulted: same `stat.size`, one note ten times
+    // longer in words.
+    const sparse = `${words(50)}${' '.repeat(5_000)}`;
+    const dense = words(900);
+    const sparseSeconds = EstimationUtils.estimateReviewTime(fileOf(5_000), sparse);
+    const denseSeconds = EstimationUtils.estimateReviewTime(fileOf(5_000), dense);
+    assert.ok(denseSeconds > sparseSeconds * 5, `${denseSeconds}s vs ${sparseSeconds}s`);
 });
 
-test('more text never means less time', () => {
+test('the file argument does not influence the answer', () => {
+    const text = words(300);
+    const small = EstimationUtils.estimateReviewTime(fileOf(10), text);
+    const large = EstimationUtils.estimateReviewTime(fileOf(10_000_000), text);
+    assert.equal(small, large);
+});
+
+test('the reader’s speed setting scales every estimate', () => {
+    const slower = EstimationUtils.estimateReviewTimeFromWords(400, 'technical'); // 100 wpm
+    const normal = EstimationUtils.estimateReviewTimeFromWords(400, 'notes');     // 200 wpm
+    assert.equal(slower, normal * 2);
+});
+
+test('more words never means less time', () => {
     let previous = 0;
-    for (const size of [200, 800, 3_200, 12_800, 51_200]) {
-        const seconds = EstimationUtils.estimateReviewTime(fileOf(size));
-        assert.ok(seconds >= previous, `${size} bytes gave ${seconds}s after ${previous}s`);
+    for (const count of [10, 100, 500, 2_000, 10_000]) {
+        const seconds = EstimationUtils.estimateReviewTimeFromWords(count);
+        assert.ok(seconds >= previous, `${count} words gave ${seconds}s after ${previous}s`);
         previous = seconds;
     }
 });

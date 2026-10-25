@@ -52,9 +52,10 @@ function makeCalendar(host: { onDatePicked?: (date: Date) => void }) {
         settings: { ...DEFAULT_SETTINGS, sidebarViewType: 'calendar', enableCalendarEvents: false },
         reviewScheduleService: {
             schedules,
-            estimateReviewTimeFromSize: () => 120,
+            estimateReviewTimeCached: () => 120,
             estimateReviewTime: async (path: string) => { reads.push(path); return 120; },
         },
+        wordCounts: { prime: async (paths: string[]) => paths.length, words: () => 200 },
         deckStore: { listDecks: async () => [] },
         pluginState: { calendarEvents: {} },
         app: { vault: { getAbstractFileByPath: () => null, read: async (file: { path: string }) => { reads.push(file.path); return ''; } } },
@@ -89,7 +90,7 @@ test('a date picked in the calendar is answered by the sidebar that drew it, wit
     assert.equal(notices.length, before, 'no notice was raised by a click that works');
 });
 
-test('drawing a month never reads a note: the estimate comes from the file size', async () => {
+test('drawing a month never reads a note: the estimate comes from the count it already has', async () => {
     const { view, reads } = makeCalendar({});
     await view.render();
     assert.deepEqual(reads, [], 'the calendar issued no vault reads');

@@ -1,9 +1,7 @@
-import { TFile } from 'obsidian';
 import SpaceforgePlugin from './main';
 import { ReviewHistoryItem, ReviewSchedule, ReviewResponse } from './models/review-schedule';
 import { ReviewSessionStore, ReviewSession } from './models/review-session';
 import { MCQSet, MCQSession } from './models/mcq';
-import { EstimationUtils } from './utils/estimation';
 import { ReviewScheduleService } from './services/review-schedule-service';
 import { ReviewHistoryService } from './services/review-history-service';
 import { ReviewSessionService } from './services/review-session-service';
@@ -350,17 +348,10 @@ export class DataStorage {
     }
 
     async estimateReviewTime(path: string): Promise<number> {
-        // This method doesn't directly modify data, so it can stay or be moved to a utility
-        // Keeping it here for now, but it doesn't use service data directly.
-        const file = this.plugin.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile)) return 60; // Default 1 minute
-
-        try {
-            const content = await this.plugin.app.vault.read(file);
-            return EstimationUtils.estimateReviewTime(file, content);
-        } catch {
-            return 60; // Default 1 minute
-        }
+        // One estimator for the whole plugin: the schedule service answers from the
+        // word-count cache, so a note read once is priced everywhere without being
+        // read again.
+        return this.reviewScheduleService.estimateReviewTime(path);
     }
 
     async createReviewSession(folderPath: string, name: string): Promise<ReviewSession | null> {

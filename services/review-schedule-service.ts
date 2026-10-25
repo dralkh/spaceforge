@@ -1051,32 +1051,37 @@ export class ReviewScheduleService {
      * @param path Path to the note file
      * @returns Estimated review time in seconds
      */
+    /**
+     * A note's review time, from its own words.
+     *
+     * The count comes from the word cache when that note has been read since it last
+     * changed, and from the file otherwise — so a list of rows is one read per note
+     * for its lifetime, not one read per render.
+     */
     async estimateReviewTime(path: string): Promise<number> {
+        const cached = this.plugin.wordCounts.words(path);
+        if (cached !== null) return EstimationUtils.estimateReviewTimeFromWords(cached);
+
         const file = this.plugin.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile)) return 60; // Default 1 minute
+        if (!(file instanceof TFile)) return 60; // the note is gone; nothing to read
 
         try {
             const content = await this.plugin.app.vault.read(file);
+            this.plugin.wordCounts.remember(path, content);
             return EstimationUtils.estimateReviewTime(file, content);
         } catch {
-            return 60; // Default 1 minute
+            return 60;
         }
     }
 
     /**
-     * The same estimate, from the file's size instead of its text.
-     *
-     * The calendar sums this over every scheduled note on every render, and a
-     * `vault.read()` per note made a month take seconds on a real vault — the
-     * pane looked disabled while it chewed through files nobody had opened.
-     * Reading is what a *review* needs; a cell only needs a number, and the size
-     * proxy is the same estimate the note row already shows for a file it has
-     * not loaded.
+     * The same estimate for a surface that cannot wait — the calendar's day cells.
+     * Null means the note has not been read yet; ask for it to be primed and paint
+     * again when it is, rather than inventing a number from the file's size.
      */
-    estimateReviewTimeFromSize(path: string): number {
-        const file = this.plugin.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile)) return 60;
-        return EstimationUtils.estimateReviewTime(file);
+    estimateReviewTimeCached(path: string): number | null {
+        const words = this.plugin.wordCounts.words(path);
+        return words === null ? null : EstimationUtils.estimateReviewTimeFromWords(words);
     }
 
     /**

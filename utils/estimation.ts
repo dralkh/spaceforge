@@ -26,14 +26,6 @@ export class EstimationUtils {
      */
     private static readonly MIN_REVIEW_TIME = 30;
 
-    /**
-     * Ceiling for a single note, in seconds.
-     *
-     * Without it a large file produces a number nobody would ever schedule — a
-     * 100 KB note claims over two hours, and nine of them claimed fifty-three
-     * hours on the calendar, because bytes were being read as minutes.
-     */
-    private static readonly MAX_REVIEW_TIME = 20 * 60;
 
     /**
      * Reference to the plugin (for access to settings)
@@ -79,40 +71,31 @@ export class EstimationUtils {
      */
     static estimateReviewTime(
         file: TFile,
-        fileContent?: string,
+        fileContent: string,
         contentType: keyof typeof EstimationUtils.READING_SPEEDS = 'notes'
     ): number {
         if (!file) {
             return this.MIN_REVIEW_TIME;
         }
-
-        // Use file size as a rough proxy if content is not available
-        if (!fileContent) {
-            // Bytes are not minutes. A note of `size` bytes holds about
-            // `size / AVG_WORD_LENGTH` words, and words are read at the reader's
-            // speed per minute — the old arithmetic divided bytes by 38.5 and
-            // called the quotient *minutes*, i.e. seven words a minute, which is
-            // how nine notes came to claim fifty-three hours.
-            const words = Math.max(1, Math.round(file.stat.size / this.AVG_WORD_LENGTH));
-            const readingSpeed = this.getReadingSpeed(contentType);
-            return this.clamp((words / readingSpeed) * 60);
-        }
-
-        // Count words in content
-        const wordCount = this.countWords(fileContent);
-
-        // Calculate reading time based on words and reading speed
-        const readingSpeed = this.getReadingSpeed(contentType);
-        const readingTimeMinutes = wordCount / readingSpeed;
-
-        // Add some buffer time for actual review (thinking, interacting)
-        return this.clamp(readingTimeMinutes * 60);
+        return this.estimateReviewTimeFromWords(this.countWords(fileContent), contentType);
     }
 
-    /** Keep an estimate between one note's floor and a number a person could act on. */
-    private static clamp(seconds: number): number {
+    /**
+     * The estimate for a known word count.
+     *
+     * Words, not bytes: a note's length is what it says, and a 400 KB file with
+     * 3,000 words in it is a 15-minute read, not a six-hour one. There is no
+     * ceiling — a genuinely long note takes a genuinely long time, and truncating
+     * that number would make every day total containing it wrong.
+     */
+    static estimateReviewTimeFromWords(
+        words: number,
+        contentType: keyof typeof EstimationUtils.READING_SPEEDS = 'notes'
+    ): number {
+        const readingSpeed = this.getReadingSpeed(contentType);
+        const seconds = (Math.max(1, words) / readingSpeed) * 60;
         if (!Number.isFinite(seconds) || seconds <= 0) return this.MIN_REVIEW_TIME;
-        return Math.min(this.MAX_REVIEW_TIME, Math.max(this.MIN_REVIEW_TIME, Math.ceil(seconds)));
+        return Math.max(this.MIN_REVIEW_TIME, Math.ceil(seconds));
     }
 
     /**

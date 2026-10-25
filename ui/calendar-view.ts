@@ -82,6 +82,9 @@ export class CalendarView {
      */
     reviewsByDate: Map<string, DateReviews> = new Map();
 
+    /** Notes this render could not price: no word count since they last changed */
+    private uncountedPaths: string[] = [];
+
     /**
      * Deck cards grouped by date, beside the notes: the two lanes are kept
      * apart everywhere, so the calendar says which is which rather than adding
@@ -141,6 +144,7 @@ export class CalendarView {
         if (this.calendarGridEl) {
             this.renderCalendarGridContent(this.calendarGridEl); // Renders/updates the grid
         }
+        void this.fillMissingEstimates(); // and prices whatever this month has not read yet
 
         // Render upcoming events
         if (this.upcomingEventsComponent) {
@@ -222,6 +226,7 @@ export class CalendarView {
      */
     loadReviewsData(): void {
         this.reviewsByDate = new Map();
+        this.uncountedPaths = [];
         const allSchedules = Object.values(this.plugin.reviewScheduleService.schedules);
 
         for (const schedule of allSchedules) {
@@ -239,11 +244,33 @@ export class CalendarView {
             const dateReviews = this.reviewsByDate.get(dateKey);
             if (dateReviews) {
                 dateReviews.notes.push(schedule);
-                // Size, not text: this loop covers every scheduled note on every
-                // render, and a read per note is what made the pane feel dead.
-                dateReviews.totalTime += this.plugin.reviewScheduleService.estimateReviewTimeFromSize(schedule.path);
+                // Every scheduled note, every render — so the number comes from the
+                // word count this note already has, never from the size of the file
+                // and never from a read in this loop. A note that has not been read
+                // since it last changed is collected, and the month is drawn again
+                // once it has: a cell shows a real time or none, not an invented one.
+                const seconds = this.plugin.reviewScheduleService.estimateReviewTimeCached(schedule.path);
+                if (seconds === null) {
+                    if (!this.uncountedPaths.includes(schedule.path)) this.uncountedPaths.push(schedule.path);
+                } else {
+                    dateReviews.totalTime += seconds;
+                }
             }
         }
+    }
+
+    /**
+     * Read the notes this month could not price, then draw it once more.
+     *
+     * The reads happen after the grid is on screen, several at a time, and only for
+     * notes that have no count for their current contents — so the pane appears at
+     * once and the times fill in, rather than the pane waiting on four hundred reads.
+     */
+    async fillMissingEstimates(): Promise<void> {
+        if (this.uncountedPaths.length === 0) return;
+        const missing = this.uncountedPaths.slice();
+        const known = await this.plugin.wordCounts.prime(missing);
+        if (known > 0 && this.containerEl.isConnected) await this.render();
     }
 
     /**
