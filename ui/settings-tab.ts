@@ -1808,6 +1808,47 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         };
         syncPomodoroSettings();
 
+        // --- Carrying progress with the vault ---
+        //
+        // The data file lives in `.obsidian/plugins/spaceforge/`, which is often
+        // the one folder left out of a sync. This writes a projection of the
+        // progress into the vault instead, and merges it back on load.
+        const carryDetails = createCollapsible('Carrying progress between devices', 'refresh-cw', false);
+
+        const configDir = this.plugin.app.vault.configDir;
+        const carryStatus = carryDetails.createDiv({ cls: 'sf-info-box' });
+        const describeCarry = (): string => this.plugin.settings.syncProgressThroughVault
+            ? `On. Your review progress and preferences are written to spaceforge/state/progress.json inside the vault, and picked up on any device that syncs the vault — even when ${configDir} is not synced. Anki’s address, the data path, and where a session stopped stay on this device.`
+            : `Off. Progress lives only in the plugin’s data file, which syncs only when your sync tool carries ${configDir}.`;
+        carryStatus.setText(describeCarry());
+
+        new Setting(carryDetails)
+            .setName('Carry progress with the vault')
+            .setDesc(`Write a copy of your review progress and shared preferences inside the vault (spaceforge/state/progress.json), so a vault synced without ${configDir} still carries them. Devices merge per note: reviews made on either side are kept, and the newest review of a note wins. Nothing is deleted by a merge.`)
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.syncProgressThroughVault)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.syncProgressThroughVault = value;
+                    await this.plugin.savePluginData();
+                    carryStatus.setText(describeCarry());
+                    if (value) {
+                        const wrote = await this.plugin.writeProgressProjection(true);
+                        new Notice(wrote
+                            ? 'Spaceforge: progress is now carried in spaceforge/state/progress.json.'
+                            : 'Spaceforge: the progress copy could not be written; see the console.', 8000);
+                    }
+                }))
+            .addButton(button => button
+                .setButtonText('Check for progress')
+                .onClick(async () => {
+                    const before = Object.keys(this.plugin.pluginState.schedules ?? {}).length;
+                    await this.plugin.mergeVaultProgress();
+                    const after = Object.keys(this.plugin.pluginState.schedules ?? {}).length;
+                    new Notice(after > before
+                        ? `Spaceforge: took ${after - before} note(s) from the vault’s copy.`
+                        : 'Spaceforge: nothing new in the vault’s copy.', 6000);
+                }));
+
         // ========= DATA MANAGEMENT SECTION =========
         const dataSection = createCollapsible('Data management', 'database', false);
 

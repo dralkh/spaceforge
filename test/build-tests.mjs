@@ -23,6 +23,8 @@ const stubs = {
 
 await esbuild.build({
     entryPoints: [
+        'test/progress-mirror.test.ts',
+        'test/progress-merge-soak.test.ts',
         'test/study.test.ts',
         'test/study-charting.test.ts',
         'test/scheduler-fidelity.test.ts',

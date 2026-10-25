@@ -420,6 +420,20 @@ export interface SpaceforgeSettings {
     ankiConnectEnabled: boolean;
 
     /**
+     * Carry review progress through the vault itself.
+     *
+     * The data file lives in `.obsidian/plugins/spaceforge/`, which is exactly
+     * the folder people leave out of a sync. With this on, a projection of the
+     * progress and of the preferences worth sharing is written to
+     * `spaceforge/state/progress.json`, inside the vault, and merged back on
+     * load: a device that syncs only notes still picks up the reviews. Device
+     * settings (Anki's address, the data path) and session state stay behind.
+     *
+     * Off by default: it writes a second file, and that should be a choice.
+     */
+    syncProgressThroughVault: boolean;
+
+    /**
      * Where AnkiConnect listens. The add-on's own default is
      * `http://127.0.0.1:8765`; anything else here is a deliberate choice (a
      * different port, or a host with the add-on bound to the network).
@@ -905,6 +919,7 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     deckMinutesPerCard: 1,
     ankiConnectEnabled: false,
     ankiConnectUrl: 'http://127.0.0.1:8765',
+    syncProgressThroughVault: false,
     ankiPushed: {},
     reviewStripIntervalPreviews: true,
     reviewStripGradeKeys: true,

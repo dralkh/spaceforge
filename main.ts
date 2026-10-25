@@ -28,6 +28,16 @@ import {
     type DataFileCandidate,
 } from './utils/data-file';
 import { DataRecoveryModal } from './ui/data-recovery-modal';
+import {
+    mergeProgress,
+    newDeviceId,
+    parseProgress,
+    projectProgress,
+    readNewestProgress,
+    retireConflictCopies,
+    writeProgress,
+    PROGRESS_FILE,
+} from './services/progress-mirror';
 import { EstimationUtils } from './utils/estimation';
 import { OpenRouterService } from './api/openrouter-service';
 import { OpenAIService } from './api/openai-service';
@@ -133,6 +143,15 @@ export default class SpaceforgePlugin extends Plugin {
     studyController: StudyController;
     studyChartQueue: StudyChartQueueService;
 
+
+    /**
+     * The vault-side projection of progress, and the bookkeeping that decides
+     * when to write it and what has already been merged back. See
+     * `services/progress-mirror.ts` for what travels and why.
+     */
+    private projectionTimer: number | null = null;
+    private projectionRev = 0;
+    private projectionDevice: string | null = null;
 
     private beforeUnloadHandler: (event: Event) => void; // Declared as a class property
     /** The save that is currently writing, and whether state changed while it ran. */
@@ -438,6 +457,9 @@ export default class SpaceforgePlugin extends Plugin {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         }
 
+        // A projection scheduled a moment before the app closed would otherwise
+        // wait for the next launch; write it now, best effort.
+        if (this.settings?.syncProgressThroughVault) void this.writeProgressProjection(true);
 
         void (async () => {
             let existingData: Partial<SpaceforgePluginData> = {};
@@ -733,6 +755,154 @@ export default class SpaceforgePlugin extends Plugin {
         return merged;
     }
 
+    /** Where this device keeps its own side of the vault projection. */
+    private projectionBookkeepingPath(): string {
+        return `${this.dataDirectory()}/sync-state.json`;
+    }
+
+    private async readProjectionBookkeeping(): Promise<{ device: string; rev: number; hash: string | null; appliedRev: number }> {
+        const raw = await readTextOrNull(this.app.vault.adapter, this.projectionBookkeepingPath());
+        try {
+            const parsed = raw ? JSON.parse(raw) as Partial<{ device: string; rev: number; hash: string; appliedRev: number }> : null;
+            return {
+                device: typeof parsed?.device === 'string' && parsed.device ? parsed.device : '',
+                rev: typeof parsed?.rev === 'number' ? parsed.rev : 0,
+                hash: typeof parsed?.hash === 'string' ? parsed.hash : null,
+                appliedRev: typeof parsed?.appliedRev === 'number' ? parsed.appliedRev : 0,
+            };
+        } catch {
+            return { device: '', rev: 0, hash: null, appliedRev: 0 };
+        }
+    }
+
+    private async writeProjectionBookkeeping(book: { device: string; rev: number; hash: string | null; appliedRev: number }): Promise<void> {
+        try {
+            await writeJsonAtomically(this.app.vault.adapter, this.projectionBookkeepingPath(), book, message => console.warn('[spaceforge]', message));
+        } catch (error) {
+            console.warn('[spaceforge] could not write the projection bookkeeping:', error);
+        }
+    }
+
+    /**
+     * Write the vault-side projection of progress.
+     *
+     * Scheduled rather than immediate: a review session saves on every answer,
+     * and a synced JSON rewritten on each one is a sync conflict waiting to
+     * happen. Three seconds of quiet, then one write — and only if the
+     * projection actually changed.
+     */
+    private scheduleProgressProjection(): void {
+        if (!this.settings?.syncProgressThroughVault) return;
+        if (this.projectionTimer !== null) return;
+        this.projectionTimer = window.setTimeout(() => {
+            this.projectionTimer = null;
+            void this.writeProgressProjection();
+        }, 3000);
+    }
+
+    /** Write the projection now, whatever the timer says. */
+    async writeProgressProjection(force = false): Promise<boolean> {
+        // `force` skips the "has anything changed" check, never the switch: a
+        // reader who has this off must not find a folder appearing on quit.
+        if (!this.settings?.syncProgressThroughVault) return false;
+        if (this.projectionTimer !== null) {
+            window.clearTimeout(this.projectionTimer);
+            this.projectionTimer = null;
+        }
+        try {
+            const book = await this.readProjectionBookkeeping();
+            const device = book.device || this.projectionDevice || newDeviceId();
+            this.projectionDevice = device;
+            this.projectionRev = Math.max(this.projectionRev, book.rev) + 1;
+            const envelope = projectProgress(this.settings, this.pluginState, {
+                rev: this.projectionRev,
+                device,
+                version: this.manifest.version,
+            });
+            const { written, hash } = await writeProgress(this.app.vault.adapter, envelope, { lastHash: force ? null : book.hash });
+            if (written) {
+                await this.writeProjectionBookkeeping({ device, rev: this.projectionRev, hash, appliedRev: book.appliedRev });
+            }
+            return written;
+        } catch (error) {
+            // The vault copy is a convenience; the data file already has
+            // everything. Say so in the console and carry on.
+            console.warn('[spaceforge] could not write the progress projection:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Fold progress written by another device into this one.
+     *
+     * Runs at load, before anything reads the schedules. The merge is per
+     * record, so this device's reviews are never replaced by an older copy from
+     * elsewhere; only notes this device has not seen, or has seen less recently,
+     * are taken from the vault.
+     */
+    async mergeVaultProgress(options: { hadLocalDataFile?: boolean } = {}): Promise<void> {
+        const enabled = Boolean(this.settings?.syncProgressThroughVault);
+        const hadLocalDataFile = options.hadLocalDataFile ?? true;
+
+        const newest = await readNewestProgress(this.app.vault.adapter);
+        if (!newest) return;
+        // A device that has never held this vault's data file adopts the vault
+        // copy even though a fresh load may already have rebuilt some state from
+        // the notes themselves: that is a reinstall, or a phone that only syncs
+        // notes. Any other device reads the copy only when the reader said so.
+        const adopting = !enabled && !hadLocalDataFile;
+        if (!enabled && !adopting) return;
+
+        if (adopting) {
+            this.settings.syncProgressThroughVault = true;
+        }
+
+        const book = await this.readProjectionBookkeeping();
+        const sameAsApplied = newest.path === PROGRESS_FILE && newest.envelope.rev <= book.appliedRev;
+        if (sameAsApplied && !adopting) return;
+
+        const localMtime = await this.fileMtime(this.dataFilePath());
+        const preferOtherSettings = newest.envelope.device !== book.device && newest.envelope.updatedAt > localMtime;
+        const { settings, state, report } = mergeProgress(
+            { settings: this.settings, state: this.pluginState },
+            newest.envelope,
+            { preferOtherSettings },
+        );
+        const changed = report.addedSchedules.length > 0
+            || report.addedHistory > 0
+            || report.addedDeckHistory > 0
+            || report.addedSessions > 0
+            || report.replaced.length > 0
+            || adopting;
+
+        this.settings = settings;
+        this.pluginState = state;
+        this.applyLoadedState();
+
+        if (changed) {
+            await this.savePluginData();
+            const pieces: string[] = [];
+            if (report.addedSchedules.length > 0) pieces.push(`${report.addedSchedules.length} note(s)`);
+            if (report.addedHistory > 0) pieces.push(`${report.addedHistory} review(s)`);
+            if (report.addedDeckHistory > 0) pieces.push(`${report.addedDeckHistory} deck answer(s)`);
+            if (pieces.length > 0) {
+                new Notice(`Spaceforge: took ${pieces.join(', ')} from the vault’s synced progress.`, 8000);
+            }
+        }
+
+        const retired = await retireConflictCopies(this.app.vault.adapter, newest.copies);
+        if (retired.length > 0) {
+            console.warn(`[spaceforge] merged and set aside ${retired.length} conflicted cop(ies) of ${PROGRESS_FILE}`);
+        }
+
+        await this.writeProjectionBookkeeping({
+            device: book.device,
+            rev: this.projectionRev,
+            hash: book.hash,
+            appliedRev: newest.envelope.rev,
+        });
+    }
+
     /** Keep a copy of the last state that loaded cleanly, to recover from next time. */
     private refreshGoodCopy(path: string, data: SpaceforgePluginData): void {
         void writeJsonAtomically(this.app.vault.adapter, goodCopyPath(path), data, message => console.warn('[spaceforge]', message))
@@ -877,6 +1047,13 @@ export default class SpaceforgePlugin extends Plugin {
 
             this.applyLoadedState();
 
+            // Progress written by another device may be waiting in the vault.
+            // The data file's own absence is the tell that this device has never
+            // held this vault's progress: a reinstall, or a phone that only syncs
+            // notes. That is the case the vault copy exists for — and it is
+            // judged on the file, not on whether a stale backup was recovered.
+            const primaryDataFileExists = await this.app.vault.adapter.exists(this.dataFilePath());
+            await this.mergeVaultProgress({ hadLocalDataFile: primaryDataFileExists });
 
         } catch (error) {
             console.error("Spaceforge: Error loading data:", error);
@@ -1086,6 +1263,9 @@ export default class SpaceforgePlugin extends Plugin {
                 // new Notice(`Spaceforge: Data saved to default plugin storage.`, 3000); // Removed notice
             }
 
+            // The real file is on disk; the vault-side projection follows a few
+            // seconds behind it, so a burst of reviews costs one write.
+            this.scheduleProgressProjection();
 
         } catch {
             new Notice("Error saving data. Check console for details", 5000);
