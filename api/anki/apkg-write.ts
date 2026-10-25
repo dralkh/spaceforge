@@ -152,6 +152,48 @@ export const SCHEMA_INDEXES: readonly SqliteWriteIndex[] = [
     { name: 'ix_notes_csum', sql: 'CREATE INDEX ix_notes_csum ON notes (csum)', table: 'notes', columns: [8] },
 ];
 
+/** A `[count, day]` pair, however an older package wrote it. */
+function pairOrZero(value: unknown): [number, number] {
+    if (Array.isArray(value) && value.length >= 2) {
+        return [Number(value[0]) || 0, Number(value[1]) || 0];
+    }
+    // Older collections kept only the count.
+    return typeof value === 'number' ? [value, 0] : [0, 0];
+}
+
+/**
+ * A deck row in the shape Anki's own decoder expects.
+ *
+ * Missing fields are not defaulted leniently on the Anki side: one absent
+ * `*Today` pair makes the whole collection fail to decode ("decoding decks:
+ * JsonError") and the package is refused wholesale. So every field the current
+ * schema carries is written, and a package's own row is laid over this.
+ */
+function modernDeckRow(id: number, name: string, conf: number, description: string, modified: number): Record<string, unknown> {
+    return {
+        id,
+        name,
+        mod: modified,
+        usn: 0,
+        lrnToday: [0, 0],
+        revToday: [0, 0],
+        newToday: [0, 0],
+        timeToday: [0, 0],
+        collapsed: false,
+        browserCollapsed: true,
+        desc: description,
+        dyn: 0,
+        conf,
+        extendNew: 0,
+        extendRev: 0,
+        reviewLimit: null,
+        newLimit: null,
+        reviewLimitToday: null,
+        newLimitToday: null,
+        desiredRetention: null,
+    };
+}
+
 /* --------------------------------------------------------------- sha-1 */
 
 /**
@@ -468,7 +510,7 @@ function templateFor(fields: readonly string[], ord: number): Record<string, unk
  * (in `extra.models`) is reused verbatim; otherwise a notetype is synthesised
  * per model name, with one template per card ordinal the notes use.
  */
-function notetypesFor(
+export function notetypesFor(
     bundle: DeckBundle,
     extraModels: Record<string, unknown>,
     used: Set<number>,
@@ -499,15 +541,27 @@ function notetypesFor(
     }
 
     const ordsOf = (noteId: string): number[] => {
-        const ords = bundle.cards.filter((card) => card.noteId === noteId).map((card) => card.ord);
+        // A card's `ord` indexes its notetype's templates, and a notetype with
+        // more than a few dozen is not a thing Anki has: a deck whose notes carry
+        // hundreds of cards (a merged or generated document) would otherwise get
+        // a template per ordinal, and Anki's importer fails on the size of the
+        // model rather than on the deck. Those cards are dropped and reported.
+        const ords = bundle.cards
+            .filter((card) => card.noteId === noteId)
+            .map((card) => card.ord)
+            .filter((ord) => Number.isFinite(ord) && ord >= 0 && ord < MAX_TEMPLATES);
         return ords.length > 0 ? [...new Set(ords)].sort((a, b) => a - b) : [0];
     };
 
     for (const note of bundle.notes) {
-        const fields = note.fields.length > 0 ? note.fields.slice() : note.values.map((_, index) => `Field ${index + 1}`);
-        if (fields.length === 0) {
-            fields.push('Front');
-        }
+        // The note row Anki reads has as many fields as its values, so a
+        // synthesised notetype must have exactly that many: a document can list
+        // more field names than it has values (a hand edit, or an import that
+        // lost the tail), and a package whose model and notes disagree is
+        // refused outright — "note has 2 fields, expected 8".
+        const names = note.fields.length > 0 ? note.fields.slice() : note.values.map((_, index) => `Field ${index + 1}`);
+        const count = Math.max(names.length, note.values.length, 1);
+        const fields = Array.from({ length: count }, (_, index) => names[index] ?? `Field ${index + 1}`);
         const existing = byName.get(note.modelName);
         if (existing) {
             if (existing.fields.length === 0) {
@@ -531,11 +585,47 @@ function notetypesFor(
     return { list: [...byName.values()], byName };
 }
 
-function modelJson(notetype: NotetypeWrite, now: number, deckId: number): Record<string, unknown> {
-    if (notetype.raw) {
-        return notetype.raw;
-    }
+/** The most templates a synthesised notetype will carry; see `ordsOf`. */
+const MAX_TEMPLATES = 32;
+
+/** A notetype's field row in the shape Anki's own decoder expects. */
+function fieldJson(name: string, ord: number, id: number): Record<string, unknown> {
     return {
+        name,
+        ord,
+        sticky: false,
+        rtl: false,
+        font: 'Arial',
+        size: 20,
+        description: '',
+        plainText: false,
+        collapsed: false,
+        excludeFromSearch: false,
+        id,
+        tag: null,
+        preventDeletion: false,
+    };
+}
+
+/** A notetype's template row, likewise. */
+function templateJson(fields: readonly string[], ord: number, id: number): Record<string, unknown> {
+    return { ...templateFor(fields, ord), bqfmt: '', bafmt: '', did: null, bfont: '', bsize: 0, id };
+}
+
+/**
+ * The notetype row for `col.models`.
+ *
+ * Anki decodes this into its own struct and refuses the whole package when a
+ * field it expects is absent ("decoding models: JsonError … missing field"), so
+ * the modern shape is written first and the package's own row laid over it —
+ * per field and per template, because an older package's rows are the ones
+ * missing keys in the first place. Field and template ids are derived from the
+ * notetype so they stay stable across exports.
+ */
+function modelJson(notetype: NotetypeWrite, now: number, deckId: number): Record<string, unknown> {
+    const fieldId = (ord: number): number => notetype.id * 1000 + ord + 1;
+    const templateId = (ord: number): number => notetype.id * 1000 + 500 + ord;
+    const base: Record<string, unknown> = {
         id: notetype.id,
         name: notetype.name,
         type: 0,
@@ -543,12 +633,57 @@ function modelJson(notetype: NotetypeWrite, now: number, deckId: number): Record
         usn: 0,
         sortf: 0,
         did: deckId,
-        tmpls: notetype.ords.map((ord) => templateFor(notetype.fields, ord)),
-        flds: notetype.fields.map((name, ord) => ({ name, ord, sticky: false, rtl: false, font: 'Arial', size: 20, media: [] })),
+        tmpls: notetype.ords.map((ord) => templateJson(notetype.fields, ord, templateId(ord))),
+        flds: notetype.fields.map((name, ord) => fieldJson(name, ord, fieldId(ord))),
         css: '.card {\n font-family: arial;\n font-size: 20px;\n text-align: center;\n color: black;\n background-color: white;\n}\n',
         latexPre: '',
         latexPost: '',
-        req: notetype.ords.map((ord) => [ord, 'any', [ord]]),
+        latexsvg: false,
+        originalStockKind: 1,
+        // Every synthesised template asks for the first field. A requirement
+        // naming a field the model does not have is what Anki answers with
+        // "missing template", which is how a deck with hundreds of card ordinals
+        // (a merged or hand-edited document) was refused.
+        req: notetype.ords.map((ord) => [ord, 'any', [
+            notetype.fields.length === 0 ? 0 : Math.min(ord, notetype.fields.length - 1),
+        ]]),
+    };
+    if (!notetype.raw) {
+        return base;
+    }
+    const raw = notetype.raw;
+    const rawFields = Array.isArray(raw.flds) ? raw.flds.map((field) => recordArg(field) ?? {}) : [];
+    const rawTemplates = Array.isArray(raw.tmpls) ? raw.tmpls.map((template) => recordArg(template) ?? {}) : [];
+    const rawByOrd = new Map<number, Record<string, unknown>>();
+    rawTemplates.forEach((template, index) => {
+        rawByOrd.set(typeof template.ord === 'number' ? template.ord : index, template);
+    });
+    return {
+        ...base,
+        ...raw,
+        id: notetype.id,
+        name: notetype.name,
+        did: deckId,
+        flds: (base.flds as Record<string, unknown>[]).map((field, index) => ({
+            ...field,
+            ...(rawFields[index] ?? {}),
+            ord: index,
+            id: rawFields[index]?.id ?? field.id,
+        })),
+        // Aligned by `ord`, not by position: a document can carry card ordinals
+        // with gaps (a merged deck, a hand edit), and renumbering the templates
+        // 0..n-1 left `req` naming an ordinal no template had — which Anki
+        // answers with "missing template" and a refused package.
+        tmpls: (base.tmpls as Record<string, unknown>[]).map((template) => {
+            const ord = Number(template.ord);
+            const raw = rawByOrd.get(ord) ?? {};
+            return {
+                ...template,
+                ...raw,
+                ord,
+                id: typeof raw.id === 'number' ? raw.id : template.id,
+            };
+        }),
     };
 }
 
@@ -608,6 +743,11 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
     const crt = numberArg(extra.crt) ?? Math.floor(now / 1000);
     const mod = numberArg(extra.mod) ?? now;
     const scm = numberArg(extra.scm) ?? now;
+    // A note that carries no stamp of its own is stamped with the deck's, not
+    // with the export time: an unchanged deck then exports byte-stable rows, so
+    // Anki's "keep the newer note" comparison sees no change and a repeated
+    // push does not rewrite every note in the collection.
+    const noteStamp = bundle.deck.modified > 0 ? bundle.deck.modified : now;
 
     const deckId = idNumber(bundle.deck.id, now, usedIds);
     const notetypes = notetypesFor(bundle, recordArg(extra.models) ?? {}, usedIds);
@@ -633,9 +773,21 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
     const deckIds = new Set<string>();
     const writeDeck = (id: number, name: string, conf: number, description: string, modified: number): void => {
         const raw = recordArg(rawDecks[String(id)]) ?? recordArg(rawDecks[name]);
-        decks[String(id)] = raw
-            ? { ...raw, id, name, conf }
-            : { id, name, mod: modified, usn: 0, collapsed: false, conf, desc: description, dyn: 0 };
+        // Anki decodes `col.decks` into its own struct and rejects the whole row
+        // when a field it requires is missing, so the modern shape is laid down
+        // first and the package's own row is laid over it. The `*Today` fields
+        // are `[count, day]` pairs; an older package may carry plain numbers.
+        decks[String(id)] = {
+            ...modernDeckRow(id, name, conf, description, modified),
+            ...raw,
+            id,
+            name,
+            conf,
+            lrnToday: pairOrZero((raw ?? {}).lrnToday),
+            revToday: pairOrZero((raw ?? {}).revToday),
+            newToday: pairOrZero((raw ?? {}).newToday),
+            timeToday: pairOrZero((raw ?? {}).timeToday),
+        };
         deckIds.add(String(id));
     };
     if (deckId !== 1) {
@@ -645,6 +797,8 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
     writeDeck(deckId, bundle.deck.name, deckConf, bundle.deck.sourceUrl ?? '', Math.floor((bundle.deck.modified || 0) / 1000));
 
     // Notes.
+    let shortNotes = 0;
+    let longNotes = 0;
     const noteNumbers = new Map<string, number>();
     const notes: SqlValueIn[][] = [];
     for (const note of bundle.notes) {
@@ -656,13 +810,26 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
             continue;
         }
         const values = note.values.length > 0 ? note.values.slice() : [''];
+        // Anki refuses a note whose field count differs from its model's, and a
+        // document can carry fewer values than the model has fields (an import
+        // that lost empty trailing values, or a hand edit). Pad, and say so.
+        if (values.length < notetype.fields.length) {
+            while (values.length < notetype.fields.length) values.push('');
+            shortNotes += 1;
+        } else if (values.length > notetype.fields.length && notetype.fields.length > 0) {
+            values.length = notetype.fields.length;
+            longNotes += 1;
+        }
         const tags = note.tags.join(' ');
         const first = values[0];
         notes.push([
             numeric,
             guidForNote(note.id !== '' ? note.id : String(numeric)),
             notetype.id,
-            Math.floor(now / 1000),
+            // The note's own stamp when it has one: an exporter that stamped
+            // every row with "now" made the next import look newer than every
+            // edit in the vault, which is how a round trip reverted them.
+            Math.floor((note.modified !== undefined && note.modified > 0 ? note.modified : noteStamp) / 1000),
             0,
             tags === '' ? '' : ` ${tags} `,
             values.join('\x1f'),
@@ -675,16 +842,32 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
     if (notes.length !== bundle.notes.length) {
         warnings.push(`${bundle.notes.length - notes.length} note(s) were left out because their notetype could not be resolved`);
     }
+    if (shortNotes > 0) {
+        warnings.push(`${shortNotes} note(s) had fewer values than their notetype has fields; the missing ones were written empty`);
+    }
+    if (longNotes > 0) {
+        warnings.push(`${longNotes} note(s) had more values than their notetype has fields; the extra ones were not written`);
+    }
 
     // Cards.
     const rawCards = recordArg(extra.cards) ?? {};
     const cards: SqlValueIn[][] = [];
     const missingDeckWarned = new Set<string>();
+    let droppedCards = 0;
     for (const card of bundle.cards) {
         const numeric = idNumber(card.id, now + notes.length + cards.length, usedIds);
         const noteId = noteNumbers.get(card.noteId);
         if (noteId === undefined) {
             warnings.push(`card ${card.id} was left out: its note ${card.noteId} is not in the bundle`);
+            continue;
+        }
+        // Anki refuses a card whose ordinal has no template; the notetype was
+        // built from the cards' own ordinals, capped, so this only bites on the
+        // documents that cap was there for.
+        const owner = bundle.notes.find((note) => note.id === card.noteId);
+        const notetype = owner ? notetypes.byName.get(owner.modelName) : undefined;
+        if (notetype === undefined || !notetype.ords.includes(card.ord)) {
+            droppedCards += 1;
             continue;
         }
         let cardDeck = card.deckId;
@@ -699,18 +882,26 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
         const isLearning = card.type === AnkiCardType.Learning || card.type === AnkiCardType.Relearning;
         const left = typeof raw?.left === 'number' ? raw.left : isLearning ? 1 : 0;
         const odid = typeof raw?.odid === 'number' ? raw.odid : 0;
-        const originalDue = card.originalDue === undefined ? 0 : dueToStorage(card.originalDue, card.type, card.queue, crt, card.newPosition);
+        const originalDue = card.originalDue === undefined ? 0 : dueToStorage(card.originalDue, card.type, card.queue, card.newPosition);
         cards.push([
             numeric,
             noteId,
             Number(cardDeck),
             card.ord,
-            Math.floor(now / 1000),
+            // The card's own `mod`, not the export time. Every card claiming
+            // "changed just now" is what made a package unusable as a merge
+            // source: the newer side could never be told from the older one.
+            Math.floor((card.mod !== undefined && card.mod > 0 ? card.mod : now) / 1000),
             0,
             card.type,
             card.queue,
-            dueToStorage(card.due, card.type, card.queue, crt, card.newPosition),
-            card.interval,
+            dueToStorage(card.due, card.type, card.queue, card.newPosition),
+            // Anki's `ivl` column is unsigned: a package carrying a negative
+            // interval is refused outright ("IntegralValueOutOfRange"), and the
+            // whole push fails. The vault keeps a sub-day learning step as a
+            // negative interval in seconds, but the moment the card is next due
+            // is already in `due`, so the step itself can go as 0 here.
+            card.interval >= 0 ? card.interval : 0,
             card.easeFactor,
             card.reviews,
             card.lapses,
@@ -720,6 +911,10 @@ export async function writeApkg(bundle: DeckBundle, options: WriteApkgOptions = 
             card.flag & 7,
             cardDataJson(card, raw),
         ]);
+    }
+
+    if (droppedCards > 0) {
+        warnings.push(`${droppedCards} card(s) were left out: their template ordinal is not one the notetype has`);
     }
 
     const revlog = rowsFromExtra(extra.revlog, REVLOG_COLUMNS);

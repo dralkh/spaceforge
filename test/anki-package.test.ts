@@ -471,10 +471,11 @@ test('apkg import reads the fixture package', async () => {
             ['1700000000014', 1, 1, 0, 2500, 1, 0, 0],
         ],
     );
-    // A review card is due on a day boundary, counted from the collection's creation.
+    // A review card's due stays a day number: it counts from the collection's
+    // own `crt` (`meta.created`), and re-basing it on another deck's day is the
+    // importer's job, not the reader's.
     const review = pkg.cards[0];
-    assert.equal(review.due % 86400000, 0);
-    assert.equal(review.due, (Math.floor(1789628529 / 86400) + 19005) * 86400000);
+    assert.equal(review.due, 19005);
     assert.equal(review.noteId, '1700000000001');
     assert.equal(review.deckId, '1700000000000');
     // The new card keeps its queue position rather than a date.
@@ -850,7 +851,7 @@ z.close()
         );
         assert.equal(pkg.cards[0].deckId, '1700000000000');
         assert.equal(pkg.cards[0].interval, 5);
-        assert.equal(pkg.cards[0].due, (Math.floor(1789628529 / 86400) + 19005) * 86400000);
+        assert.equal(pkg.cards[0].due, 19005);
         assert.ok(
             pkg.warnings.some((warning) => warning.includes('newer Anki schema')),
             `expected a newer-schema note, got ${JSON.stringify(pkg.warnings)}`,
@@ -900,4 +901,88 @@ test('Anki’s own commented DDL reads every column, not just the first', async 
     assert.equal(pkg.cards.length, 1);
     assert.equal(pkg.cards[0].easeFactor, 2500);
     assert.deepEqual(pkg.warnings, [], 'and nothing was guessed at');
+});
+
+// ------------------------------------- a package Anki will actually accept
+
+/** The models row a written package carries, as Anki would decode it. */
+async function modelsIn(bytes: Uint8Array): Promise<Array<Record<string, unknown>>> {
+    const back = await readApkg(bytes);
+    const models = back.meta.raw.models as Record<string, Record<string, unknown>>;
+    return Object.values(models);
+}
+
+test('a note with fewer values than its model has fields is padded, not refused', async () => {
+    const bundle = await fixtureBundle();
+    // The document keeps eight field names but only two values — what a hand
+    // edit, or an import that dropped empty trailing fields, leaves behind.
+    const note = bundle.notes[0];
+    const eight = ['Front', 'Back', 'Extra', 'Example', 'Hint', 'Source', 'Tag', 'Note'];
+    note.fields = eight;
+    note.values = ['only front', 'only back'];
+
+    const written = await writeApkg(bundle, { now: 1792220529616 });
+    const models = await modelsIn(written.bytes);
+    const model = models.find(candidate => candidate.name === note.modelName);
+    assert.ok(model, 'the notetype is there');
+    assert.equal((model.flds as unknown[]).length, 2, 'the model is exactly as wide as the note');
+
+    const back = await readApkg(written.bytes);
+    const reread = back.notes.find(candidate => candidate.modelName === note.modelName);
+    assert.deepEqual(reread?.values, ['only front', 'only back'], 'and the values are untouched');
+});
+
+test('a note narrower than its model is padded to the model’s width and reported', async () => {
+    const bundle = await fixtureBundle();
+    const note = bundle.notes[0];
+    const modelId = String(bundle.deck.id);
+    // A raw model of Anki's own: three fields, which the note must match.
+    bundle.extra.models = {
+        [modelId]: {
+            id: Number(modelId),
+            name: note.modelName,
+            type: 0,
+            flds: [{ name: 'Front', ord: 0 }, { name: 'Back', ord: 1 }, { name: 'Source', ord: 2 }],
+            tmpls: [{ name: 'Card 1', ord: 0, qfmt: '{{Front}}', afmt: '{{FrontSide}}<hr id=answer>{{Back}}' }],
+        },
+    };
+    note.fields = ['Front', 'Back', 'Source'];
+    note.values = ['a', 'b'];
+
+    const written = await writeApkg(bundle, { now: 1792220529616 });
+    assert.match(written.warnings.join(' | '), /fewer values than their notetype has fields/);
+    const back = await readApkg(written.bytes);
+    const reread = back.notes.find(candidate => candidate.modelName === note.modelName);
+    assert.deepEqual(reread?.values, ['a', 'b', ''], 'the missing field is written empty');
+});
+
+test('a template requirement points at a field the model actually has', async () => {
+    const bundle = await fixtureBundle();
+    // Cards with ordinals far past the field count: a merged or hand-edited
+    // deck, which is what Anki refused with "missing template".
+    const note = bundle.notes[0];
+    bundle.cards.push({
+        ...bundle.cards[0],
+        id: '1792300999999',
+        noteId: note.id,
+        ord: 27,
+    });
+
+    const written = await writeApkg(bundle, { now: 1792220529616 });
+    const models = await modelsIn(written.bytes);
+    const model = models.find(candidate => candidate.name === note.modelName);
+    assert.ok(model);
+    const fieldCount = (model.flds as unknown[]).length;
+    const req = model.req as Array<[number, string, number[]]>;
+    for (const [, , fields] of req) {
+        for (const index of fields) {
+            assert.ok(index >= 0 && index < fieldCount, `requirement ${index} is inside 0..${fieldCount - 1}`);
+        }
+    }
+    const templates = model.tmpls as Array<{ ord: number }>;
+    const ords = new Set(templates.map(template => template.ord));
+    assert.ok(
+        ords.has(27),
+        `and the new ordinal has a template of its own (note ${note.id}; cards: ${bundle.cards.map(c => c.noteId + '@' + c.ord).join(', ')}; models: ${models.map(candidate => `${candidate.name}: ${(candidate.tmpls as Array<{ ord: number }>).map(template => template.ord).join(',')}`).join(' | ')}; note model ${note.modelName})`
+    );
 });

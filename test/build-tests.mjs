@@ -81,6 +81,12 @@ await esbuild.build({
     'test/stats-service.test.ts',
     'test/stats-view.test.ts',
     'test/stats-charts.test.ts',
+    // Two writers, one deck: the per-card merge with Anki and the per-device
+    // answer log (appended after the lanes above so each keeps its anchor).
+    'test/deck-merge.test.ts',
+    'test/deck-sync.test.ts',
+    'test/anki-connect.test.ts',
+    'test/paths.test.ts',
     ],
     bundle: true,
     platform: 'node',

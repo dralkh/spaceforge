@@ -76,9 +76,12 @@ import {
     DEFAULT_DECK_OPTIONS,
     ExportReport,
     ImportReport,
+    isDayBasedDue,
     newAnkiId,
 } from '../models/anki';
 import { bundleMediaReferences, deckDocumentPath, rewriteMediaPaths, sanitizeDeckFileName } from '../models/deck-document';
+import { DeckMergeReport, mergeDeckBundles, mergeSummary } from '../models/deck-merge';
+import { deckDayBase } from '../utils/dates';
 import { DeckStore } from './deck-store';
 import { displayDeckName } from '../utils/deck-display';
 import SpaceforgePlugin from '../main';
@@ -105,6 +108,14 @@ export interface DeckImportServiceOptions {
 export interface DeckExportServiceOptions {
     /** A fixed clock, for a deterministic package. Defaults to `Date.now()`. */
     now?: number;
+    /**
+     * Write only these cards, and the notes they belong to.
+     *
+     * Anki's importer builds a search over everything a package carries, and a
+     * package of several thousand cards makes it fail outright ("Expression tree
+     * is too large"); sending the deck in slices is the way round that.
+     */
+    cardIds?: readonly AnkiId[];
 }
 
 /** What an export produced. */
@@ -193,7 +204,24 @@ export class DeckService {
 
         // Every card is placed in the imported deck: a deck document holds one
         // deck, and dropping cards would silently lose notes.
-        const cards = pkg.cards.map((card) => (card.deckId === deck.id ? card : { ...card, deckId: deck.id }));
+        //
+        // The deck being replaced is read before anything is converted: its
+        // `crt` is the day its own numbers count from, and a package's numbers
+        // count from the collection that wrote it. Anki re-bases on import (a
+        // card keeps its *date*, not its number), so the shift happens here.
+        const ankiWebId = deck.ankiWebId ?? ankiWebIdFromSource(deck.sourceUrl);
+        const replaceExisting = options.replaceExisting ?? true;
+        const existing = replaceExisting
+            ? await this.findExistingDeck({ id: deck.id, ankiWebId, name: deckName })
+            : null;
+        const local = existing !== null ? (await this.store.readDeckWithWarnings(existing)).bundle : null;
+
+        const extra = packageFidelity(pkg);
+        const createdSeconds = pkg.meta.created;
+        const cards = pkg.cards.map((card) => {
+            const placed = card.deckId === deck.id ? card : { ...card, deckId: deck.id };
+            return dueIntoDocument(placed, createdSeconds, local);
+        });
         const cardedNotes = new Set(cards.map((card) => card.noteId));
         const notes = pkg.notes.filter((note) => cardedNotes.has(note.id));
         const orphaned = pkg.notes.length - notes.length;
@@ -231,24 +259,38 @@ export class DeckService {
             presets: pkg.presets,
             deckPresetOf: pkg.deckPresetOf,
             media,
-            extra: packageFidelity(pkg),
+            extra,
         };
-        const ankiWebId = deck.ankiWebId ?? ankiWebIdFromSource(deck.sourceUrl);
         if (ankiWebId !== undefined) {
             bundle.deck.ankiWebId = ankiWebId;
         }
 
-        const replaceExisting = options.replaceExisting ?? true;
-        const existing = replaceExisting
-            ? await this.findExistingDeck({ id: bundle.deck.id, ankiWebId, name: deckName })
-            : null;
         const path = existing ?? (replaceExisting ? undefined : await this.unusedDeckPath(deckName));
         // Read the deck being replaced *before* the import overwrites it.
         const previousMedia = existing !== null ? await this.listedMedia(existing) : null;
 
+        // A re-import is a merge, not a replacement. The desktop and the phone
+        // both answer cards between two packages, and "the package wins" (the
+        // old behaviour) silently threw away every answer made in the vault —
+        // so each card is decided by its own modification stamp instead.
+        let target = bundle;
+        let merge: DeckMergeReport | null = null;
+        if (local !== null) {
+            const merged = mergeDeckBundles(local, bundle);
+            target = merged.bundle;
+            merge = merged.report;
+            warnings.push(...merged.report.warnings);
+        }
+
         // The store writes the media, rewrites the card text to where it put
-        // them, and writes the deck file.
-        const report = await this.store.importBundle(bundle, { path, name: deckName, mediaBytes });
+        // them, and writes the deck file. The name is the vault's own unless
+        // the caller asked for a rename: a merge must not undo a rename.
+        const report = await this.store.importBundle(target, {
+            path,
+            name: options.name ?? target.deck.name,
+            mediaBytes,
+        });
+        if (merge !== null) report.merge = merge;
 
         if (previousMedia !== null) {
             const stale = await this.mediaLeftBehind(previousMedia, report.deckPath);
@@ -271,6 +313,9 @@ export class DeckService {
             ...report,
             missingMedia: unique([...report.missingMedia, ...missing]),
             warnings: unique([...warnings, ...report.warnings]),
+            // The package's own day count, for a caller that has to speak in
+            // Anki's frame (the bridge comparing due dates).
+            crt: createdSeconds,
         };
     }
 
@@ -285,7 +330,20 @@ export class DeckService {
      * `report.path` (the deck document's sibling, `.apkg`).
      */
     async exportDeck(path: string, options: DeckExportServiceOptions = {}): Promise<DeckExportResult> {
-        const { bundle, media } = await this.store.exportBundle(path);
+        const exported = await this.store.exportBundle(path);
+        let bundle = exported.bundle;
+        const media = exported.media;
+        if (options.cardIds !== undefined) {
+            const wanted = new Set(options.cardIds);
+            const cards = bundle.cards.filter((card) => wanted.has(card.id));
+            const noteIds = new Set(cards.map((card) => card.noteId));
+            bundle = { ...bundle, cards, notes: bundle.notes.filter((note) => noteIds.has(note.id)) };
+        }
+        // A review card's `due` is a day number, and a package needs the day it
+        // counts from. A deck imported from Anki carries `crt`; a hand-written
+        // one counts from its own id's day — the same base `deckDayBase()` gives
+        // the scheduler — so that is what the package is stamped with.
+        const createdSeconds = deckCrtSeconds(bundle);
 
         // The vault paths the cards were rewritten to become, once more, the
         // file names Anki's media map talks about. Listed-but-missing media is
@@ -305,10 +363,16 @@ export class DeckService {
             return originalNames.get(bare) ?? null;
         });
 
-        const written = await writeApkg(rewritten, {
-            media: media.map((entry) => ({ ...entry.file, bytes: new Uint8Array(entry.bytes) })),
-            now: options.now,
-        });
+        const written = await writeApkg(
+            {
+                ...rewritten,
+                extra: { ...rewritten.extra, crt: createdSeconds },
+            },
+            {
+                media: media.map((entry) => ({ ...entry.file, bytes: new Uint8Array(entry.bytes) })),
+                now: options.now,
+            }
+        );
 
         const warnings = [...written.warnings];
         const absent = this.store.missingMedia(bundle);
@@ -360,6 +424,10 @@ export class DeckService {
         }
         if (report.replaced) {
             detail.push('replacing the earlier import');
+        }
+        const merged = report.merge ? mergeSummary(report.merge) : null;
+        if (merged !== null) {
+            detail.push(merged);
         }
         if (report.missingMedia.length > 0) {
             detail.push(`${countLabel(report.missingMedia.length, 'referenced file')} missing`);
@@ -477,6 +545,45 @@ function packageFidelity(pkg: AnkiPackage): Record<string, unknown> {
         dconf: pkg.meta.raw.dconf,
         conf: pkg.meta.raw.conf,
     };
+}
+
+/**
+ * The day a deck's day numbers count from, in seconds.
+ *
+ * A deck imported from Anki records the collection's `crt`; a deck made in the
+ * vault counts from its own id's day, which is the base `deckDayBase()` hands the
+ * scheduler. Both places have to agree, or a card's due moves by the distance
+ * between the two.
+ */
+function deckCrtSeconds(bundle: DeckBundle): number {
+    const recorded = bundle.extra?.crt;
+    if (typeof recorded === 'number' && Number.isFinite(recorded) && recorded > 0) {
+        return recorded > 1e12 ? Math.floor(recorded / 1000) : recorded;
+    }
+    return Math.floor(deckDayBase(bundle.deck.id, null) / 1000);
+}
+
+/**
+ * A package's cards become the deck's cards.
+ *
+ * A review card's `due` is a day number counted from the collection that wrote
+ * the package; the document counts from the deck's own `crt`. Anki re-bases on
+ * import — a card keeps its *date*, not its number — so the same shift has to
+ * happen here, or every package written by another collection moves the whole
+ * schedule by the distance between the two `crt`s. A learning card's value is an
+ * absolute timestamp and needs no shift.
+ */
+function dueIntoDocument(card: AnkiCard, packageCrt: number, local: DeckBundle | null): AnkiCard {
+    if (!isDayBasedDue(card.type, card.queue)) return card;
+    if (packageCrt <= 0) return card;
+    const deckCrt = local !== null ? deckCrtSeconds(local) : packageCrt;
+    const shift = Math.floor(packageCrt / 86400) - Math.floor(deckCrt / 86400);
+    if (shift === 0) return card;
+    const converted: AnkiCard = { ...card, due: card.due + shift };
+    if (card.originalDue !== undefined) {
+        converted.originalDue = card.originalDue + shift;
+    }
+    return converted;
 }
 
 /** The AnkiWeb deck id a shared deck's URL carries, when it looks like one. */

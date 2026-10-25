@@ -410,6 +410,33 @@ export interface SpaceforgeSettings {
     deckMinutesPerCard: number;
 
     /**
+     * Sync decks with Anki through the AnkiConnect add-on on this computer.
+     *
+     * Off by default: it makes the plugin write into a running Anki, which is
+     * not something a reader should discover after the fact. When it is on, the
+     * plugin pulls each deck, merges per card, and pushes the merged deck back
+     * on a timer — see `services/anki-connect-service.ts`.
+     */
+    ankiConnectEnabled: boolean;
+
+    /**
+     * Where AnkiConnect listens. The add-on's own default is
+     * `http://127.0.0.1:8765`; anything else here is a deliberate choice (a
+     * different port, or a host with the add-on bound to the network).
+     */
+    ankiConnectUrl: string;
+
+    /**
+     * The deck revision last sent to Anki, per deck path.
+     *
+     * A push is an import of the whole deck, and Anki's importer is slow on a
+     * large one, so a deck whose `modified` stamp has not moved since the last
+     * successful push is left alone: the timer then costs a pull and a due-date
+     * pass, not a rebuild of every package.
+     */
+    ankiPushed: Record<string, number>;
+
+    /**
      * Internal bookkeeping: set once the corrected FSRS short-term default has
      * been applied to an existing vault, so a later explicit "off" is respected.
      */
@@ -876,6 +903,9 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     reviewSessionPlacement: 'split',
     deckSessionPlacement: 'modal',
     deckMinutesPerCard: 1,
+    ankiConnectEnabled: false,
+    ankiConnectUrl: 'http://127.0.0.1:8765',
+    ankiPushed: {},
     reviewStripIntervalPreviews: true,
     reviewStripGradeKeys: true,
     leechThreshold: 8,

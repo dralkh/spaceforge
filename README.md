@@ -183,6 +183,17 @@ logged (grade, intervals, ease, answer time), which is what the statistics page'
 The calendar shows what the notes owe and what the decks owe side by side, so a day with both is
 never a surprise.
 
+If Anki is running on the same computer, the deck can stay in step with it without any exporting:
+turn on **Sync with Anki in the background**, which needs the AnkiConnect add-on, and every few
+minutes each deck is pulled from Anki, merged card by card, and pushed back. The push is skipped
+when the deck has not changed since the last one, and a deck of thousands of cards goes over in
+slices, because Anki's importer is slow — and on a very large package, refuses — when handed
+everything at once. Both sides keep their own schedule authority: answers recorded in either app
+reach the other, along with the due date and the ease factor. Anki's interval and rep counts are
+rebuilt by Anki's own scheduler from its state, so a card can shift by a day when it is first
+answered there. Nothing leaves the machine — the add-on answers on the loopback interface — and the
+bridge is offered only in the desktop app, since a phone has no Anki to talk to.
+
 ## Core Concepts
 
 ### Scheduling Algorithms: Optimize Your Learning

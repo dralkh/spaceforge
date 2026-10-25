@@ -284,6 +284,44 @@ function bytesOf(text: string): ArrayBuffer {
 
 // --------------------------------------------------------------- the format
 
+test('a review card written with a timestamp due is read back as Anki\'s day number', () => {
+    // The shape an older import produced (and a hand-written file can): the
+    // timestamp instead of the day number. The scheduler compares day numbers,
+    // so left alone the card reads as due ~55,000 days out and never appears.
+    const bundle = sampleBundle();
+    bundle.extra = { crt: 1789628529 };
+    const review = bundle.cards.find(card => card.type === AnkiCardType.Review);
+    assert.ok(review !== undefined);
+    const createdDay = Math.floor(1789628529 / 86_400);
+    review.due = (createdDay + 19005) * 86_400_000;
+
+    const { bundle: parsed } = parseDeckWithWarnings(serializeDeck(bundle), DECK_PATH);
+    const read = parsed.cards.find(card => card.id === review.id);
+
+    assert.equal(read?.due, 19005, 'the same instant, in the convention the scheduler reads');
+});
+
+test('a day number is left exactly as written, however it was typed', () => {
+    const bundle = sampleBundle();
+    bundle.extra = { crt: 1789628529 };
+    const review = bundle.cards.find(card => card.type === AnkiCardType.Review);
+    assert.ok(review !== undefined);
+    review.due = -3; // three days overdue
+
+    const { bundle: parsed } = parseDeckWithWarnings(serializeDeck(bundle), DECK_PATH);
+    assert.equal(parsed.cards.find(card => card.id === review.id)?.due, -3);
+});
+
+test('a deck with no creation stamp leaves due values alone', () => {
+    const bundle = sampleBundle();
+    const review = bundle.cards.find(card => card.type === AnkiCardType.Review);
+    assert.ok(review !== undefined);
+    review.due = 3431635200000;
+
+    const { bundle: parsed } = parseDeckWithWarnings(serializeDeck(bundle), DECK_PATH);
+    assert.equal(parsed.cards.find(card => card.id === review.id)?.due, 3431635200000, 'nothing to convert against');
+});
+
 test('a deck round-trips through its document: deck, options, notes, cards, media, extras', () => {
     const bundle = sampleBundle();
     const text = serializeDeck(bundle);

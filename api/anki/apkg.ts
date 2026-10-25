@@ -28,6 +28,8 @@ import {
     LeechAction,
     DEFAULT_DECK_OPTIONS,
     DECKS_MEDIA_FOLDER,
+    isDayBasedDue,
+    isSecondBasedDue,
 } from '../../models/anki';
 import { isZip, readZipDirectory, readZipEntry } from './zip';
 import { openSqlite, readTable, SqliteDatabase, SqliteTableData, SqlValue, tableInfo } from './sqlite-read';
@@ -35,10 +37,8 @@ import { openSqlite, readTable, SqliteDatabase, SqliteTableData, SqlValue, table
 /** The collection entry names Anki has used, newest first. */
 const COLLECTION_NAMES = ['collection.anki21b', 'collection.anki21', 'collection.anki2'];
 
-const MS_PER_DAY = 86400000;
 const MS_PER_SECOND = 1000;
 /** Anki counts review due dates in days since the collection was created. */
-const SECONDS_PER_DAY = 86400;
 
 /** A media file from a package: the metadata we model, plus its bytes. */
 export interface AnkiPackageMedia extends DeckMediaFile {
@@ -585,26 +585,17 @@ function notetypesFromTables(db: SqliteDatabase, warnings: string[]): Map<string
     return out;
 }
 
-/** Days from the collection's creation date for review cards, seconds for the rest. */
-function isDayBasedDue(type: number, queue: number): boolean {
-    if (queue === Number(AnkiCardQueue.Review) || queue === 3) {
-        return true;
-    }
-    return queue < 0 && type === Number(AnkiCardType.Review);
-}
-
-function isSecondBasedDue(type: number, queue: number): boolean {
-    if (queue === Number(AnkiCardQueue.Learning) || queue === 4) {
-        return true;
-    }
-    return queue < 0 && (type === Number(AnkiCardType.Learning) || type === Number(AnkiCardType.Relearning));
-}
-
-/** Anki's stored due value becomes milliseconds since the epoch. */
-export function dueFromStorage(raw: number, type: number, queue: number, createdSeconds: number): number {
+/**
+ * A package's stored `due` becomes the deck document's value.
+ *
+ * A day-based card is already a day number relative to the *package's* `crt`,
+ * which is what the document stores too; re-basing it on the deck's own `crt` is
+ * the importer's job, because only it knows both. A learning card's value is
+ * absolute seconds, so it becomes milliseconds here and back again on export.
+ */
+export function dueFromStorage(raw: number, type: number, queue: number): number {
     if (isDayBasedDue(type, queue)) {
-        const createdDay = Math.floor(createdSeconds / SECONDS_PER_DAY);
-        return (createdDay + raw) * MS_PER_DAY;
+        return raw;
     }
     if (isSecondBasedDue(type, queue)) {
         return raw * MS_PER_SECOND;
@@ -613,11 +604,10 @@ export function dueFromStorage(raw: number, type: number, queue: number, created
     return 0;
 }
 
-/** Milliseconds since the epoch become Anki's stored due value. */
-export function dueToStorage(due: number, type: number, queue: number, createdSeconds: number, newPosition: number | null | undefined): number {
+/** The document's value becomes what Anki stores in the package. */
+export function dueToStorage(due: number, type: number, queue: number, newPosition: number | null | undefined): number {
     if (isDayBasedDue(type, queue)) {
-        const createdDay = Math.floor(createdSeconds / SECONDS_PER_DAY);
-        return Math.floor(due / MS_PER_DAY) - createdDay;
+        return Math.round(due);
     }
     if (isSecondBasedDue(type, queue)) {
         return Math.floor(due / MS_PER_SECOND);
@@ -749,10 +739,10 @@ export async function readApkg(bytes: Uint8Array): Promise<AnkiPackage> {
             easeFactor: scalarToNumber(row.factor, 0),
             reviews: scalarToNumber(row.reps, 0),
             lapses: scalarToNumber(row.lapses, 0),
-            due: dueFromStorage(rawDue, type, queue, created),
+            due: dueFromStorage(rawDue, type, queue),
             newPosition: isDayBasedDue(type, queue) || isSecondBasedDue(type, queue) ? null : rawDue,
             flag: scalarToNumber(row.flags, 0) & 7,
-            originalDue: scalarToNumber(row.odue, 0) === 0 ? undefined : dueFromStorage(scalarToNumber(row.odue, 0), type, queue, created),
+            originalDue: scalarToNumber(row.odue, 0) === 0 ? undefined : dueFromStorage(scalarToNumber(row.odue, 0), type, queue),
             originalPosition: memory.position,
             timeTakenMs: timeByCard.get(id),
         };
@@ -765,6 +755,11 @@ export async function readApkg(bytes: Uint8Array): Promise<AnkiPackage> {
             };
             card.desiredRetentionDays = card.interval;
         }
+        // Anki's `cards.mod` is in seconds; the model keeps every stamp in ms.
+        // A card that has never been touched leaves it unset rather than 0, so
+        // the merge can tell "no stamp" from "stamped at the epoch".
+        const modified = scalarToNumber(row.mod, 0);
+        if (modified > 0) card.mod = modified * MS_PER_SECOND;
         cards.push(card);
         const list = cardIdsByNote.get(noteId);
         if (list) {
@@ -804,7 +799,7 @@ export async function readApkg(bytes: Uint8Array): Promise<AnkiPackage> {
             }
         }
         const tags = scalarToString(row.tags).trim();
-        notes.push({
+        const note: AnkiNote = {
             id,
             modelName: notetype?.name ?? `Notetype ${mid}`,
             fields,
@@ -812,7 +807,10 @@ export async function readApkg(bytes: Uint8Array): Promise<AnkiPackage> {
             tags: tags === '' ? [] : tags.split(/\s+/),
             cardIds: cardIdsByNote.get(id) ?? [],
             mediaFiles,
-        });
+        };
+        const modified = scalarToNumber(row.mod, 0);
+        if (modified > 0) note.modified = modified * MS_PER_SECOND;
+        notes.push(note);
     }
 
     const media = await readMedia(extracted, referencedMedia, warnings);

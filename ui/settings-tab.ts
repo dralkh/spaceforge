@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, setIcon } from 'obsidian';
+import { App, Notice, Platform, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import { getCliAgent } from '../api/cli/cli-agents';
 import { CliModelEntry } from '../api/cli/cli-types';
 import { getEnvVar, setCliExtraPath } from '../api/cli/cli-runner';
@@ -598,6 +598,74 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     this.plugin.settings.reviewStripGradeKeys = value;
                     await this.plugin.savePluginData();
                 }));
+
+        // --- Anki on this computer ---
+        //
+        // The address row is built unconditionally and hidden, so turning the
+        // switch shows it in place: rebuilding the tab would close every section
+        // the reader had opened.
+        const ankiDetails = spacedRepSection.createEl('details', { cls: 'sf-settings-collapsible-subsection' });
+        ankiDetails.createEl('summary').setText('Anki on this computer');
+        ankiDetails.open = false;
+
+        if (Platform.isDesktop) {
+            let ankiAddressRow: Setting | null = null;
+
+            new Setting(ankiDetails)
+                .setName('Sync with Anki in the background')
+                .setDesc('Needs the AnkiConnect add-on in Anki, and Anki running. Every few minutes each deck is pulled from Anki, merged card by card, and pushed back, so both apps share one schedule. Nothing leaves this machine: the add-on answers on the loopback interface only.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.ankiConnectEnabled)
+                    .onChange(async (value: boolean) => {
+                        this.plugin.settings.ankiConnectEnabled = value;
+                        await this.plugin.savePluginData();
+                        ankiAddressRow?.settingEl.toggleClass('sf-hidden', !value);
+                    }));
+
+            ankiAddressRow = new Setting(ankiDetails)
+                .setName('AnkiConnect address')
+                .setDesc('Where the add-on listens. Its own default is 127.0.0.1:8765.')
+                .addText(text => text
+                    .setValue(this.plugin.settings.ankiConnectUrl)
+                    .onChange(async (value: string) => {
+                        this.plugin.settings.ankiConnectUrl = value.trim();
+                        await this.plugin.savePluginData();
+                    }));
+            ankiAddressRow.settingEl.toggleClass('sf-hidden', !this.plugin.settings.ankiConnectEnabled);
+
+            const ankiStatus = ankiDetails.createDiv({ cls: 'sf-info-box' });
+            ankiStatus.setText('Check the connection to see what Anki answers.');
+
+            new Setting(ankiDetails)
+                .setName('Anki connection')
+                .setDesc('Check that Anki is answering, or sync every deck now.')
+                .addButton(button => button
+                    .setButtonText('Check connection')
+                    .onClick(async () => {
+                        ankiStatus.setText('Checking…');
+                        const status = await this.plugin.ankiConnectService.status();
+                        ankiStatus.setText(status.reachable
+                            ? `AnkiConnect ${status.version ?? ''} is answering${status.mediaPath ? ` (media: ${status.mediaPath})` : ''}.`
+                            : `No answer: ${status.error ?? 'Anki is not running.'}`);
+                    }))
+                .addButton(button => button
+                    .setButtonText('Sync now')
+                    .setCta()
+                    .onClick(async () => {
+                        ankiStatus.setText('Syncing…');
+                        const summary = await this.plugin.ankiConnectService.syncAll();
+                        ankiStatus.setText(summary.message);
+                    }));
+        }
+
+        // A phone can reach neither Anki nor the add-on, so the controls would be
+        // a switch that does nothing. The section stays, to say why.
+        if (!Platform.isDesktop) {
+            ankiDetails.createDiv({
+                cls: 'sf-info-box',
+                text: 'Anki runs on a computer, and this bridge talks to it over that machine’s own loopback interface. Turn it on there. Decks still travel between devices through the vault, so whatever the computer last pulled is already here.',
+            });
+        }
 
         new Setting(reviewFlowContainer)
             .setName('Lapse checkpoint')

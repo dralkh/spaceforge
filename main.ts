@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, normalizePath, TFolder } from 'obsidian';
+import { Notice, Platform, Plugin, TFile, normalizePath, TFolder } from 'obsidian';
 import { EventEmitter } from './utils/event-emitter';
 import { DataStorage } from './data-storage';
 import { ReviewController } from './controllers/review-controller';
@@ -52,7 +52,9 @@ import { CalendarEventService } from './services/calendar-event-service';
 import { RecurringNotesService } from './services/recurring-notes-service';
 import { StudyPlanService } from './services/study-plan-service';
 import { DeckStore } from './services/deck-store';
+import { DeckSyncService } from './services/deck-sync-service';
 import { DeckService } from './services/deck-service';
+import { AnkiConnectService } from './services/anki-connect-service';
 import { AnkiWebService, AnkiWebDeckResult } from './services/ankiweb-service';
 import { AnkiWebSearchModal } from './ui/ankiweb-search-modal';
 import { pickFile } from './ui/file-picker';
@@ -96,6 +98,8 @@ export default class SpaceforgePlugin extends Plugin {
     studyPlanService: StudyPlanService;
     /** The deck lane: cards, their own schedule, Anki's rules. */
     deckStore: DeckStore;
+    /** The per-device answer log that lets two devices' reviews merge. */
+    deckSyncService: DeckSyncService;
     /** Cards due across every deck, as last counted; null until something counts. */
     deckDueCount: number | null = null;
     /** The decks holding due cards, in the order the sidebar lists them. */
@@ -122,6 +126,8 @@ export default class SpaceforgePlugin extends Plugin {
     deckSessionController: DeckSessionController;
     /** Packages in and out: .apkg files, however they arrive. */
     deckService: DeckService;
+    /** Anki on this computer, through the AnkiConnect add-on (desktop only). */
+    ankiConnectService: AnkiConnectService;
     ankiWebService: AnkiWebService;
     studyWebSearchService: StudyWebSearchService;
     studyController: StudyController;
@@ -175,9 +181,11 @@ export default class SpaceforgePlugin extends Plugin {
 
         // The deck lane. A deck keeps its cards and their schedule in its own
         // file under spaceforge/decks/, so this store needs no plugin state.
+        this.deckSyncService = new DeckSyncService(this);
         this.deckStore = new DeckStore(this);
         this.deckSessionController = new DeckSessionController(this, this.deckStore);
         this.deckService = new DeckService(this, this.deckStore);
+        this.ankiConnectService = new AnkiConnectService(this);
         this.ankiWebService = new AnkiWebService();
 
         // Load stored data, which will override the defaults in this.settings and this.pluginState
@@ -186,6 +194,13 @@ export default class SpaceforgePlugin extends Plugin {
         // After settings are fully loaded (including from storage), ensure services are updated
         // This is crucial for FsrsScheduleService to get the correct FSRS parameters.
         this.reviewScheduleService.updateAlgorithmServicesForSettingsChange();
+
+        // Anki on this computer: a pull-merge-push every few minutes, but only
+        // when the reader turned it on and no sitting is running. `syncIfEnabled`
+        // is silent when either is not true.
+        this.registerInterval(window.setInterval(() => {
+            void this.ankiConnectService.syncIfEnabled();
+        }, 5 * 60_000));
 
         // Initialize PomodoroService after settings are loaded
         this.pomodoroService = new PomodoroService(this);
@@ -423,6 +438,7 @@ export default class SpaceforgePlugin extends Plugin {
             window.removeEventListener('beforeunload', this.beforeUnloadHandler);
         }
 
+
         void (async () => {
             let existingData: Partial<SpaceforgePluginData> = {};
             try {
@@ -516,6 +532,20 @@ export default class SpaceforgePlugin extends Plugin {
             console.error('spaceforge: could not import the package', error);
             new Notice('That file could not be read as an Anki package.');
         }
+    }
+
+    /**
+     * Sync every deck with Anki on this computer.
+     *
+     * This is the same merge as importing a package by hand, carried over the
+     * add-on's loopback bridge: pull each deck Anki has, merge it card by card,
+     * then push the merged deck back. A deck Anki does not have yet is simply
+     * pushed, which is what creates it there the first time.
+     */
+    private async syncDecksWithAnki(): Promise<void> {
+        const summary = await this.ankiConnectService.syncAll();
+        new Notice(summary.message);
+        if (summary.ok) void this.getSidebarView()?.refresh();
     }
 
     /** Export the deck that is open, or let the reader pick one. */
@@ -847,6 +877,7 @@ export default class SpaceforgePlugin extends Plugin {
 
             this.applyLoadedState();
 
+
         } catch (error) {
             console.error("Spaceforge: Error loading data:", error);
 
@@ -1055,8 +1086,6 @@ export default class SpaceforgePlugin extends Plugin {
                 // new Notice(`Spaceforge: Data saved to default plugin storage.`, 3000); // Removed notice
             }
 
-            // Removed the local backup for settings as it's not the source of truth for the path anymore.
-            // If user wants to backup settings, they can use the export feature.
 
         } catch {
             new Notice("Error saving data. Check console for details", 5000);
@@ -1248,6 +1277,18 @@ export default class SpaceforgePlugin extends Plugin {
             id: 'study-all-decks-due',
             name: 'Study everything due (all decks)',
             callback: () => void this.deckSessionController.startAllDue(),
+        });
+
+        this.addCommand({
+            id: 'sync-decks-with-anki',
+            name: 'Sync decks with Anki (this computer)',
+            // The add-on listens on the loopback interface; a phone has no way
+            // to reach it, so the command is not offered there at all.
+            checkCallback: (checking: boolean) => {
+                if (!Platform.isDesktop) return false;
+                if (!checking) void this.syncDecksWithAnki();
+                return true;
+            },
         });
 
         this.addCommand({

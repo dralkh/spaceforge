@@ -18,7 +18,7 @@ import { SpaceforgeSettingTab } from '../ui/settings-tab';
 import { getHttpProvider } from '../api/provider-registry';
 import { DEFAULT_SETTINGS, SpaceforgeSettings, ApiProvider, MCQQuestionAmountMode, StudySearchProvider } from '../models/settings';
 import { DEFAULT_PLUGIN_STATE_DATA } from '../models/plugin-data';
-import { Setting, createdSettings } from './support/obsidian-shim';
+import { Platform, Setting, createdSettings } from './support/obsidian-shim';
 import { MiniElement } from './support/mini-dom';
 
 type TabCtor = ConstructorParameters<typeof SpaceforgeSettingTab>;
@@ -472,4 +472,37 @@ test('choosing a provider draws its detection matrix, and a CLI is checked at on
     assert.match(companyValues.get('Endpoint') ?? '', /^https:\/\/api\.x\.ai/, 'and the endpoint it will call');
     assert.equal(companyValues.get('Model'), getHttpProvider(ApiProvider.Xai)?.latestModel, 'with the model it would ask for');
     void find; void findCompany;
+});
+
+test('the Anki switch shows its address row in place, without rebuilding the tab', async () => {
+    const h = makeTab({ ankiConnectEnabled: false });
+    const toggle = h.find('Sync with Anki in the background');
+    const address = h.find('AnkiConnect address');
+    const addressEl = address.settingEl;
+    const sectionBefore = h.section('Spaced repetition');
+
+    assert.ok(addressEl.hasClass('sf-hidden'), 'the address waits while the switch is off');
+
+    await toggle.toggle?.change(true);
+
+    assert.equal(h.settings.ankiConnectEnabled, true);
+    assert.ok(!addressEl.hasClass('sf-hidden'), 'and appears as soon as it is on');
+    assert.equal(address.settingEl, addressEl, 'the same row, not a rebuilt one');
+    assert.equal(h.section('Spaced repetition'), sectionBefore, 'the section the reader had open is still there');
+    assert.equal(h.settings.ankiConnectUrl, 'http://127.0.0.1:8765', 'with the add-on\u2019s own default ready to edit');
+});
+
+test('a phone explains the Anki bridge instead of offering a switch that cannot work', async () => {
+    const platform = Platform as unknown as { isDesktop: boolean };
+    platform.isDesktop = false;
+    try {
+        const h = makeTab({ ankiConnectEnabled: false });
+        assert.deepEqual(h.named('Sync with Anki in the background'), [], 'no switch');
+        assert.deepEqual(h.named('AnkiConnect address'), [], 'no address to edit');
+        const text = h.section('Spaced repetition')?.textContent ?? '';
+        assert.match(text, /Anki runs on a computer/, 'and it says why');
+        assert.match(text, /through the vault/, 'and where the decks come from instead');
+    } finally {
+        platform.isDesktop = true;
+    }
 });

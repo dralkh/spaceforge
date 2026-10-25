@@ -31,6 +31,9 @@ import {
     DECKS_MEDIA_FOLDER,
 } from '../models/anki';
 import { isDeckDocumentPath } from '../models/deck-document';
+import { mergeSummary } from '../models/deck-merge';
+import { buildQueue } from '../models/anki-scheduler';
+import { deckDayBase } from '../utils/dates';
 import { DeckStore } from '../services/deck-store';
 import { DeckService, chooseTopDeck } from '../services/deck-service';
 
@@ -200,6 +203,7 @@ test('importing sample-basic.apkg writes the deck, its media and rewrites the ca
         missingMedia: [],
         warnings: [],
         replaced: false,
+        crt: 1789628529,
     }, `the fixture imports cleanly: ${report.warnings.join(' | ')}`);
     assert.equal(folders.has(DECKS_FOLDER), true, 'the decks folder was made');
     assert.equal(files.has(DECK_PATH), true, 'the deck file exists at spaceforge/decks/<sanitized name>.md');
@@ -247,11 +251,22 @@ test('the zstd package imports the same content', async () => {
         'The mitochondrion, via oxidative phosphorylation.',
     ]);
     assert.deepEqual(read.cards.map(card => [card.id, card.type, card.queue, card.due]), [
-        ['1700000000011', 2, 2, (Math.floor(1789628529 / 86400) + 19005) * 86400000],
+        // A review card's `due` is Anki's own day number relative to the
+        // collection's creation (`crt`, 1789628529) — that is what the
+        // scheduler compares. The same instant, as a timestamp, is
+        // (createdDay + 19005) * DAY; storing the timestamp here made the card
+        // read as due tens of thousands of days out, so it never appeared.
+        ['1700000000011', 2, 2, 19005],
         ['1700000000012', 0, 0, 0],
+        // Learning cards keep their timestamps.
         ['1700000000013', 3, 1, 3000],
         ['1700000000014', 1, 1, 4000],
     ]);
+    assert.equal(
+        (Math.floor(1789628529 / 86400) + read.cards[0].due) * 86400000,
+        3431635200000,
+        'and the day number means the same instant the package carried'
+    );
     assert.equal(files.has(MEDIA_PATH), true);
 });
 
@@ -309,19 +324,23 @@ test('replaceExisting: false writes a second deck file beside the first', async 
     assert.deepEqual(deckFilesIn(files), [first.deckPath, second.deckPath].sort());
 });
 
-test('an existing deck is replaced when its name, not its id, matches', async () => {
+test('a re-import merges into the deck whose name matches, instead of making a second file', async () => {
     const { service, store, files } = fakeVault();
     const hand = await store.createDeck('Cell Biology::Organelles');
     assert.equal(hand.path, DECK_PATH);
+    const handId = hand.bundle.deck.id;
 
     const report = await service.importApkg(BASIC);
     assert.equal(report.replaced, true, 'matched by name');
     assert.equal(report.deckPath, DECK_PATH);
     assert.deepEqual(deckFilesIn(files), [DECK_PATH]);
 
+    // The file is the vault's own document, so its deck id survives the
+    // import; what arrives is the package's cards, not a new identity.
     const read = await store.readDeck(DECK_PATH);
-    assert.equal(read.deck.id, '1700000000000', 'the imported deck took the file over');
+    assert.equal(read.deck.id, handId, 'the deck keeps the id its file had');
     assert.equal(read.cards.length, 4);
+    assert.equal(report.merge?.cards.added, 4, 'every package card is new to this deck');
 });
 
 test('a deck is matched by the AnkiWeb id its package was shared under', async () => {
@@ -375,6 +394,11 @@ test('a deck exports to a package that imports back with the same notes, cards, 
     const pkg = await readApkg(exported.bytes);
     assert.equal(pkg.notes.length, 3);
     assert.equal(pkg.cards.length, 4);
+    assert.equal(
+        pkg.cards.find(card => card.id === '1700000000011')?.due,
+        19005,
+        'the day number went back out unchanged, against the package’s own crt'
+    );
     assert.equal(pkg.media.length, 1);
     assert.equal(pkg.media[0].originalName, 'nucleus.png');
     assert.deepEqual(new Uint8Array(pkg.media[0].bytes), NUCLEUS_PNG);
@@ -406,6 +430,198 @@ test('a deck exports to a package that imports back with the same notes, cards, 
     // The vault path in the text is the fresh one, not the first vault's.
     const text = second.files.get(again.deckPath)?.text ?? '';
     assert.match(text, /<img src="spaceforge\/decks\/media\/nucleus\.png">/);
+});
+
+test('a package imported after the vault reviewed keeps both sides\' answers', async () => {
+    const DAY = 86_400_000;
+    const vault = fakeVault();
+    const imported = await vault.service.importApkg(BASIC);
+    const before = await vault.store.readDeck(imported.deckPath);
+    const original = await readApkg(BASIC);
+
+    // The fixture's own stamps are real timestamps, so later answers have to
+    // be later than them — not later than the test's arbitrary `NOW`.
+    const base = Math.max(...before.cards.map(card => card.mod ?? 0));
+
+    // The reader answers the first card here — exactly what a sitting writes:
+    // a review interval, a due date on a day boundary (the scheduler's own
+    // rule, and what Anki's day-number storage can represent exactly), and the
+    // card's stamp.
+    const vaultAnswer = { ...before.cards[0] };
+    vaultAnswer.interval = 9;
+    vaultAnswer.due = Math.ceil(NOW / DAY) * DAY + 9 * DAY;
+    vaultAnswer.reviews += 1;
+    vaultAnswer.mod = base + 60_000;
+    await vault.store.updateCardStates(imported.deckPath, [vaultAnswer]);
+
+    // An export carries that answer, so the desktop would start from it…
+    const exported = await vault.service.exportDeck(imported.deckPath, { now: base + 120_000 });
+    const pkg = await readApkg(exported.bytes);
+    assert.equal(
+        pkg.cards.find(card => card.id === vaultAnswer.id)?.interval,
+        9,
+        'the vault answer travelled in the package'
+    );
+    assert.equal(
+        pkg.cards.find(card => card.id === vaultAnswer.id)?.mod,
+        base + 60_000,
+        'and it carried the card\'s own stamp, not the export time'
+    );
+
+    // …but the package this test imports is the one Anki exported *before* it
+    // saw that answer — the real conflict. Anki answered a different card in
+    // the meantime, later than the vault did.
+    const ankiCards = original.cards.map(card => ({ ...card }));
+    const ankiAnswer = ankiCards.find(card => card.id !== vaultAnswer.id);
+    assert.ok(ankiAnswer !== undefined);
+    ankiAnswer.interval = 21;
+    ankiAnswer.due = Math.ceil(NOW / DAY) * DAY + 21 * DAY;
+    ankiAnswer.reviews += 1;
+    ankiAnswer.mod = base + 180_000;
+    const fromAnki = await writeApkg(
+        {
+            deck: before.deck,
+            notes: original.notes,
+            cards: ankiCards,
+            presets: original.presets,
+            deckPresetOf: original.deckPresetOf,
+            media: [],
+        },
+        { now: base + 180_000 }
+    );
+
+    const report = await vault.service.importApkg(fromAnki.bytes, { now: base + 240_000 });
+    const after = await vault.store.readDeck(imported.deckPath);
+
+    // "The package wins" would have reverted the vault's answer to the
+    // interval the stale package still carried, which is what used to happen.
+    assert.equal(after.cards.find(card => card.id === vaultAnswer.id)?.interval, 9, 'the vault answer survived');
+    assert.equal(after.cards.find(card => card.id === ankiAnswer.id)?.interval, 21, 'the Anki answer arrived');
+    assert.equal(report.merge?.cards.kept, 1, 'the vault had the newer answer for one card');
+    assert.equal(report.merge?.cards.taken, 1, 'the package had the newer answer for one card');
+    assert.equal(report.merge?.cards.unchanged, 2, 'the rest were already the same schedule');
+    assert.equal(report.replaced, true);
+});
+
+test('importing the same package twice is a no-op the second time', async () => {
+    const vault = fakeVault();
+    const first = await vault.service.importApkg(BASIC);
+    const before = await vault.store.readDeck(first.deckPath);
+
+    const second = await vault.service.importApkg(BASIC);
+    const after = await vault.store.readDeck(first.deckPath);
+
+    assert.equal(second.merge?.cards.unchanged, 4, 'every card says the same thing');
+    assert.equal(second.merge?.cards.taken, 0);
+    assert.deepEqual(
+        after.cards.map(card => [card.id, card.interval, card.due, card.mod]),
+        before.cards.map(card => [card.id, card.interval, card.due, card.mod]),
+        'no drift on a second import'
+    );
+    assert.ok(second.merge !== undefined);
+    assert.equal(mergeSummary(second.merge), null, 'and there is nothing to tell the reader');
+});
+
+test('a review card whose Anki due has passed actually enters the sitting', async () => {
+    // The bug this pins: the package's `due` is a timestamp, the scheduler
+    // compares day numbers, and a card holding the timestamp reads as due in
+    // the year 50000 — so an imported deck could look empty forever.
+    const original = await readApkg(BASIC);
+    const review = original.cards.find(card => card.type === AnkiCardType.Review);
+    assert.ok(review !== undefined);
+    review.due = (Math.floor(original.meta.created / 86_400) - 1) * 86_400_000; // yesterday
+    const pkg = await writeApkg(
+        {
+            deck: original.decks[0],
+            notes: original.notes,
+            cards: original.cards,
+            media: [],
+            // Keep the collection's day base: without it the writer stamps a
+            // new creation time and every day number moves.
+            extra: { crt: original.meta.created },
+        },
+        { now: NOW }
+    );
+
+    const vault = fakeVault();
+    const imported = await vault.service.importApkg(pkg.bytes);
+    const bundle = await vault.store.readDeck(imported.deckPath);
+    const dayBase = deckDayBase(bundle.deck.id, original.meta.created);
+    const queue = buildQueue(bundle.cards, bundle.deck.options, Date.now(), dayBase, undefined, bundle.deck.id);
+
+    assert.ok(
+        queue.some(card => card.id === review.id),
+        `the overdue review card is in today's queue (due ${review.due})`
+    );
+});
+
+test('a hand-written deck exports with the day its own schedule counts from', async () => {
+    // No `crt`: the deck counts its days from its own id, so that is the day
+    // its package must be stamped with or every due number moves.
+    const first = fakeVault();
+    const created = await first.store.createDeck('Hand written');
+    const bundle = created.bundle;
+    bundle.notes.push({
+        id: '1700000000301',
+        modelName: 'Basic',
+        fields: ['Front', 'Back'],
+        values: ['Q', 'A'],
+        tags: [],
+        cardIds: ['1700000000302'],
+        mediaFiles: [],
+    });
+    bundle.cards.push({
+        id: '1700000000302',
+        noteId: '1700000000301',
+        deckId: bundle.deck.id,
+        ord: 0,
+        type: AnkiCardType.Review,
+        queue: AnkiCardQueue.Review,
+        interval: 4,
+        easeFactor: 2500,
+        reviews: 2,
+        lapses: 0,
+        due: -1,
+        newPosition: null,
+        flag: 0,
+    });
+    await first.store.writeDeck(bundle, created.path);
+
+    const exported = await first.service.exportDeck(created.path, { now: NOW });
+    const pkg = await readApkg(exported.bytes);
+    const expectedCrt = Math.floor(deckDayBase(bundle.deck.id, null) / 1000);
+
+    assert.equal(pkg.meta.created, expectedCrt, 'the package counts from the day the deck does');
+    assert.equal(pkg.cards[0].due, -1, 'the day number goes out as written');
+
+    const second = fakeVault();
+    const again = await second.service.importApkg(exported.bytes);
+    assert.equal((await second.store.readDeck(again.deckPath)).cards[0].due, -1, 'and the day number survives');
+});
+
+test('a package from another collection keeps every card’s date', async () => {
+    const vault = fakeVault();
+    const first = await vault.service.importApkg(BASIC, { name: 'Cell Biology' });
+    const bundle = (await vault.store.exportBundle(first.deckPath)).bundle;
+    const review = bundle.cards.find(card => card.id === '1700000000011');
+    assert.equal(review?.due, 19005, 'the fixture counts from its own crt');
+
+    // Anki exports with the *exporting* collection's crt. A card keeps its date,
+    // so the number it carries there is the date minus that collection's day:
+    // a collection 33 days newer carries the same card as 18972.
+    const shift = 33;
+    const later = (bundle.extra?.crt as number) + shift * 86_400;
+    const elsewhere: DeckBundle = {
+        ...bundle,
+        cards: bundle.cards.map(card => ({ ...card, due: card.due - shift })),
+        extra: { ...bundle.extra, crt: later },
+    };
+    const pkg = await writeApkg(elsewhere, { now: NOW });
+
+    const again = await vault.service.importApkg(pkg.bytes, { name: 'Cell Biology' });
+    const after = (await vault.store.readDeck(again.deckPath)).cards.find(card => card.id === '1700000000011');
+
+    assert.equal(after?.due, 19005, 'the date is unchanged, not the number');
 });
 
 test('exporting a deck whose media has gone missing warns and still writes the package', async () => {

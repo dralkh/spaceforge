@@ -527,7 +527,13 @@ export class DeckStore {
 
     private async readDeckFile(file: TFile): Promise<DeckParseResult> {
         const text = await this.plugin.app.vault.read(file);
-        return parseDeckWithWarnings(text, file.path);
+        const parsed = parseDeckWithWarnings(text, file.path);
+        // The document is a cache: every device's own log is a second copy of
+        // the answers it made, and the newest per card is what this reader
+        // should see. A missing service (a test's stand-in plugin) leaves the
+        // document alone.
+        const merged = await this.plugin.deckSyncService?.mergeInto(parsed.bundle);
+        return merged && merged !== parsed.bundle ? { ...parsed, bundle: merged } : parsed;
     }
 
     /** Create a folder and any parent it needs. */

@@ -318,9 +318,17 @@ export class DeckSessionController {
         const result = options.scheduler === DeckScheduler.Fsrs
             ? answerFsrs(current.card, options, grade, now, options.fsrs, dayBase)
             : answerCard(current.card, options, grade, now, dayBase);
+        // The answer changes this card's schedule, so it stamps the card. That
+        // stamp is what a merge with Anki (or with the other device's log)
+        // compares — without it, "newer" could never be decided and the last
+        // writer to sync would win the whole deck.
+        result.card.mod = now;
 
         this.replaceCard(bundle, result.card);
         this.answered.set(result.card.id, grade);
+        // Log first: the log is the copy that survives a sync conflict, so an
+        // answer should reach it even if the document write below fails.
+        await this.plugin.deckSyncService?.record(bundle, result.card);
         await this.store.updateCardStates(path, [result.card]);
 
         // Anki's statistics read a review log; the deck lane writes one now.

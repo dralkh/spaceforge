@@ -11,6 +11,10 @@
  * its own limits and options, and none of it touches the note-review scheduler.
  */
 
+// Type-only, and deliberately so: the merge's report describes this model, and
+// `deck-merge` imports it. A value import would be a cycle; this one is erased.
+import type { DeckMergeReport } from './deck-merge';
+
 /** Anki timestamps: milliseconds since the epoch, as a string. */
 export type AnkiId = string;
 
@@ -51,6 +55,26 @@ export enum DeckScheduler {
     Sm2 = 'sm2',
     /** FSRS (Anki 23.10+, and Spaceforge's own option). */
     Fsrs = 'fsrs',
+}
+
+/**
+ * Does this card's `due` count days from the collection's creation?
+ *
+ * Anki stores a review card's `due` as a day number relative to `col.crt` and a
+ * learning card's as a timestamp; a buried or suspended card keeps the
+ * convention of the queue it came from, which is why the queue's sign is part
+ * of the rule. Every conversion between the package's world and the deck
+ * document's asks this, so the two never disagree about what a number means.
+ */
+export function isDayBasedDue(type: number, queue: number): boolean {
+    if (queue === AnkiCardQueue.Review || queue === AnkiCardQueue.DayLearn) return true;
+    return queue < 0 && type === AnkiCardType.Review;
+}
+
+/** The timestamp-based counterpart of {@link isDayBasedDue}. */
+export function isSecondBasedDue(type: number, queue: number): boolean {
+    if (queue === AnkiCardQueue.Learning || queue === AnkiCardQueue.PreviewRepeat) return true;
+    return queue < 0 && (type === AnkiCardType.Learning || type === AnkiCardType.Relearning);
 }
 
 /**
@@ -186,7 +210,14 @@ export interface AnkiCard {
     reviews: number;
     /** How many times the card has been forgotten. */
     lapses: number;
-    /** When the card is due, ms since epoch. */
+    /**
+     * When the card is due, in the shape the scheduler compares. A review or
+     * day-learning card carries Anki's own day number — relative to the deck's
+     * `crt`, never an epoch timestamp — a learning card a millisecond
+     * timestamp, and a new card 0 (its place in the new queue is
+     * `newPosition`). Mixing the three is how an imported card reads as due
+     * tens of thousands of days out and never enters a sitting.
+     */
     due: number;
     /** Position in the new queue; null once it has been introduced. */
     newPosition: number | null;
@@ -201,6 +232,18 @@ export interface AnkiCard {
     originalPosition?: number;
     /** Accumulated review time in ms, for the statistics screen. */
     timeTakenMs?: number;
+    /**
+     * When this card's schedule last changed, ms since epoch — Anki's own
+     * `cards.mod`, which a package carries and a round trip must preserve.
+     *
+     * It is what lets two writers (Anki on the desktop, this plugin on a
+     * phone) merge per card: the newest state wins and an answer made
+     * elsewhere is never silently overwritten by an older one. Cards that
+     * predate the field, or that were never touched, leave it unset; the
+     * merge falls back to the card's own review evidence (see
+     * `cardMod()` in `models/deck-merge.ts`).
+     */
+    mod?: number;
     /**
      * How this card asks its question, when that is not what the note's own
      * shape implies. A note with two fields is a flip card, one field with
@@ -329,6 +372,19 @@ export interface ImportReport {
     warnings: string[];
     /** True when the deck replaced an earlier import of the same deck. */
     replaced: boolean;
+    /**
+     * What a re-import had to reconcile with the deck already in the vault.
+     * Present only when there was an earlier deck to merge into; a first
+     * import has nothing to report.
+     */
+    merge?: DeckMergeReport;
+    /**
+     * The day the package's own day numbers count from (Anki's `col.crt`), in
+     * seconds. A caller that has to express a due date in the *package's* frame —
+     * the AnkiConnect bridge does — needs this, because the vault's deck counts
+     * from its own day and the two differ by however long the collection lived.
+     */
+    crt?: number;
 }
 
 /** What an export produced. */

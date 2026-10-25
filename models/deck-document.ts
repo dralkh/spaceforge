@@ -78,7 +78,8 @@
  * `id`, `nid`, `ord`, `type`, `queue`, `due` (epoch ms), `ivl`, `factor`
  * (permille), `reps`, `lapses`, `flag` are always written; `did` (only when
  * the card names a deck other than this file's), `npos` (absent means the card
- * has been introduced), `drd`, `mem` (`s`, `d`, `lr`, `sd`), `odue`, `opos`
+ * has been introduced), `drd`, `mem` (`s`, `d`, `lr`, `sd`), `odue`, `opos`,
+ * `mod` (Anki's `cards.mod`, epoch ms — the stamp the per-card merge compares)
  * and `time` only when they mean something. The note's own structure rides on
  * its first card's line under `note` (`model`, `fields`, `values`, `tags`,
  * `media`, `modified`) — only when the sections alone cannot rebuild it.
@@ -136,6 +137,7 @@ import {
     DECKS_FOLDER,
     LeechAction,
     newAnkiId,
+    isDayBasedDue,
 } from './anki';
 import { asBoolValue, asNumberValue, asRecordValue, asTextList, asTextValue } from '../utils/coerce';
 
@@ -226,6 +228,7 @@ const KNOWN_CARD_KEYS = new Set<string>([
     'mem',
     'odue',
     'opos',
+    'mod',
     'time',
     'note',
 ]);
@@ -616,6 +619,8 @@ function writeCardStateInto(
     else state.odue = card.originalDue;
     if (card.originalPosition === undefined) delete state.opos;
     else state.opos = card.originalPosition;
+    if (card.mod === undefined) delete state.mod;
+    else state.mod = card.mod;
     if (card.timeTakenMs === undefined) delete state.time;
     else state.time = card.timeTakenMs;
     return state;
@@ -897,6 +902,7 @@ export function parseDeckWithWarnings(text: string, path: string): DeckParseResu
         if (Array.isArray(presets) && presets.length > 0) bundle.presets = presets as DeckPreset[];
         if (asRecordValue(meta.deckPresetOf)) bundle.deckPresetOf = meta.deckPresetOf as Record<AnkiId, string>;
         if (Object.keys(extra).length > 0) bundle.extra = extra;
+        normalizeDocumentDues(bundle);
 
         return { bundle, warnings };
     } catch (error) {
@@ -908,6 +914,34 @@ export function parseDeckWithWarnings(text: string, path: string): DeckParseResu
 function emptyBundle(path: string): DeckBundle {
     const name = path.split('/').pop()?.replace(/\.md$/, '') ?? path;
     return newDeck(name);
+}
+
+/** A day-based `due` above this cannot be a day index — a century is 36,500. */
+const DAY_INDEX_CEILING = 100_000;
+
+/**
+ * Older documents, and ones a human wrote by hand, sometimes carry a review
+ * card's `due` as an epoch timestamp where Anki's own storage — and the
+ * scheduler that reads it — uses a day number relative to the collection's
+ * creation. Such a card reads as "due tens of thousands of days out" and never
+ * appears in a sitting; it is silently lost from the queue.
+ *
+ * The deck knows the day it counts from (`crt`, kept in its meta line), so the
+ * value is converted in place when it is unmistakably a timestamp. A genuine
+ * day number is far below the ceiling and is left exactly as written.
+ */
+function normalizeDocumentDues(bundle: DeckBundle): void {
+    const crt = asNumberValue(bundle.extra?.crt);
+    if (crt === null || crt <= 0) return;
+    const createdDay = Math.floor((crt > 1e12 ? crt : crt * 1000) / 86_400_000);
+    const toDay = (value: number): number => Math.floor(value / 86_400_000) - createdDay;
+    for (const card of bundle.cards) {
+        if (!isDayBasedDue(card.type, card.queue)) continue;
+        if (Math.abs(card.due) > DAY_INDEX_CEILING) card.due = toDay(card.due);
+        if (card.originalDue !== undefined && Math.abs(card.originalDue) > DAY_INDEX_CEILING) {
+            card.originalDue = toDay(card.originalDue);
+        }
+    }
 }
 
 /** Build the deck record from the frontmatter, filling in Anki defaults. */
@@ -1141,6 +1175,8 @@ function cardFromState(state: Record<string, unknown>, deck: AnkiDeck, warnings:
     if (originalPosition !== null) card.originalPosition = originalPosition;
     const timeTaken = asNumberValue(state.time);
     if (timeTaken !== null) card.timeTakenMs = timeTaken;
+    const mod = asNumberValue(state.mod);
+    if (mod !== null) card.mod = mod;
     return card;
 }
 
