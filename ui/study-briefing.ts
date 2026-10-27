@@ -1,4 +1,4 @@
-import { Notice, setIcon } from 'obsidian';
+import { Menu, Notice, setIcon } from 'obsidian';
 import { StudyMode, StudyObjectiveStatus, StudyObjectiveType } from '../models/study';
 import type { StudyObjective, StudyPlan } from '../models/study';
 import { STUDY_DOMAINS, getDomainProfile } from '../models/study-domains';
@@ -78,6 +78,8 @@ export type StudyBriefingSection =
  * with, and nothing here reaches into the plugin.
  */
 export interface StudyBriefingHost {
+    /** The panel supplies the shared note header and view navigation. */
+    workspace?: boolean;
     /** Everything the panel computed about this note. */
     briefing: StudyBriefing;
     /** The charted plan (the figure rail lives on it), or null before a chart. */
@@ -174,17 +176,32 @@ export class StudyBriefingView {
             this.renderIntro(card, host);
         } else {
             // 3-5. What it teaches, where the reader is, what last time left.
-            this.renderObjectives(card, host);
-            this.renderProgress(card, host);
-            this.renderContext(card, host);
+            if (host.workspace) {
+                const details = card.createEl('details', { cls: 'sf-study-workspace-options' });
+                details.createEl('summary', { text: 'Objectives and previous learning' });
+                this.renderObjectives(details, host);
+                this.renderProgress(details, host);
+                this.renderContext(details, host);
+            } else {
+                this.renderObjectives(card, host);
+                this.renderProgress(card, host);
+                this.renderContext(card, host);
+            }
         }
 
         // 6. The session's options, together: mode, lookups, subject lens.
-        this.renderOptions(card, host);
+        if (host.workspace) {
+            const options = card.createEl('details', { cls: 'sf-study-workspace-options' });
+            options.createEl('summary', { text: 'Session options and figures' });
+            this.renderOptions(options, host);
+            this.renderFigures(options, host);
+        } else this.renderOptions(card, host);
 
         // 7-8. The note's figures, the material, then who is teaching.
-        this.renderFigures(card, host);
-        host.materialSlot(this.section(card, 'material'));
+        if (!host.workspace) {
+            this.renderFigures(card, host);
+            host.materialSlot(this.section(card, 'material'));
+        }
         this.renderProvider(card, host);
     }
 
@@ -238,7 +255,7 @@ export class StudyBriefingView {
         const briefing = host.briefing;
         const section = this.section(card, 'launch');
         this.launchEl = section;
-        section.createDiv({ cls: 'sf-brief-title', text: briefing.noteTitle });
+        if (!host.workspace) section.createDiv({ cls: 'sf-brief-title', text: briefing.noteTitle });
         if (briefing.topicSummary) section.createDiv({ cls: 'sf-study-topic', text: briefing.topicSummary });
         const scope = this.scopeLine(host);
         if (scope.length > 0) section.createDiv({ cls: 'sf-brief-scope', text: scope });
@@ -266,7 +283,7 @@ export class StudyBriefingView {
             primary.addEventListener('click', () => host.start(false));
         }
 
-        this.renderMaterialButtons(actions);
+        if (!host.workspace) this.renderMaterialButtons(actions);
 
         const secondary: [string, () => void, boolean][] = [];
         if (stale) secondary.push(['Start anyway', () => host.start(false), !canStart]);
@@ -576,8 +593,21 @@ export class StudyBriefingView {
         const section = this.section(card, 'options');
         section.createDiv({ cls: 'sf-study-section-title', text: 'How to run this session' });
 
-        const grid = section.createDiv('sf-study-mode-grid');
+        if (host.workspace) {
+            const mode = section.createEl('button', { cls: 'sf-btn sf-study-mode-button', text: `Mode: ${modeLabel(host.mode)}` });
+            mode.addEventListener('click', event => {
+                const menu = new Menu();
+                for (const choice of MODE_CHOICES) menu.addItem(item => item.setTitle(`${choice.label} — ${choice.blurb}`).setChecked(choice.mode === host.mode).onClick(() => {
+                    host.mode = choice.mode;
+                    mode.setText(`Mode: ${choice.label}`);
+                    host.changeMode(choice.mode);
+                }));
+                menu.showAtMouseEvent(event);
+            });
+        }
+        const grid = host.workspace ? null : section.createDiv('sf-study-mode-grid');
         for (const choice of MODE_CHOICES) {
+            if (!grid) break;
             const button = grid.createEl('button', { cls: 'sf-study-mode' });
             if (choice.mode === host.mode) button.addClass('is-selected');
             const icon = button.createSpan('sf-study-mode-icon');

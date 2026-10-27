@@ -100,7 +100,7 @@ function scriptedChat(answers: (request: ChatRequest, call: number) => ChatResul
 interface HarnessOptions {
     settings?: Partial<SpaceforgeSettings>;
     /** What the material model does: answer, or fail. */
-    material?: 'answer' | 'throw';
+    material?: 'answer' | 'throw' | 'null' | 'truncated';
 }
 
 /**
@@ -150,6 +150,8 @@ function makeHarness(options: HarnessOptions = {}) {
         calls.material += 1;
         calls.order.push('material');
         if (options.material === 'throw') throw new Error('the provider is down');
+        if (options.material === 'null') return result('not usable JSON');
+        if (options.material === 'truncated') return { ...result('{'), truncated: true };
         return result(JSON.stringify(VISUAL_REPLY));
     });
     const visualService = new StudyVisualService(plugin as never, () => materialClient);
@@ -359,7 +361,7 @@ test('concurrent asks are one run, and the visual service is asked once', async 
     assert.equal(harness.calls.questions.length, 1, 'one question preparation for two asks');
 });
 
-test('a failed material step does not stop the questions, and is logged rather than announced', async () => {
+test('a failed material step does not stop questions, and is observable without a popup', async () => {
     const harness = makeHarness({ settings: { studyAutoMaterials: true, studyAutoMcq: true }, material: 'throw' });
     const before = notices.length;
     await harness.chart('notes/acs.md', NOTE, scriptedChat(() => objectivesReply(2)));
@@ -368,8 +370,48 @@ test('a failed material step does not stop the questions, and is logged rather t
     assert.equal(harness.calls.material, 1, 'the material step ran and failed');
     assert.equal(harness.planService.getPlan('notes/acs.md')?.visuals, null, 'nothing was stored for it');
     assert.deepEqual(harness.calls.questions, ['notes/acs.md'], 'the questions were still written');
+    const status = harness.queue.getPreparationStatus('notes/acs.md');
+    assert.equal(status?.state, 'error');
+    assert.equal(status?.materials, 'error');
+    assert.equal(status?.questions, 'ready');
+    assert.match(status?.message ?? '', /provider is down/);
     const added = notices.slice(before);
     assert.equal(added.some(message => /material/i.test(message)), false, `no notice about the material: ${added.join(' | ')}`);
+});
+
+test('malformed and truncated material replies surface a parked error while questions finish', async () => {
+    for (const material of ['null', 'truncated'] as const) {
+        const harness = makeHarness({ settings: { studyAutoMaterials: true, studyAutoMcq: true }, material });
+        await harness.chart('notes/acs.md', NOTE, scriptedChat(() => objectivesReply(2)));
+        assert.equal(harness.queue.getPreparationStatus('notes/acs.md')?.state, 'error');
+        assert.match(harness.queue.getPreparationStatus('notes/acs.md')?.message ?? '', /usable|ran out of room/);
+        assert.equal(harness.calls.questions.length, 1);
+        await harness.queue.reconcilePreparation();
+        assert.equal(harness.calls.material, 1, 'no repeated quota spend after failure');
+    }
+});
+
+test('a manual visual request and background preparation share the real visual service flight', async () => {
+    const harness = makeHarness();
+    await harness.chart('notes/acs.md', NOTE, scriptedChat(() => objectivesReply(2)));
+    const plan = harness.planService.getPlan('notes/acs.md')!;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const service = new StudyVisualService(harness.plugin as never, () => ({
+        providerLabel: 'Scripted', model: 'scripted-1',
+        send: async () => { harness.calls.material++; await gate; return result(JSON.stringify(VISUAL_REPLY)); },
+    }));
+    (harness.plugin as unknown as { studyVisualService: StudyVisualService }).studyVisualService = service;
+    const direct = service.generate({
+        notePath: plan.notePath, content: NOTE, objectives: plan.objectives,
+        fingerprint: StudyPlanService.fingerprint(NOTE), profile: getDomainProfile(plan.domainId),
+    });
+    const preparation = harness.queue.retryMaterials(plan.notePath);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    release();
+    await Promise.all([direct, preparation]);
+    assert.equal(harness.calls.material, 1);
+    assert.ok(plan.visuals);
 });
 
 test('the deck lane is not charted and not followed up', async () => {

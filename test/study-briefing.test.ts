@@ -625,6 +625,18 @@ test('every class the briefing renders has a rule in the stylesheet', () => {
     }
 });
 
+test('workspace briefing retains its actions without a duplicate material row or five-mode wall', () => {
+    const h = mount({}, { workspace: true });
+    assert.equal(byClass(h.root, 'sf-brief-material-button').length, 0);
+    assert.equal(byClass(h.root, 'sf-study-mode-grid').length, 0);
+    assert.equal(byClass(h.root, 'sf-study-mode-button').length, 1);
+    assert.equal(byClass(h.root, 'sf-study-switch').length, 1, 'lookup remains reachable');
+    assert.equal(byClass(h.root, 'sf-study-domain-edit').length, 1, 'domain correction remains reachable');
+    assert.equal(h.slot, null, 'the shared workspace owns the material host');
+    byClass(h.root, 'sf-brief-primary')[0].click();
+    assert.deepEqual(h.calls.start, [false]);
+});
+
 test('mounting the briefing twice replaces it instead of stacking it', () => {
     const root = new MiniElement('div');
     const view = new StudyBriefingView();

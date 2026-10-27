@@ -63,6 +63,8 @@ export class StudyController {
     private chartProgress = new Map<string, StudyChartUpdate>();
     private chartListeners: ((update: StudyChartUpdate) => void)[] = [];
     private queueAttached = false;
+    /** One live Study surface per note; two panels would overwrite one thread. */
+    private studyOwners = new Map<string, object>();
 
     constructor(plugin: SpaceforgePlugin, planService: StudyPlanService, searchService: StudyWebSearchService) {
         this.plugin = plugin;
@@ -101,6 +103,24 @@ export class StudyController {
     }
 
     // ------------------------------------------------------------- charting
+
+    /**
+     * Claim the one live Study surface for a note.
+     *
+     * Both the dock tab and the Study window embed the same panel. They share
+     * one persisted thread, so two engines writing checkpoints would erase each
+     * other's turns. The second surface is refused rather than allowed to race.
+     */
+    acquireStudy(notePath: string, owner: object): boolean {
+        const current = this.studyOwners.get(notePath);
+        if (current && current !== owner) return false;
+        this.studyOwners.set(notePath, owner);
+        return true;
+    }
+
+    releaseStudy(notePath: string, owner: object): void {
+        if (this.studyOwners.get(notePath) === owner) this.studyOwners.delete(notePath);
+    }
 
     /**
      * Tell the controller which note is open in a study surface right now.
@@ -397,6 +417,7 @@ export class StudyController {
 
     /** Forget the plan, the progress and the sessions for a note. */
     async forgetNote(notePath: string): Promise<void> {
+        this.plugin.studyChartQueue?.cancelForNote(notePath);
         this.planService.removeForNote(notePath);
         await this.plugin.savePluginData();
         new Notice('Study data for this note was removed.');

@@ -1391,7 +1391,9 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.studyEnabled)
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.studyEnabled = value;
+                    if (!value) this.plugin.cancelStudyPreparation('all');
                     await this.plugin.savePluginData();
+                    if (value) this.plugin.reconcileStudyPreparation();
                     void this.plugin.getSidebarView()?.refresh();
                     studyBody.toggleClass('sf-hidden', !value);
                 }));
@@ -1446,12 +1448,14 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             // the chart finishing, not to background charting being on.
             new Setting(studySection)
                 .setName('Make Study material automatically')
-                .setDesc('After a note is charted, draw its mind map, boards and summary in the background — the same material the Study panel makes when you ask for it.')
+                .setDesc('Prepare the mind map, visuals and summary for charted notes, including notes already charted. Failures can be retried in review.')
                 .addToggle(toggle => toggle
                     .setValue(this.plugin.settings.studyAutoMaterials)
                     .onChange(async (value: boolean) => {
                         this.plugin.settings.studyAutoMaterials = value;
+                        if (!value) this.plugin.cancelStudyPreparation('materials');
                         await this.plugin.savePluginData();
+                        if (value) this.plugin.reconcileStudyPreparation();
                         // The hint this turns on appears in place.
                         syncAutoFollowRows();
                     }));
@@ -1463,14 +1467,16 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     .setValue(this.plugin.settings.studyAutoMcq)
                     .onChange(async (value: boolean) => {
                         this.plugin.settings.studyAutoMcq = value;
+                        if (!value) this.plugin.cancelStudyPreparation('questions');
                         await this.plugin.savePluginData();
+                        if (value) this.plugin.reconcileStudyPreparation();
                         syncAutoFollowRows();
                     }));
 
             const autoFollowRows = studySection.createDiv();
             const autoFollowInfo = autoFollowRows.createDiv({ cls: 'sf-info-box' });
             autoFollowInfo.createEl('p', {
-                text: 'A charted note is finished quietly in the background: the material first, then its questions. Nothing is made for a note that has not been charted, and a step that fails is logged rather than announced.',
+                text: 'A charted note is finished quietly in the background: material first, then questions. Already charted notes are included. Each failed step stays available to retry in review without repeating successful work.',
             });
 
             const syncAutoFollowRows = (): void => {
@@ -1818,7 +1824,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
         const configDir = this.plugin.app.vault.configDir;
         const carryStatus = carryDetails.createDiv({ cls: 'sf-info-box' });
         const describeCarry = (): string => this.plugin.settings.syncProgressThroughVault
-            ? `On. Your review progress and preferences are written to spaceforge/state/progress.json inside the vault, and picked up on any device that syncs the vault — even when ${configDir} is not synced. Anki’s address, the data path, and where a session stopped stay on this device.`
+            ? `On. Your review progress and preferences are written to spaceforge/state/progress.json inside the vault, and picked up on any device that syncs the vault — even when ${configDir} is not synced. Anki’s address, the data path, Study chats, drafts, and where a session stopped stay on this device; finished session transcripts are not copied into the portable file.`
             : `Off. Progress lives only in the plugin’s data file, which syncs only when your sync tool carries ${configDir}.`;
         carryStatus.setText(describeCarry());
 

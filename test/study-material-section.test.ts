@@ -65,11 +65,12 @@ function mount(initial: ReturnType<typeof goodPack> | null, options: {
     stale?: boolean;
     result?: () => Promise<ReturnType<typeof goodPack> | null>;
     error?: Error;
+    preparation?: { state: string; message: string; materials: string } | null;
 } = {}): Harness {
     const root = new MiniElement('div');
     const state = { pack: initial, stale: options.stale ?? false, calls: 0 };
     const host: StudyMaterialHost = {
-        snapshot: () => ({ pack: state.pack, stale: state.stale }),
+        snapshot: () => ({ pack: state.pack, stale: state.stale, preparation: options.preparation ?? null }),
         generate: async () => {
             state.calls += 1;
             if (options.error) throw options.error;
@@ -114,21 +115,49 @@ const settle = () => new Promise<void>(resolve => setImmediate(resolve));
 
 // ---------------------------------------------------------------- the empty state
 
-test('with nothing made yet the section offers the button and disables the tabs', () => {
+test('with nothing made yet the section offers generation and actionable material views', () => {
     const { root } = mount(null);
     assert.match(stateText(root), /mind map/i);
     assert.equal(generateLabel(root), 'Make it');
     const tabs = byClass(root, 'sf-study-material-tab');
     assert.equal(tabs.length, 3);
-    for (const button of tabs) assert.equal(button.classList.contains('is-disabled'), true, 'a tab with nothing behind it is disabled');
-    assert.match(flatten(root), /Nothing made yet/);
+    for (const button of tabs) assert.equal(button.classList.contains('is-disabled'), false, 'views explain their preparation state instead of being inert');
+    assert.match(flatten(root), /nothing made yet/);
 });
 
-test('a tab press with no pack does nothing rather than mounting an empty surface', () => {
+test('a tab press with no pack names the requested view and keeps generation available', () => {
     const { root } = mount(null);
     tab(root, 'Visualize')?.click();
     assert.equal(byClass(root, 'sf-vb-visual').length, 0);
-    assert.match(flatten(root), /Nothing made yet/);
+    assert.match(flatten(root), /Visualize: nothing made yet/);
+    assert.equal(tab(root, 'Visualize')?.getAttribute('aria-pressed'), 'true');
+    assert.match(flatten(root), /nothing made yet/);
+});
+
+test('a failed automatic attempt says what happened and offers the retry, not “Make it”', () => {
+    const { root } = mount(null, { preparation: { state: 'error', message: 'The model did not return usable material.', materials: 'error' } });
+    assert.match(flatten(root), /was not made/);
+    assert.match(flatten(root), /Retry material/);
+    assert.doesNotMatch(flatten(root), /nothing made yet/);
+});
+
+test('a view switch re-reads preparation, so a retry that finished while hidden is visible', () => {
+    const options: { preparation: { state: string; message: string; materials: string } | null } = {
+        preparation: { state: 'error', message: 'The model did not return usable material.', materials: 'error' },
+    };
+    const root = new MiniElement('div');
+    const state = { pack: null as ReturnType<typeof goodPack> | null };
+    const section = new StudyMaterialSection();
+    section.mount(root as unknown as HTMLElement, {
+        snapshot: () => ({ pack: state.pack, stale: false, preparation: options.preparation }),
+        generate: async () => null,
+    });
+    assert.match(flatten(root), /was not made/);
+    options.preparation = { state: 'ready', message: 'Study preparation ready', materials: 'ready' };
+    state.pack = goodPack();
+    section.setView('board');
+    assert.doesNotMatch(flatten(root), /was not made/);
+    assert.ok(byClass(root, 'sf-vb-visual').length > 0, 'the pack that arrived while hidden is drawn');
 });
 
 // ---------------------------------------------------------------- making it

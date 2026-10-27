@@ -23,6 +23,33 @@ import { detectDomain, getDomainProfile, STUDY_DOMAINS } from '../models/study-d
 import { asRecordValue, asTextList, asTextValue } from '../utils/coerce';
 import { parseImportance, parseObjectiveType } from '../utils/tutor-protocol';
 
+/** Additive persistence fields; old versions safely ignore them. */
+export interface IntegrityProgressStore extends StudyProgressStore {
+    archivedObjectives?: Record<string, { objective: StudyObjective; progress: ObjectiveProgressState; archivedAt: number }>;
+    objectiveDefinitions?: Record<string, string>;
+    pendingObjectives?: Record<string, StudyObjective>;
+    incompatibleObjectives?: Record<string, { definition?: string; progress: ObjectiveProgressState }>;
+    planFingerprint?: string;
+    deletedAt?: number;
+    renamedTo?: string;
+    restoredAt?: number;
+    noteMissingAt?: number;
+}
+
+/** Identity witness for compatibility checks, never a fuzzy match. */
+export function objectiveDefinition(objective: StudyObjective): string {
+    return JSON.stringify([objective.title.trim().toLowerCase(), objective.statement.trim().toLowerCase(), objective.type]);
+}
+
+function newObjectiveId(reserved: Set<string>): string {
+    let id: string;
+    do {
+        id = `objective-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
+    } while (reserved.has(id));
+    reserved.add(id);
+    return id;
+}
+
 /**
  * Storage and lifecycle for study plans and mastery state.
  *
@@ -69,7 +96,17 @@ export class StudyPlanService {
         return plan;
     }
 
-    savePlan(plan: StudyPlan): void {
+    /**
+     * Store a chart. Returns false when the note's study data is currently
+     * forgotten (a deletion receipt from a rename or an explicit forget); the
+     * caller must revive it first. Never fails silently: a chart that cannot be
+     * stored is a cost the reader did not agree to.
+     */
+    savePlan(plan: StudyPlan): boolean {
+        if (this.isForgotten(plan.notePath)) {
+            console.warn(`[spaceforge] Study plan for ${plan.notePath} was not saved: the note's Study data is forgotten until it is revived.`);
+            return false;
+        }
         plan.updatedAt = Date.now();
         this.normalizeDomain(plan);
         this.plans[plan.notePath] = plan;
@@ -77,6 +114,12 @@ export class StudyPlanService {
         // A chart that has just finished is the one moment worth announcing:
         // everything downstream of a plan (material, questions) waits on it.
         if (StudyPlanService.planReady(plan)) this.announcePlanReady(plan);
+        return true;
+    }
+
+    /** True while a deletion receipt owns this path. */
+    private isForgotten(notePath: string): boolean {
+        return Boolean((this.progress[notePath] as IntegrityProgressStore | undefined)?.deletedAt);
     }
 
     /**
@@ -177,11 +220,25 @@ export class StudyPlanService {
             };
             this.progress[plan.notePath] = store;
         }
+        if ((store as IntegrityProgressStore).deletedAt) return store;
         for (const objective of plan.objectives) {
             if (!store.objectives[objective.id]) {
                 store.objectives[objective.id] = createObjectiveProgress();
             }
         }
+        const integrity = store as IntegrityProgressStore;
+        integrity.planFingerprint = plan.contentFingerprint;
+        const definitions = {
+            ...integrity.objectiveDefinitions,
+            ...Object.fromEntries(plan.objectives.map(objective => [objective.id, objectiveDefinition(objective)])),
+        };
+        // Read every time a plan is touched, so retired definitions would grow
+        // for the life of the vault. Only the objectives this plan teaches need
+        // a witness; archived ones carry their own copy.
+        const active = new Set(plan.objectives.map(objective => objective.id));
+        integrity.objectiveDefinitions = Object.fromEntries(
+            Object.entries(definitions).filter(([id]) => active.has(id)),
+        );
         return store;
     }
 
@@ -197,6 +254,7 @@ export class StudyPlanService {
     resetProgress(notePath: string): void {
         const plan = this.getPlan(notePath);
         const previous = this.progress[notePath];
+        if ((previous as IntegrityProgressStore | undefined)?.deletedAt) return;
         if (!plan) {
             delete this.progress[notePath];
             return;
@@ -204,6 +262,7 @@ export class StudyPlanService {
         this.progress[notePath] = {
             notePath,
             updatedAt: Date.now(),
+            ...((previous as IntegrityProgressStore | undefined)?.restoredAt ? { restoredAt: (previous as IntegrityProgressStore).restoredAt } : {}),
             totalSessions: 0,
             completedSessions: 0,
             objectives: {},
@@ -220,8 +279,89 @@ export class StudyPlanService {
     /** Forget everything about a note (plan, progress, sessions). */
     removeForNote(notePath: string): void {
         delete this.plans[notePath];
-        delete this.progress[notePath];
+        const old = this.progress[notePath] as IntegrityProgressStore | undefined;
+        const deletedAt = Math.max(Date.now(), old?.restoredAt ?? 0, old?.deletedAt ?? 0);
+        this.progress[notePath] = {
+            notePath, updatedAt: deletedAt, deletedAt,
+            totalSessions: 0, completedSessions: 0, objectives: {},
+            tutorMemory: [], lastSessionSummary: null, scheduleSuggestions: [],
+        } as IntegrityProgressStore;
         delete this.sessions[notePath];
+    }
+
+    /**
+     * Supersede a deletion receipt because the path is live again (a new file
+     * was created there, or the reader asked to chart it). Until this runs,
+     * every writer refuses the path — which is correct for sync, and a dead end
+     * for a note that now exists.
+     */
+    reviveForNote(notePath: string): boolean {
+        const old = this.progress[notePath] as IntegrityProgressStore | undefined;
+        if (!old?.deletedAt) return false;
+        this.progress[notePath] = {
+            notePath, updatedAt: Date.now(), restoredAt: Math.max(Date.now(), old.deletedAt + 1),
+            objectives: {}, totalSessions: 0, completedSessions: 0, tutorMemory: [],
+            lastSessionSummary: null, scheduleSuggestions: [],
+        } as IntegrityProgressStore;
+        return true;
+    }
+
+    /** Move legacy buckets atomically; never overwrite another note's data. */
+    renameForNote(oldPath: string, newPath: string): boolean {
+        if (oldPath === newPath) return true;
+        if (newPath.startsWith(`${oldPath}/`)) return false;
+        const matches = (path: string): boolean => path === oldPath || path.startsWith(`${oldPath}/`);
+        const maps = [this.plans, this.progress, this.sessions];
+        const paths = new Set(maps.flatMap(map => Object.keys(map)).filter(matches));
+        for (const path of paths) {
+            const target = newPath + path.slice(oldPath.length);
+            if (!paths.has(target) && (this.plans[target] || this.sessions[target] ||
+                (this.progress[target] && !(this.progress[target] as IntegrityProgressStore).deletedAt))) return false;
+        }
+        const receipts = new Map([...paths].map(path => {
+            const target = newPath + path.slice(oldPath.length);
+            return [target, (this.progress[target] as IntegrityProgressStore | undefined)?.deletedAt ?? 0];
+        }));
+        for (const map of maps) {
+            const record = map as Record<string, unknown>;
+            const moved = [...paths].filter(path => path in record).map(path => [path, record[path]] as const);
+            for (const [path] of moved) delete record[path];
+            for (const [path, value] of moved) {
+                record[newPath + path.slice(oldPath.length)] = value;
+                const visit = (entry: unknown): void => {
+                    if (!entry || typeof entry !== 'object') return;
+                    for (const [key, child] of Object.entries(entry)) {
+                        if (typeof child === 'string' && ['notePath', 'path', 'sourcePath', 'resolvedPath', 'filePath', 'currentPath', 'target'].includes(key) && matches(child)) {
+                            (entry as Record<string, unknown>)[key] = newPath + child.slice(oldPath.length);
+                        } else if (child && typeof child === 'object') visit(child);
+                    }
+                };
+                visit(value);
+            }
+        }
+        for (const [target, deletedAt] of receipts) {
+            if (deletedAt && this.progress[target]) {
+                const store = this.progress[target] as IntegrityProgressStore;
+                store.restoredAt = Math.max(Date.now(), deletedAt + 1, store.restoredAt ?? 0);
+            }
+        }
+        for (const path of paths) {
+            this.removeForNote(path);
+            (this.progress[path] as IntegrityProgressStore).renamedTo = newPath + path.slice(oldPath.length);
+        }
+        return true;
+    }
+
+    /** A missing file retains its learning history, including folder children. */
+    markNoteMissing(notePath: string): void {
+        for (const path of new Set([...Object.keys(this.plans), ...Object.keys(this.progress)])) {
+            if (path !== notePath && !path.startsWith(`${notePath}/`)) continue;
+            const store = this.progress[path] ?? (this.plans[path] ? this.ensureProgress(this.plans[path]) : null);
+            if (store) {
+                (store as IntegrityProgressStore).noteMissingAt = Date.now();
+                store.updatedAt = Date.now();
+            }
+        }
     }
 
     /** True when the note body no longer matches the charted content. */
@@ -233,18 +373,28 @@ export class StudyPlanService {
      * Merge a freshly charted plan over an existing one.
      *
      * Objectives that still describe the same idea keep their mastery (matched
-     * by statement similarity, not by id, because ids are regenerated). New
-     * objectives start empty. Objectives present before but absent now are
-     * reported so the digest can say so out loud instead of dropping them.
+     * by definition, never by provisional positional IDs). Continuations keep
+     * their original identity; new objectives receive unique IDs and start empty.
+     * Dropped definitions and mastery are archived only when replacement is final.
      */
-    mergePlans(previous: StudyPlan | null, fresh: StudyPlan): { plan: StudyPlan; kept: number; added: number; dropped: StudyObjective[] } {
-        if (!previous) {
-            this.savePlan(fresh);
-            return { plan: fresh, kept: 0, added: fresh.objectives.length, dropped: [] };
+    mergePlans(previous: StudyPlan | null, fresh: StudyPlan, options: { final?: boolean } = {}): { plan: StudyPlan; kept: number; added: number; dropped: StudyObjective[] } {
+        const store = (this.progress[fresh.notePath] ?? (previous ? this.ensureProgress(previous) : undefined)) as IntegrityProgressStore | undefined;
+        const current = this.plans[fresh.notePath];
+        const previousObjectives = [...(previous?.objectives ?? [])];
+        for (const objective of Object.values(store?.pendingObjectives ?? {})) {
+            if (!previousObjectives.some(existing => existing.id === objective.id)) previousObjectives.push(objective);
         }
-
-        const store = this.progress[fresh.notePath];
-        const previousObjectives = previous.objectives;
+        // Continue newly discovered objectives across checkpoints too.
+        for (const objective of current?.objectives ?? []) {
+            if (!previousObjectives.some(existing => existing.id === objective.id)) previousObjectives.push(objective);
+        }
+        const reserved = new Set([
+            ...previousObjectives.map(objective => objective.id),
+            ...Object.values(this.plans).flatMap(plan => plan.objectives.map(objective => objective.id)),
+            ...Object.values(this.progress).flatMap(value => [
+                ...Object.keys(value.objectives), ...Object.keys((value as IntegrityProgressStore).archivedObjectives ?? {}),
+            ]),
+        ]);
         const usedPrevious = new Set<string>();
         /** new objective id -> previous objective id it continues. */
         const matched: Record<string, string> = {};
@@ -253,7 +403,8 @@ export class StudyPlanService {
         const mergedObjectives: StudyObjective[] = [];
 
         for (const objective of fresh.objectives) {
-            const match = previousObjectives.find(candidate =>
+            const match = previousObjectives.find(candidate => !usedPrevious.has(candidate.id) &&
+                objectiveDefinition(candidate) === objectiveDefinition(objective)) ?? previousObjectives.find(candidate =>
                 !usedPrevious.has(candidate.id) && StudyPlanService.similar(candidate, objective)
             );
             if (match) {
@@ -261,51 +412,62 @@ export class StudyPlanService {
                 matched[objective.id] = match.id;
                 kept++;
             } else {
+                matched[objective.id] = newObjectiveId(reserved);
                 added++;
             }
-            mergedObjectives.push(objective);
+            mergedObjectives.push({ ...objective, id: matched[objective.id], prerequisites: [...objective.prerequisites] });
         }
 
+        for (const objective of mergedObjectives) {
+            objective.prerequisites = objective.prerequisites.map(id => matched[id]).filter((id): id is string => !!id && id !== objective.id);
+        }
         const dropped = previousObjectives.filter(objective => !usedPrevious.has(objective.id));
-        const carriedMemory = Array.from(new Set([...(previous.tutorMemory ?? []), ...(fresh.tutorMemory ?? [])])).slice(-20);
+        const carriedMemory = Array.from(new Set([...(previous?.tutorMemory ?? []), ...(fresh.tutorMemory ?? [])])).slice(-20);
 
         const merged: StudyPlan = {
             ...fresh,
             objectives: mergedObjectives,
             tutorMemory: carriedMemory,
-            images: fresh.images.length > 0 ? fresh.images : previous.images,
+            images: fresh.images.length > 0 ? fresh.images : previous?.images ?? [],
+            visuals: fresh.visuals ?? current?.visuals ?? previous?.visuals ?? null,
             chartState: fresh.chartState,
-            generatedAt: previous.generatedAt,
+            generatedAt: previous?.generatedAt ?? fresh.generatedAt,
             version: STUDY_DATA_VERSION,
             // A chart that only gained objectives is not a content drift.
             contentFingerprint: fresh.contentFingerprint,
-            domainOverriddenByUser: previous.domainOverriddenByUser,
+            domainOverriddenByUser: previous?.domainOverriddenByUser ?? fresh.domainOverriddenByUser,
         };
 
-        this.savePlan(merged);
-
-        // Rebuild the progress map explicitly instead of reusing ids.
-        //
-        // Ids are positional ('obj-1', 'obj-2', ...), so an objective that
-        // moved position would otherwise inherit the mastery of whatever used
-        // to sit there. Only a matched objective carries its state over;
-        // everything else starts clean.
+        // Stable IDs make repeated merge(original, partial) non-destructive.
+        // Until the chart is final, unseen objectives remain in the live store.
         if (store) {
-            const rebuilt: Record<string, ObjectiveProgressState> = {};
             for (const objective of mergedObjectives) {
-                const previousId = matched[objective.id];
-                const carried = previousId ? store.objectives[previousId] : undefined;
-                rebuilt[objective.id] = carried ? { ...carried } : createObjectiveProgress();
+                store.objectives[objective.id] ??= createObjectiveProgress();
             }
-            store.objectives = rebuilt;
-            if (dropped.length > 0) {
+            const final = options.final ?? StudyPlanService.planReady(fresh);
+            store.pendingObjectives = final ? {} : Object.fromEntries(dropped.map(objective => [objective.id, structuredClone(objective)]));
+            if (final) {
+                store.archivedObjectives ??= {};
+                for (const objective of dropped) {
+                    if (!store.objectives[objective.id]) continue;
+                    store.archivedObjectives[objective.id] = {
+                        objective: structuredClone(objective),
+                        progress: structuredClone(store.objectives[objective.id]), archivedAt: Date.now(),
+                    };
+                    delete store.objectives[objective.id];
+                }
+                const active = new Set(mergedObjectives.map(objective => objective.id));
+                store.scheduleSuggestions = store.scheduleSuggestions.filter(suggestion => active.has(suggestion.objectiveId));
+            }
+            if (final && dropped.length > 0) {
                 store.tutorMemory = Array.from(new Set([
                     ...store.tutorMemory,
                     `Re-charted: ${dropped.length} objective(s) are no longer in the note.`,
                 ])).slice(-20);
             }
+            store.updatedAt = Date.now();
         }
-
+        this.savePlan(merged);
         return { plan: merged, kept, added, dropped };
     }
 
@@ -600,13 +762,19 @@ export class StudyPlanService {
         return list.length > 0 ? list[0] : null;
     }
 
-    saveSession(session: StudySessionRecord): void {
+    /** Store a finished sitting. False when the path is currently forgotten. */
+    saveSession(session: StudySessionRecord): boolean {
+        if (this.isForgotten(session.notePath)) {
+            console.warn(`[spaceforge] Study session for ${session.notePath} was not saved: the note's Study data is forgotten until it is revived.`);
+            return false;
+        }
         const list = this.sessions[session.notePath] ?? [];
         const index = list.findIndex(existing => existing.id === session.id);
         if (index >= 0) list[index] = StudySessionRecordLimit(session);
         else list.unshift(StudySessionRecordLimit(session));
         list.sort((a, b) => b.startedAt - a.startedAt);
         this.sessions[session.notePath] = list.slice(0, STUDY_MAX_SESSIONS_PER_NOTE);
+        return true;
     }
 
     /** Record that a session started. */

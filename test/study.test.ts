@@ -259,7 +259,9 @@ test('re-charting keeps earned mastery on matching objectives and drops the rest
     const carried = service.getProgress('a.md')?.objectives['obj-1'];
     assert.equal(carried?.U, 3, 'mastery followed the matching objective');
     assert.equal(carried?.successfulDays.length, 2);
-    const fresh = service.getProgress('a.md')?.objectives['obj-2'];
+    const freshId = merged.plan.objectives.find(objective => objective.title === 'Membrane pumps')!.id;
+    assert.notEqual(freshId, 'obj-2', 'a retired positional ID is never reassigned');
+    const fresh = service.getProgress('a.md')?.objectives[freshId];
     assert.equal(fresh?.U, 0, 'the new objective starts empty');
     assert.ok(service.getProgress('a.md')?.tutorMemory.some(line => /no longer in the note/.test(line)));
 });

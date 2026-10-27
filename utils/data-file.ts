@@ -17,10 +17,14 @@
  *
  * Why the Adapter API: everything here reads and writes files inside
  * `.obsidian/plugins/spaceforge/`, which the Vault API does not address (it covers
- * the vault's notes, not the app's own configuration directory). The write is also
- * deliberately not `Vault.process`: it is a whole-file replace through a temp file
- * and a rename, so a crash mid-write cannot leave a half-written data file behind.
+ * the vault's notes, not the app's own configuration directory). The write is not
+ * `Vault.process` either: it keeps a complete `path.previous` copy of the state
+ * being replaced and then writes `path` in place, both under permanent names, so a
+ * sync client never sees a file appear and vanish. A crash mid-write can leave a
+ * partial primary, and `.previous` is the last complete state the loader can use.
  */
+
+import { mergeStudyState } from '../services/progress-mirror';
 
 /** The slice of Obsidian's DataAdapter this module needs. */
 export interface DataFileAdapter {
@@ -108,6 +112,21 @@ export function historyOf(data: PluginDataShape | null): unknown[] {
     return Array.isArray(history) ? history : [];
 }
 
+/** Study-only files are real data, even when the learner has no schedules. */
+export function studyRecordCount(data: PluginDataShape | null): number {
+    const state = pluginStateRecord(data);
+    let count = 0;
+    for (const key of ['studyPlans', 'studyProgress', 'studySessions']) {
+        const collection = state[key];
+        if (!collection || typeof collection !== 'object' || Array.isArray(collection)) continue;
+        for (const value of Object.values(collection)) {
+            if (key === 'studySessions') count += Array.isArray(value) ? value.length : 0;
+            else if (value && typeof value === 'object' && !Array.isArray(value)) count++;
+        }
+    }
+    return count;
+}
+
 /**
  * Write JSON so a crash cannot cost the state, without ever leaving a file that
  * appears and vanishes.
@@ -130,7 +149,7 @@ export function historyOf(data: PluginDataShape | null): unknown[] {
  * holding the last complete state, and the loader already prefers it over a file it
  * cannot parse.
  */
-export async function writeJsonAtomically(
+export async function writeJsonWithPreviousCopy(
     adapter: DataFileAdapter,
     path: string,
     value: unknown,
@@ -216,7 +235,7 @@ export async function collectRecoverableCandidates(
         });
     }
 
-    return candidates.sort((a, b) => (b.schedules - a.schedules) || (b.mtime - a.mtime));
+    return candidates.sort((a, b) => (b.schedules - a.schedules) || (studyRecordCount(b.data) - studyRecordCount(a.data)) || (b.mtime - a.mtime));
 }
 
 /** True for names that hold a previous copy of the data file. */
@@ -270,6 +289,7 @@ export function mergePluginStates<T extends PluginDataShape>(
         ...current,
         pluginState: {
             ...pluginStateRecord(current),
+            ...mergeStudyState(pluginStateRecord(current), pluginStateRecord(incoming), true),
             schedules: currentSchedules,
             history: currentHistory,
         },

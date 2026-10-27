@@ -11,7 +11,7 @@ import {
     parsePluginData,
     readTextOrNull,
     schedulesOf,
-    writeJsonAtomically,
+    writeJsonWithPreviousCopy,
     type DataFileAdapter,
     type PluginDataShape,
 } from '../utils/data-file';
@@ -69,7 +69,7 @@ test('a save never creates a file that appears and then vanishes', async () => {
     // appeared and renamed away a millisecond later, so Nextcloud reported an
     // error on every save. Both names a save touches must be permanent.
     const { adapter, store, log } = fakeAdapter({ 'dir/data.json': '{"old":true}' });
-    await writeJsonAtomically(adapter, 'dir/data.json', { hello: 'world' });
+    await writeJsonWithPreviousCopy(adapter, 'dir/data.json', { hello: 'world' });
 
     assert.deepEqual(log, ['read dir/data.json', 'write dir/data.json.previous', 'write dir/data.json']);
     assert.equal(log.some(entry => entry.includes('.tmp')), false, 'no temp file is written');
@@ -82,7 +82,7 @@ test('a previous copy is overwritten with the state it is about to replace', asy
         'dir/data.json': '{"old":true}',
         'dir/data.json.previous': '{"older":true}',
     });
-    await writeJsonAtomically(adapter, 'dir/data.json', { hello: 'world' });
+    await writeJsonWithPreviousCopy(adapter, 'dir/data.json', { hello: 'world' });
     assert.deepEqual(JSON.parse(store.get('dir/data.json.previous')!), { old: true });
 });
 
@@ -103,7 +103,7 @@ test('a save lands even when the adapter cannot rename at all', async () => {
     // not a special case any more — the data simply arrives.
     const { adapter, store } = fakeAdapter({}, { refuseRename: true });
     const warnings: string[] = [];
-    await writeJsonAtomically(adapter, 'dir/data.json', { kept: true }, message => warnings.push(message));
+    await writeJsonWithPreviousCopy(adapter, 'dir/data.json', { kept: true }, message => warnings.push(message));
 
     assert.equal(JSON.parse(store.get('dir/data.json')!).kept, true, 'the data landed');
     assert.deepEqual(warnings, [], 'nothing to warn about');
@@ -111,7 +111,7 @@ test('a save lands even when the adapter cannot rename at all', async () => {
 
 test('a temp file left by an earlier version is cleared on the next save', async () => {
     const { adapter, store } = fakeAdapter({ 'dir/data.json': '{"old":true}', 'dir/data.json.tmp': 'stale' });
-    await writeJsonAtomically(adapter, 'dir/data.json', { hello: 'world' });
+    await writeJsonWithPreviousCopy(adapter, 'dir/data.json', { hello: 'world' });
     assert.equal(store.has('dir/data.json.tmp'), false, 'the legacy temp is gone');
 });
 

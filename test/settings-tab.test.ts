@@ -28,6 +28,7 @@ interface Harness {
     containerEl: MiniElement;
     /** The settings the tab is reading and writing. */
     settings: SpaceforgeSettings;
+    preparations(): number;
     /** The row with this title, as the current render left it. */
     find(name: string): Setting;
     /** Every attached row with this title (headings count too). */
@@ -59,6 +60,9 @@ function makeTab(overrides: Partial<SpaceforgeSettings> = {}): Harness {
         manifest: { id: 'spaceforge', version: '0.0.0' },
         pluginState: JSON.parse(JSON.stringify(DEFAULT_PLUGIN_STATE_DATA)),
         saves: 0,
+        preparationCalls: 0,
+        reconcileStudyPreparation() { this.preparationCalls += 1; },
+        cancelStudyPreparation() { /* fences in-flight work without starting new work */ },
         async savePluginData() { this.saves += 1; },
         register() { /* the tab registers its key capture here */ },
         initializeMCQComponents() { /* rebuilds services, not the tab */ },
@@ -97,10 +101,22 @@ function makeTab(overrides: Partial<SpaceforgeSettings> = {}): Harness {
     const sectionTitles = (): string[] => containerEl.byClass('sf-settings-section')
         .map(candidate => candidate.find(el => el.hasClass('setting-item-name'))?.text ?? '');
 
-    return { tab, containerEl, settings, find, named, section, sectionTitles, rows };
+    return { tab, containerEl, settings, find, named, section, sectionTitles, rows, preparations: () => plugin.preparationCalls };
 }
 
 /** The same elements, in the same order: what "the tab was not rebuilt" means. */
+test('enabling automatic material or questions reconciles already charted notes without rebuilding settings', async () => {
+    const h = makeTab({ studyEnabled: true });
+    const before = h.rows().map(row => row.settingEl);
+    await h.find('Make Study material automatically').toggle?.change(true);
+    assert.equal(h.preparations(), 1);
+    await h.find('Write questions automatically').toggle?.change(true);
+    assert.equal(h.preparations(), 2);
+    await h.find('Make Study material automatically').toggle?.change(false);
+    assert.equal(h.preparations(), 2, 'disabling must not start another job');
+    assertSameElements(h.rows().map(row => row.settingEl), before, 'preparation must not rebuild settings');
+});
+
 function assertSameElements(after: MiniElement[], before: MiniElement[], message: string): void {
     assert.equal(
         after.length === before.length && after.every((el, index) => el === before[index]),

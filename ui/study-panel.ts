@@ -1,4 +1,4 @@
-import { Component, MarkdownRenderer, Menu, Notice, TFile, setIcon } from 'obsidian';
+import { Component, EventRef, MarkdownRenderer, Menu, Notice, TFile, setIcon } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import {
     STUDY_ERROR_LABELS,
@@ -19,10 +19,10 @@ import {
 import { STUDY_DOMAINS, getDomainProfile } from '../models/study-domains';
 import { StudyImageRef } from '../utils/study-media';
 import { StudyChartUpdate, StudyController } from '../controllers/study-controller';
-import { StudyBriefing, StudySessionService } from '../services/study-session-service';
+import { StudyBriefing, StudyCommand, StudySessionService } from '../services/study-session-service';
 import { StudyPlanService } from '../services/study-plan-service';
 import { StudyVisualPack } from '../models/study-visuals';
-import { StudyMaterialHost, StudyMaterialSection } from './study-material-section';
+import { StudyMaterialHost, StudyMaterialSection, StudyMaterialState, StudyMaterialView, studyPackStateKey } from './study-material-section';
 import {
     MODE_CHOICES,
     STATUS_LABELS,
@@ -32,6 +32,15 @@ import {
     modeLabel,
 } from './study-briefing';
 import { EstimationUtils } from '../utils/estimation';
+import { stripRestatedQuestion } from './study-copy';
+import { repairStudyWorkspace, studyUniqueId } from '../models/study-workspace';
+
+interface WorkspaceViewState {
+    activeView?: 'learn' | StudyMaterialView;
+    objectiveId?: string | null;
+    scroll?: Record<string, number>;
+    material?: StudyMaterialState;
+}
 
 export interface StudyPanelOptions {
     /** Tighter layout for embedding above other content. */
@@ -81,6 +90,7 @@ export class StudyPanel {
     private session: StudySessionService | null = null;
     private unsubscribeSession: (() => void) | null = null;
     private unsubscribeChart: (() => void) | null = null;
+    private unsubscribePreparation: (() => void) | null = null;
     private renderComponent = new Component();
     private closed = false;
     private finished = false;
@@ -99,6 +109,22 @@ export class StudyPanel {
     private content = '';
     private briefing: StudyBriefing | null = null;
     private mounted = false;
+    private learningEl: HTMLElement | null = null;
+    private materialEl: HTMLElement | null = null;
+    private viewButtons = new Map<string, HTMLButtonElement>();
+    private activeView: 'learn' | StudyMaterialView = 'learn';
+    private viewState: WorkspaceViewState = {};
+    private workspaceProgress: HTMLElement | null = null;
+    private objectiveChooser: HTMLSelectElement | null = null;
+    private saveTimer: number | null = null;
+    private workspaceResize: ResizeObserver | null = null;
+    private starting = false;
+    private readonly leaseToken = {};
+    private leasePath: string | null = null;
+    private renameRef: EventRef | null = null;
+    private deleteRef: EventRef | null = null;
+    private modifyRef: EventRef | null = null;
+    private modifyTimer: number | null = null;
 
     constructor(plugin: SpaceforgePlugin, controller: StudyController, notePath: string, options: StudyPanelOptions = {}) {
         this.plugin = plugin;
@@ -119,6 +145,13 @@ export class StudyPanel {
         container.addClass('sf-study-panel');
         if (this.options.compact) container.addClass('is-compact');
         this.root = container;
+        if (typeof ResizeObserver !== 'undefined') {
+            this.workspaceResize = new ResizeObserver(() => {
+                const height = container.clientHeight;
+                this.overflowEl?.toggleClass('is-short', height > 0 && height < 480);
+            });
+            this.workspaceResize.observe(container);
+        }
 
         this.chartLineEl = container.createDiv('sf-study-chartline');
         this.overflowEl = container.createDiv('sf-study-panel-body');
@@ -126,15 +159,114 @@ export class StudyPanel {
         this.unsubscribeChart = this.controller.subscribeChart(update => {
             if (update.path === this.notePath) this.onChartProgress(update);
         });
+        this.unsubscribePreparation = this.plugin.studyChartQueue?.subscribePreparation?.(status => {
+            if (status.notePath !== this.notePath || this.closed) return;
+            this.materialSection?.refresh();
+            if (status.materials === 'ready') void this.controller.readNote(this.notePath).then(content => {
+                if (this.closed) return;
+                if (content !== null) this.content = content;
+                this.materialSection?.refresh();
+            });
+        }) ?? null;
+        const vault = this.plugin.app?.vault;
+        if (vault) {
+            this.renameRef = vault.on('rename', (file, oldPath) => {
+                const moved = this.movedPath(oldPath, file.path);
+                if (moved) void this.followNote(moved);
+            });
+            this.deleteRef = vault.on('delete', file => {
+                if (file.path === this.notePath) this.noteGone();
+            });
+            this.modifyRef = vault.on('modify', file => {
+                if (file.path !== this.notePath) return;
+                if (this.modifyTimer !== null) window.clearTimeout(this.modifyTimer);
+                this.modifyTimer = window.setTimeout(() => {
+                    this.modifyTimer = null;
+                    void this.refreshNoteContent();
+                }, 250);
+            });
+        }
 
         void this.init();
     }
 
+    /** The path this panel would have after a file or folder move, if it moved. */
+    private movedPath(oldPath: string, newPath: string): string | null {
+        if (this.notePath === oldPath) return newPath;
+        if (this.notePath.startsWith(`${oldPath}/`)) return newPath + this.notePath.slice(oldPath.length);
+        return null;
+    }
+
+    private releaseStudyLease(): void {
+        if (this.leasePath && typeof this.controller.releaseStudy === 'function') {
+            this.controller.releaseStudy(this.leasePath, this.leaseToken);
+        }
+        this.leasePath = null;
+    }
+
+    /** A moved note keeps its sitting: checkpoint, rebind, then restore in place. */
+    private async followNote(newPath: string): Promise<void> {
+        if (newPath === this.notePath) return;
+        if (this.session && !this.finished) {
+            if (this.inputEl && this.inputEl.value !== this.session.getDraft()) this.session.setDraft(this.inputEl.value);
+            try { this.session.suspend(); } catch { /* the save path reports */ }
+        }
+        this.stopTicker();
+        this.unsubscribeSession?.();
+        this.unsubscribeSession = null;
+        this.session = null;
+        this.releaseStudyLease();
+        this.notePath = newPath;
+        this.noteTitle = (newPath.split('/').pop() ?? newPath).replace(/\.md$/, '');
+        this.finished = false;
+        this.resultRecorded = false;
+        this.starting = false;
+        await this.init();
+    }
+
+    /** Deleted is not forgotten: keep the history, stop writing, and say so. */
+    private noteGone(): void {
+        if (this.session && !this.finished) {
+            if (this.inputEl && this.inputEl.value !== this.session.getDraft()) this.session.setDraft(this.inputEl.value);
+            try { this.session.suspend(); } catch { /* the history is still in memory */ }
+        }
+        this.stopTicker();
+        this.unsubscribeSession?.();
+        this.unsubscribeSession = null;
+        this.session = null;
+        this.finished = false;
+        this.releaseStudyLease();
+        this.controller.setStudyingNote?.(null);
+        this.renderFailure('This note was deleted. Its learning history is kept; restore the note to continue.');
+    }
+
+    /** The note changed in another pane: freshness follows it without a remount. */
+    private async refreshNoteContent(): Promise<void> {
+        const content = await this.controller.readNote(this.notePath);
+        if (this.closed || content === null) return;
+        this.content = content;
+        this.briefing = StudySessionService.prepare(
+            this.plugin,
+            this.controller.planService,
+            this.controller.searchService,
+            this.notePath,
+            content,
+        );
+        if (!this.finished && !this.session) this.renderBriefing();
+        this.materialSection?.refresh();
+        this.updateWorkspaceProgress();
+    }
+
     /** Tear the panel down: abort any session and unsubscribe everything. */
     unmount(): void {
+        this.captureWorkspace();
+        this.saveWorkspace();
+        if (this.session && this.inputEl && this.inputEl.value !== this.session.getDraft()) this.session.setDraft(this.inputEl.value);
         this.closed = true;
         this.mounted = false;
         this.stopTicker();
+        this.workspaceResize?.disconnect();
+        this.workspaceResize = null;
         this.unsubscribeSession?.();
         this.briefingView?.destroy();
         this.briefingView = null;
@@ -143,17 +275,31 @@ export class StudyPanel {
         this.unsubscribeSession = null;
         this.unsubscribeChart?.();
         this.unsubscribeChart = null;
+        this.unsubscribePreparation?.();
+        this.unsubscribePreparation = null;
+        const vault = this.plugin.app?.vault;
+        if (this.renameRef && vault) vault.offref(this.renameRef);
+        this.renameRef = null;
+        if (this.deleteRef && vault) vault.offref(this.deleteRef);
+        this.deleteRef = null;
+        if (this.modifyRef && vault) vault.offref(this.modifyRef);
+        this.modifyRef = null;
+        if (this.modifyTimer !== null) window.clearTimeout(this.modifyTimer);
+        this.modifyTimer = null;
         if (this.session && !this.finished) {
             const session = this.session;
-            session.abort();
             try {
-                session.finish(false);
+                session.suspend();
             } catch {
                 // The window is going away; nothing useful to do.
             }
-            void this.plugin.savePluginData();
         }
+        void this.plugin.savePluginData().catch(() => new Notice('Study progress could not be saved. Reopen the workspace to retry.'));
         this.session = null;
+        this.releaseStudyLease();
+        this.controller.setStudyingNote?.(null);
+        if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+        this.saveTimer = null;
         this.renderComponent.unload();
         this.root?.empty();
         this.root = null;
@@ -173,6 +319,7 @@ export class StudyPanel {
 
     private async init(): Promise<void> {
         const content = await this.controller.readNote(this.notePath);
+        if (this.closed) return;
         if (content === null) {
             this.renderFailure('This note could not be read. It may have been moved or deleted.');
             return;
@@ -181,10 +328,35 @@ export class StudyPanel {
         this.briefing = StudySessionService.prepare(this.plugin, this.controller.planService, this.controller.searchService, this.notePath, content);
         if (this.briefing.hasPlan) this.mode = this.briefing.suggestedMode;
         this.webSearch = this.briefing.webDefault;
+        const plan = this.controller.planService.getPlan(this.notePath);
+        const store = this.controller.planService.getProgress(this.notePath);
+        const savedWorkspace = store?.workspace
+            ? repairStudyWorkspace(store.workspace, plan ? new Set(plan.objectives.map(objective => objective.id)) : null)
+            : null;
+        if (savedWorkspace && store) store.workspace = savedWorkspace.workspace;
+        if (savedWorkspace && savedWorkspace.droppedThreads > 0) {
+            new Notice(`Study removed ${savedWorkspace.droppedThreads} unreadable or over-limit conversation${savedWorkspace.droppedThreads === 1 ? '' : 's'}.`, 6000);
+        }
+        if (savedWorkspace?.changed) this.saveWorkspace();
+        this.viewState = (store?.workspace?.viewState ?? {}) as WorkspaceViewState;
+        this.pruneViewState();
+        this.activeView = this.viewState.activeView ?? 'learn';
+        this.buildWorkspace();
         this.renderBriefing();
+        const workspace = store?.workspace;
+        const savedThread = workspace?.activeThreadId ? workspace.threads[workspace.activeThreadId] : null;
+        const savedIsCurrent = savedThread !== null
+            && !savedThread.archived
+            && savedThread.objective !== null
+            && (plan?.objectives.some(objective => objective.id === savedThread.objective!.id) ?? false);
+        // Resume only when there is real unfinished work: an unanswered request
+        // or typed draft. Opening a note to browse must not look like a sitting.
+        const resumable = !!savedThread
+            && (savedThread.draft.trim().length > 0 || savedThread.checkpoint.pendingRequest !== null);
+        if (savedThread && savedIsCurrent && savedThread.checkpoint.finished && !this.freshStart) void this.startSession(true);
+        else if (savedThread && savedIsCurrent && (this.freshStart || resumable)) void this.startSession();
 
         // Kick off charting in the background if the note is not fully charted.
-        const plan = this.controller.planService.getPlan(this.notePath);
         const state = plan?.chartState ?? null;
         const incomplete = !plan || !state || state.done.length < state.total;
         if (incomplete && this.controller.status().ok && !this.controller.isCharting(this.notePath)) {
@@ -193,6 +365,137 @@ export class StudyPanel {
             const update = this.controller.chartUpdate(this.notePath);
             if (update) this.onChartProgress(update);
         }
+    }
+
+    private buildWorkspace(): void {
+        const host = this.overflowEl;
+        if (!host) return;
+        host.empty();
+        this.materialSection?.destroy();
+        this.materialSection = null;
+        host.addClass('sf-study-workspace');
+        const heading = host.createDiv('sf-study-workspace-heading');
+        const title = heading.createEl('button', { cls: 'sf-study-workspace-note', text: this.noteTitle });
+        title.setAttribute('title', 'Open source note');
+        title.addEventListener('click', () => void this.plugin.app.workspace.openLinkText(this.notePath, '', false));
+        this.workspaceProgress = heading.createDiv('sf-study-workspace-progress');
+        this.updateWorkspaceProgress();
+        const nav = host.createDiv('sf-study-workspace-views');
+        nav.setAttribute('role', 'group');
+        nav.setAttribute('aria-label', 'Learning view');
+        this.viewButtons.clear();
+        for (const [view, label] of [['learn', 'Learn'], ['board', 'Visualize'], ['mindmap', 'Mind map'], ['summary', 'Summary']] as const) {
+            const button = nav.createEl('button', { cls: 'sf-study-workspace-view', text: label });
+            button.addEventListener('click', () => this.switchWorkspaceView(view));
+            this.viewButtons.set(view, button);
+        }
+        this.learningEl = host.createDiv('sf-study-workspace-learn');
+        this.materialEl = host.createDiv('sf-study-workspace-material');
+        this.switchWorkspaceView(this.activeView, false);
+    }
+
+    private switchWorkspaceView(view: 'learn' | StudyMaterialView, capture = true): void {
+        if (capture) this.captureWorkspace();
+        this.activeView = view;
+        this.viewState.activeView = view;
+        this.learningEl?.toggleClass('sf-hidden', view !== 'learn');
+        this.materialEl?.toggleClass('sf-hidden', view === 'learn');
+        for (const [id, button] of this.viewButtons) {
+            button.toggleClass('is-selected', view === id);
+            button.setAttribute('aria-pressed', String(view === id));
+        }
+        if (view !== 'learn' && this.materialEl) {
+            if (!this.materialSection) this.renderMaterialSection(this.materialEl);
+            this.materialSection?.setView(view);
+        }
+        const key = `${view}:${this.session?.getActiveObjectiveId() ?? ''}`;
+        if (this.overflowEl) this.overflowEl.scrollTop = this.viewState.scroll?.[key] ?? 0;
+        this.saveWorkspace();
+    }
+
+    private captureWorkspace(): void {
+        const key = `${this.activeView}:${this.session?.getActiveObjectiveId() ?? ''}`;
+        (this.viewState.scroll ??= {})[key] = this.overflowEl?.scrollTop ?? 0;
+        if (this.streamEl && this.session) this.viewState.scroll[`thread:${this.session.getActiveObjectiveId() ?? ''}`] = this.streamEl.scrollTop;
+    }
+
+    private saveWorkspace(): void {
+        this.pruneViewState();
+        const store = this.controller.planService.getProgress(this.notePath);
+        if (store) {
+            store.workspace ??= { schema: 1, id: studyUniqueId('workspace'), activeThreadId: null, threads: {}, updatedAt: Date.now() };
+            store.workspace.viewState = { ...this.viewState };
+        }
+        if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+        this.saveTimer = window.setTimeout(() => {
+            this.saveTimer = null;
+            void this.plugin.savePluginData().then(
+                saved => { if (saved === false) this.renderError('Progress not saved', 'Your work remains here. Try saving again before closing.'); },
+                () => this.renderError('Progress not saved', 'Your work remains here. Try saving again before closing.'),
+            );
+        }, 300);
+    }
+
+    /** View state is cache: one material entry, and no retired packs. */
+    private pruneViewState(): void {
+        const packs = this.viewState.material?.packs;
+        if (!packs) return;
+        const pack = this.controller.planService.getPlan(this.notePath)?.visuals ?? null;
+        const keep = pack ? studyPackStateKey(pack) : null;
+        for (const key of Object.keys(packs)) if (key !== keep) delete packs[key];
+    }
+
+    private updateWorkspaceProgress(): void {
+        const el = this.workspaceProgress;
+        if (!el) return;
+        el.empty();
+        const objectives = this.controller.planService.getPlan(this.notePath)?.objectives ?? [];
+        const store = this.controller.planService.getProgress(this.notePath);
+        const practiced = objectives.filter(objective => (store?.objectives[objective.id]?.attempts ?? 0) > 0).length;
+        el.createSpan({ text: practiced ? `${practiced} of ${objectives.length} objectives practiced` : `${objectives.length} objectives ready` });
+        const bar = el.createEl('progress', { attr: { max: String(Math.max(1, objectives.length)), value: String(practiced), 'aria-label': 'Objectives practiced' } });
+        bar.setAttribute('title', 'Practice is not durable mastery');
+    }
+
+    private restoreConversation(): void {
+        const session = this.session;
+        if (!session || !this.streamEl) return;
+        this.pendingChoiceButtons = [];
+        const stream = this.streamEl;
+        stream.empty();
+        const prompt = session.getPendingPrompt();
+        const transcript = session.getVisibleTranscript();
+        // The live prompt is rendered once below with its controls. Only the
+        // last matching question is the live one: repeated wording is normal,
+        // and earlier copies are history the reader may still need.
+        let liveQuestion = -1;
+        for (let index = transcript.length - 1; index >= 0; index -= 1) {
+            const record = transcript[index];
+            if (record.kind === 'question' && record.text === prompt?.text) {
+                liveQuestion = index;
+                break;
+            }
+        }
+        transcript.forEach((record, index) => {
+            // The pending question is rendered once below with its live controls.
+            if (index === liveQuestion) return;
+            if (record.role === 'user') this.appendUserTurn(record.text);
+            else {
+                const bubble = stream.createDiv(`sf-study-turn sf-study-turn-${record.role}`);
+                bubble.createDiv({ cls: 'sf-study-turn-role', text: record.role === 'tutor' ? 'Tutor' : 'Study' });
+                const body = bubble.createDiv('sf-study-turn-body markdown-rendered');
+                this.renderMarkdown(
+                    record.kind === 'explain' ? stripRestatedQuestion(record.text, prompt?.text) : record.text,
+                    body,
+                );
+            }
+        });
+        if (prompt) this.renderPrompt(prompt);
+        if (this.inputEl) this.inputEl.value = session.getDraft();
+        this.markActiveObjective(session.getActiveObjectiveId());
+        stream.scrollTop = this.viewState.scroll?.[`thread:${session.getActiveObjectiveId() ?? ''}`] ?? stream.scrollHeight;
+        this.setBusy(session.isBusy(), 'Thinking…');
+        this.updateWorkspaceProgress();
     }
 
     // ------------------------------------------------------------- material
@@ -209,8 +512,10 @@ export class StudyPanel {
         const host: StudyMaterialHost = {
             snapshot: () => this.materialSnapshot(),
             generate: () => this.generateVisuals(),
+            state: this.viewState.material ??= {},
+            saveState: () => this.saveWorkspace(),
         };
-        section.mount(card, host);
+        section.mount(card, host, { externalNavigation: true });
     }
 
     /**
@@ -219,22 +524,32 @@ export class StudyPanel {
      * since it was made. One method for both, so the row beside the primary
      * action and the section's own state line can never disagree about it.
      */
-    private materialSnapshot(): { pack: StudyVisualPack | null; stale: boolean } {
+    private materialSnapshot(): ReturnType<StudyMaterialHost['snapshot']> {
         const pack = this.controller.planService.getPlan(this.notePath)?.visuals ?? null;
         return {
             pack,
+            preparation: this.plugin.studyChartQueue?.getPreparationStatus?.(this.notePath) ?? null,
             // Against the note as it is now, not the fingerprint the chart
             // stored: a note edited after charting is exactly the case this
             // line exists for, and the stored fingerprint never moves.
             stale: this.plugin.studyVisualService.isStale(
                 pack,
                 StudyPlanService.fingerprint(this.content),
-            ) || this.briefing?.stale === true,
+            ),
         };
     }
 
     /** Make the pack and keep it on the plan; the section paints the result. */
     private async generateVisuals(): Promise<StudyVisualPack | null> {
+        if (this.plugin.studyChartQueue?.retryMaterials) {
+            await this.plugin.studyChartQueue.retryMaterials(this.notePath);
+            const status = this.plugin.studyChartQueue.getPreparationStatus(this.notePath);
+            if (status?.materials === 'error' || status?.materials === 'interrupted') throw new Error(status.message);
+            const pack = this.controller.planService.getPlan(this.notePath)?.visuals ?? null;
+            const content = await this.controller.readNote(this.notePath);
+            if (content !== null) this.content = content;
+            return pack;
+        }
         const plan = this.controller.planService.getPlan(this.notePath);
         if (!plan) throw new Error('This note has not been charted yet.');
         const file = this.plugin.app.vault.getAbstractFileByPath(this.notePath);
@@ -243,12 +558,21 @@ export class StudyPanel {
             notePath: this.notePath,
             content,
             objectives: plan.objectives,
-            fingerprint: plan.contentFingerprint,
+            fingerprint: StudyPlanService.fingerprint(content),
             profile: getDomainProfile(plan.domainId),
         });
         if (!pack) return null;
+        const previous = plan.visuals;
         plan.visuals = pack;
         this.controller.planService.savePlan(plan);
+        this.content = content;
+        try {
+            if ((await this.plugin.savePluginData()) === false) throw new Error('The material could not be saved.');
+        } catch (error) {
+            plan.visuals = previous;
+            this.controller.planService.savePlan(plan);
+            throw error;
+        }
         // Wake the buttons beside the primary action too: the material exists
         // now, and the row that said "not made yet" has to stop saying it.
         const material = this.materialSnapshot();
@@ -269,6 +593,8 @@ export class StudyPanel {
     // ---------------------------------------------------------- chart status
 
     private onChartProgress(update: StudyChartUpdate): void {
+        this.updateWorkspaceProgress();
+        this.materialSection?.refresh();
         if (!this.chartLineEl) return;
         this.chartLineEl.empty();
         this.chartLineEl.toggleClass('is-active', !update.complete);
@@ -299,7 +625,7 @@ export class StudyPanel {
         if (this.session && !this.finished) {
             const plan = this.controller.planService.getPlan(this.notePath);
             if (plan) this.renderRail(plan.objectives);
-        } else if (update.objectives > 0 && update.objectives !== (this.briefing?.totalObjectives ?? -1)) {
+        } else if (!this.finished && update.objectives > 0 && update.objectives !== (this.briefing?.totalObjectives ?? -1)) {
             // Refresh the briefing whenever the objective count actually moved,
             // including on the pass that finishes the chart: otherwise the
             // counters keep saying 33 while the plan already holds 40.
@@ -320,7 +646,7 @@ export class StudyPanel {
      */
     private renderBriefing(): void {
         const briefing = this.briefing;
-        const host = this.overflowEl;
+        const host = this.learningEl;
         if (!briefing || !host) return;
         host.empty();
 
@@ -329,6 +655,7 @@ export class StudyPanel {
         this.briefingView = view;
         const material = this.materialSnapshot();
         const briefingHost: StudyBriefingHost = {
+            workspace: true,
             briefing,
             plan: this.controller.planService.getPlan(this.notePath) ?? null,
             mode: this.mode,
@@ -357,6 +684,10 @@ export class StudyPanel {
             openFigure: image => this.openLightbox(image, this.resolveResourcePath(image)),
         };
         view.mount(host, briefingHost);
+        const workspace = this.controller.planService.getProgress(this.notePath)?.workspace;
+        const thread = workspace?.activeThreadId ? workspace.threads[workspace.activeThreadId] : null;
+        const start = host.querySelector<HTMLElement>('.sf-brief-primary');
+        if (start && thread && !thread.checkpoint.finished) start.setText('Continue learning');
     }
 
     /**
@@ -385,13 +716,21 @@ export class StudyPanel {
         const plan = this.controller.planService.getPlan(this.notePath);
         if (plan) {
             const profile = getDomainProfile(domainId);
+            const previous = { domainId: plan.domainId, domainLabel: plan.domainLabel, safetyCritical: plan.safetyCritical, domainNotes: plan.domainNotes, domainOverriddenByUser: plan.domainOverriddenByUser };
             plan.domainId = profile.id;
             plan.domainLabel = profile.label;
             plan.safetyCritical = profile.safetyCritical;
             plan.domainNotes = notes;
             plan.domainOverriddenByUser = true;
             this.controller.planService.savePlan(plan);
-            await this.plugin.savePluginData();
+            try {
+                if ((await this.plugin.savePluginData()) === false) throw new Error('The save failed.');
+            } catch (error) {
+                Object.assign(plan, previous);
+                this.controller.planService.savePlan(plan);
+                new Notice(`Subject lens not saved: ${String(error)}`);
+                return;
+            }
             new Notice(`Study will treat this note as: ${profile.label}`);
         }
         this.briefing = this.briefing
@@ -481,7 +820,12 @@ export class StudyPanel {
                     plan.domainNotes = notes.value.trim();
                     plan.domainOverriddenByUser = true;
                     this.controller.planService.savePlan(plan);
-                    await this.plugin.savePluginData();
+                    try {
+                        if ((await this.plugin.savePluginData()) === false) throw new Error('The save failed.');
+                    } catch (error) {
+                        new Notice(`Subject lens not saved: ${String(error)}`);
+                        return;
+                    }
                     new Notice(`Study will treat this note as: ${profile.label}`);
                 }
                 this.briefing = this.briefing
@@ -496,12 +840,15 @@ export class StudyPanel {
 
     // --------------------------------------------------------------- session
 
-    private async startSession(): Promise<void> {
+    private async startSession(restoreFinished = false): Promise<void> {
+        if (this.starting || (this.session && !this.finished) || this.closed) return;
         const briefing = this.briefing;
-        const host = this.overflowEl;
+        const host = this.learningEl;
         if (!briefing || !host) return;
-
+        this.starting = true;
         const content = await this.controller.readNote(this.notePath);
+        this.starting = false;
+        if (this.closed) return;
         if (content === null) {
             this.renderFailure('This note could not be read.');
             return;
@@ -512,6 +859,14 @@ export class StudyPanel {
             new Notice('No objectives yet — charting is still running.');
             return;
         }
+        const acquired = typeof this.controller.acquireStudy === 'function'
+            ? this.controller.acquireStudy(this.notePath, this.leaseToken)
+            : true;
+        if (!acquired) {
+            new Notice('Study is already open for this note. Close that window before starting another.');
+            return;
+        }
+        this.leasePath = this.notePath;
 
         this.finished = false;
         this.resultRecorded = false;
@@ -532,26 +887,31 @@ export class StudyPanel {
                 freshStart: this.freshStart,
             }
         );
+        // The engine consumes freshStart at construction; the panel must not
+        // carry it into a later re-init (for example after a rename).
+        this.freshStart = false;
+        this.saveWorkspace();
         this.unsubscribeSession = this.session.subscribe(event => this.handleEvent(event));
         this.controller.setStudyingNote?.(this.notePath);
         this.renderRail(plan.objectives);
         this.updateWebChip();
         this.setBusy(true, 'Planning where to start…');
-        void this.session.start();
+        void this.session.start()
+            .then(() => {
+                if (!restoreFinished || this.closed || !this.session) return;
+                const summary = this.session.getFinishedSummary();
+                if (summary) void this.renderComplete(summary, true);
+            })
+            .catch(error => this.renderError('Could not restore the last session', String(error)));
     }
 
     private buildSessionShell(host: HTMLElement): void {
         host.empty();
 
         const header = host.createDiv('sf-study-header');
-        const titleRow = header.createDiv('sf-study-title-row');
-        const titleIcon = titleRow.createSpan('sf-study-title-icon');
-        setIcon(titleIcon, 'graduation-cap');
-        titleRow.createDiv({ cls: 'sf-study-title', text: this.noteTitle });
-
         const chips = header.createDiv('sf-study-chips');
 
-        const domainChip = chips.createDiv('sf-study-chip sf-study-chip-domain');
+        const domainChip = chips.createEl('button', { cls: 'sf-study-chip sf-study-chip-domain' });
         const domainIcon = domainChip.createSpan('sf-study-chip-icon');
         setIcon(domainIcon, 'compass');
         domainChip.createSpan({ text: this.briefing?.domainLabel ?? 'General' });
@@ -561,7 +921,7 @@ export class StudyPanel {
             if (plan) this.openDomainEditor(host);
         });
 
-        this.webChip = chips.createDiv('sf-study-chip sf-study-chip-web');
+        this.webChip = chips.createEl('button', { cls: 'sf-study-chip sf-study-chip-web' });
         this.webChip.setAttribute('title', 'Turn web lookup on or off for this session');
         this.webChip.addEventListener('click', () => {
             if (!this.session) return;
@@ -596,6 +956,61 @@ export class StudyPanel {
         });
         this.modeButton = modeButton;
 
+        const chooserRow = host.createDiv('sf-study-workspace-objective');
+        chooserRow.createSpan({ text: 'Objective' });
+        this.objectiveChooser = chooserRow.createEl('select', { cls: 'dropdown', attr: { 'aria-label': 'Objective' } });
+        this.objectiveChooser.addEventListener('change', () => {
+            this.captureWorkspace();
+            void this.session?.focusOn(this.objectiveChooser!.value);
+        });
+        const objectiveDetails = chooserRow.createEl('button', { text: 'Details', cls: 'sf-btn' });
+        objectiveDetails.addEventListener('click', () => {
+            const objective = this.controller.planService.getPlan(this.notePath)?.objectives.find(entry => entry.id === this.session?.getActiveObjectiveId());
+            if (objective) this.renderObjectiveDetail(objective);
+        });
+        // In a short dock the chip row is one row too many; the same choices
+        // live here, beside the objective, so nothing becomes unreachable.
+        const sessionMenu = chooserRow.createEl('button', {
+            cls: 'sf-study-session-menu',
+            attr: { 'aria-label': 'Session options', title: 'Session options' },
+        });
+        setIcon(sessionMenu, 'sliders-horizontal');
+        sessionMenu.addEventListener('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            const menu = new Menu();
+            menu.addItem(item => item
+                .setTitle('Look things up')
+                .setChecked(this.session?.getOptions().webSearch === true)
+                .onClick(() => {
+                    if (!this.session) return;
+                    this.session.setWebSearch(!this.session.getOptions().webSearch);
+                    this.updateWebChip();
+                }));
+            menu.addSeparator();
+            for (const choice of MODE_CHOICES) {
+                menu.addItem(item => item
+                    .setTitle(`Mode: ${choice.label}`)
+                    .setChecked(choice.mode === this.mode)
+                    .onClick(() => {
+                        this.mode = choice.mode;
+                        this.modeButton?.setText(modeLabel(this.mode));
+                        this.session?.setMode(this.mode);
+                    }));
+            }
+            // The chip row and the quick-answer row are both hidden in a short
+            // dock; their actions live here, so the reader keeps every control.
+            menu.addSeparator();
+            const commands: [string, StudyCommand][] = [
+                ["I don't know", 'dont-know'], ['Nudge me', 'hint'], ['Explain more', 'more'],
+                ['Harder', 'harder'], ['Easier', 'easier'], ['Move on', 'skip'], ['Wrap up', 'wrap-up'],
+            ];
+            for (const [label, command] of commands) {
+                menu.addItem(item => item.setTitle(label).onClick(() => void this.session?.command(command)));
+            }
+            menu.addSeparator();
+            menu.addItem(item => item.setTitle('Change subject lens…').onClick(() => this.openDomainEditor(host)));
+            menu.showAtMouseEvent(event);
+        });
         const body = host.createDiv('sf-study-body');
         const railColumn = body.createDiv('sf-study-rail-column');
         railColumn.createDiv('sf-study-rail-head').createSpan({ text: 'Objectives' });
@@ -608,7 +1023,9 @@ export class StudyPanel {
         this.composerEl = main.createDiv('sf-study-composer');
         this.buildComposer();
 
-        this.digestEl = host.createDiv('sf-study-digest');
+        const sessionDetails = host.createEl('details', { cls: 'sf-study-workspace-options' });
+        sessionDetails.createEl('summary', { text: 'Session details and export' });
+        this.digestEl = sessionDetails.createDiv('sf-study-digest');
         this.renderStageRail();
         this.renderDigest();
     }
@@ -620,7 +1037,7 @@ export class StudyPanel {
         const inputRow = composer.createDiv('sf-study-input-row');
         this.inputEl = inputRow.createEl('textarea', {
             cls: 'sf-study-input',
-            attr: { rows: '3', placeholder: 'Answer in your own words — the tutor grades the reasoning, not the phrasing.' },
+            attr: { rows: '2', placeholder: 'Answer in your own words…', 'aria-label': 'Your answer. The tutor grades the reasoning, not the phrasing.' },
         });
         this.inputEl.addEventListener('keydown', event => {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -628,10 +1045,17 @@ export class StudyPanel {
                 this.submit();
             }
         });
+        this.inputEl.addEventListener('input', () => {
+            this.session?.setDraft(this.inputEl?.value ?? '');
+        });
         this.sendBtn = inputRow.createEl('button', { text: 'Answer', cls: 'sf-btn sf-btn-primary sf-study-send' });
         this.sendBtn.addEventListener('click', () => this.submit());
 
-        const actions = composer.createDiv('sf-study-quick');
+        // Secondary answer controls stay one disclosure away, so the answer
+        // field and its primary button fit a short dock without shrinking type.
+        const more = composer.createEl('details', { cls: 'sf-study-quick-more' });
+        more.createEl('summary', { text: 'More ways to answer' });
+        const actions = more.createDiv('sf-study-quick');
         const quick = (label: string, title: string, handler: () => void, cls = ''): void => {
             const button = actions.createEl('button', { text: label, cls: `sf-study-quick-btn ${cls}`.trim() });
             button.setAttribute('title', title);
@@ -655,10 +1079,15 @@ export class StudyPanel {
     private submit(): void {
         if (!this.inputEl) return;
         const text = this.inputEl.value.trim();
-        if (text.length === 0 || !this.session || this.session.isBusy()) return;
+        if (text.length === 0 || !this.session) return;
+        const canAnswer = typeof this.session.canAnswer === 'function' ? this.session.canAnswer() : !this.session.isBusy();
+        if (!canAnswer) {
+            if (!this.session.isBusy()) new Notice('The previous answer was not sent. Use try again before typing a new answer.');
+            return;
+        }
         this.inputEl.value = '';
+        this.session.setDraft('');
         this.pendingChoiceButtons = [];
-        this.appendUserTurn(text);
         this.setBusy(true, 'Reading your answer…');
         void this.session.answer(text);
     }
@@ -699,6 +1128,17 @@ export class StudyPanel {
         }
     }
 
+    private syncSessionOptions(): void {
+        const getOptions = this.session?.getOptions;
+        if (typeof getOptions !== 'function') return;
+        const options = getOptions.call(this.session);
+        if (!options) return;
+        this.mode = options.mode;
+        this.webSearch = options.webSearch;
+        this.modeButton?.setText(modeLabel(this.mode));
+        this.updateWebChip();
+    }
+
     private updateWebChip(): void {
         if (!this.webChip || !this.session) return;
         const on = this.session.getOptions().webSearch;
@@ -713,8 +1153,13 @@ export class StudyPanel {
 
     private handleEvent(event: StudySessionEvent): void {
         switch (event.type) {
+            case 'restored':
+                this.syncSessionOptions();
+                this.restoreConversation();
+                break;
             case 'status':
-                new Notice(event.text, 4000);
+                if (/interrupted|not saved|not sent/i.test(event.text)) this.renderError(event.text, null);
+                else new Notice(event.text, 4000);
                 break;
             case 'thinking':
                 this.setBusy(event.active, event.label);
@@ -729,11 +1174,15 @@ export class StudyPanel {
             case 'turn':
                 this.renderTurn(event.turn);
                 break;
+            case 'user-turn':
+                this.appendUserTurn(event.turn.text);
+                break;
             case 'research':
                 this.renderResearch(event.queries, event.results, event.done);
                 break;
             case 'progress':
                 this.updateObjective(event.objectiveId, event.state.U, event.state.R, event.state.T, event.state.status, event.state.errorCounts);
+                this.updateWorkspaceProgress();
                 break;
             case 'digest':
                 this.digest = event.digest;
@@ -755,6 +1204,10 @@ export class StudyPanel {
         if (!stageEl) return;
         stageEl.empty();
         const currentIndex = STUDY_STAGE_ORDER.indexOf(this.stage);
+        const position = stageEl.createDiv('sf-study-stage-position');
+        position.setText(currentIndex >= 0
+            ? `Step ${currentIndex + 1} of ${STUDY_STAGE_ORDER.length} · ${STUDY_STAGE_LABELS[this.stage]}`
+            : STUDY_STAGE_LABELS[this.stage]);
         for (const stage of [...STUDY_STAGE_ORDER, StudyStage.Complete]) {
             const index = STUDY_STAGE_ORDER.indexOf(stage);
             const pill = stageEl.createDiv('sf-study-stage');
@@ -769,10 +1222,18 @@ export class StudyPanel {
         if (!railEl) return;
         railEl.empty();
         const store = this.session?.getProgress();
+        if (this.objectiveChooser) {
+            this.objectiveChooser.empty();
+            for (const objective of objectives) {
+                const option = this.objectiveChooser.createEl('option', { text: objective.title });
+                option.value = objective.id;
+            }
+            this.objectiveChooser.value = this.session?.getActiveObjectiveId() ?? '';
+        }
 
         for (const objective of objectives) {
             const state = store?.objectives[objective.id];
-            const row = railEl.createDiv('sf-study-obj');
+            const row = railEl.createEl('button', { cls: 'sf-study-obj', attr: { type: 'button' } });
             row.dataset.obj = objective.id;
             row.dataset.status = state?.status ?? StudyObjectiveStatus.Unseen;
             if (objective.id === this.selectedObjectiveId) row.addClass('is-selected');
@@ -807,11 +1268,19 @@ export class StudyPanel {
                 railEl.querySelectorAll('.sf-study-obj').forEach(el => el.removeClass('is-selected'));
                 row.addClass('is-selected');
                 this.renderObjectiveDetail(objective);
+                this.captureWorkspace();
+                void this.session?.focusOn(objective.id);
             });
         }
     }
 
     private markActiveObjective(objectiveId: string | null): void {
+        if (objectiveId) {
+            this.selectedObjectiveId = objectiveId;
+            this.viewState.objectiveId = objectiveId;
+            if (this.objectiveChooser) this.objectiveChooser.value = objectiveId;
+            this.saveWorkspace();
+        }
         if (!objectiveId || !this.railEl) return;
         this.railEl.querySelectorAll('.sf-study-obj').forEach(el => el.removeClass('is-active'));
         const row = this.railEl.querySelector<HTMLElement>(`.sf-study-obj[data-obj="${objectiveId}"]`);
@@ -854,7 +1323,7 @@ export class StudyPanel {
     }
 
     private renderObjectiveDetail(objective: StudyObjective): void {
-        const column = this.railEl?.parentElement;
+        const column = this.learningEl ?? this.railEl?.parentElement;
         if (!column) return;
         column.querySelector('.sf-study-obj-detail')?.remove();
 
@@ -930,7 +1399,7 @@ export class StudyPanel {
             const body = bubble.createDiv('sf-study-turn-body markdown-rendered');
             // The tutor is given the note's exact image syntax, so an image it
             // points at renders here as a preview through the normal renderer.
-            this.renderMarkdown(turn.say, body);
+            this.renderMarkdown(stripRestatedQuestion(turn.say, turn.next?.text), body);
 
             if (turn.anchors.length > 0) {
                 const anchors = bubble.createDiv('sf-study-anchors');
@@ -999,12 +1468,32 @@ export class StudyPanel {
     private renderPrompt(prompt: TutorPromptSpec): void {
         const streamEl = this.streamEl;
         if (!streamEl) return;
+        // A new prompt makes the previous card history. Leaving it mounted
+        // would leave two live cards and old MCQ choices that can still submit.
+        for (const old of Array.from(streamEl.querySelectorAll('.sf-study-question'))) {
+            const text = old.querySelector('.sf-study-question-text')?.textContent ?? '';
+            old.remove();
+            if (!text) continue;
+            const past = streamEl.createDiv('sf-study-turn sf-study-turn-tutor sf-study-turn-history');
+            past.createDiv({ cls: 'sf-study-turn-role', text: 'Question' });
+            past.createDiv({ cls: 'sf-study-turn-body', text });
+        }
         const card = streamEl.createDiv('sf-study-question sf-animate-fade-in');
         const head = card.createDiv('sf-study-question-head');
         const icon = head.createSpan('sf-study-question-icon');
         setIcon(icon, prompt.kind === 'explain-back' ? 'message-square-quote' : prompt.kind === 'decision' ? 'git-branch' : 'help-circle');
         head.createSpan({ text: prompt.format === 'mcq' ? 'Choose one' : 'Your turn' });
         head.createSpan({ cls: 'sf-study-question-difficulty', text: `depth ${prompt.difficulty}/4` });
+
+        const focus = this.session?.getActiveObjectiveId() ?? null;
+        if (prompt.objectiveId && focus && prompt.objectiveId !== focus) {
+            const elsewhere = this.controller.planService.getPlan(this.notePath)?.objectives
+                .find(objective => objective.id === prompt.objectiveId)?.title;
+            card.createDiv({
+                cls: 'sf-study-question-scope',
+                text: elsewhere ? `This question is about ${elsewhere}` : 'This question is about another objective',
+            });
+        }
 
         this.renderMarkdown(prompt.text, card.createDiv('sf-study-question-text markdown-rendered'));
 
@@ -1022,15 +1511,17 @@ export class StudyPanel {
                     button.addClass('is-picked');
                     this.pendingChoiceButtons = [];
                     const answer = `${String.fromCharCode(65 + index)}) ${choice}`;
-                    this.appendUserTurn(answer);
                     this.setBusy(true, 'Working through your answer…');
                     void this.session.answer(answer);
                 });
             });
         }
 
-        this.scrollStream();
-        if (this.inputEl && prompt.format !== 'mcq') this.inputEl.focus();
+        // Bring the question's first line into view. Scrolling to the bottom
+        // of the transcript hides the start of a question taller than the pane.
+        if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'start' });
+        else this.scrollStream();
+        if (this.inputEl && prompt.format !== 'mcq' && this.activeView === 'learn') this.inputEl.focus();
     }
 
     private renderResearch(queries: string[], results: number, done: boolean): void {
@@ -1049,7 +1540,7 @@ export class StudyPanel {
     }
 
     private renderError(message: string, detail: string | null): void {
-        const streamEl = this.streamEl;
+        const streamEl = this.streamEl ?? this.learningEl;
         if (!streamEl) return;
         const box = streamEl.createDiv('sf-study-flag sf-study-flag-danger sf-animate-fade-in');
         const iconEl = box.createSpan('sf-study-flag-icon');
@@ -1065,7 +1556,8 @@ export class StudyPanel {
         const retry = content.createEl('button', { text: 'Try again', cls: 'sf-btn sf-study-retry' });
         retry.addEventListener('click', () => {
             box.remove();
-            void this.session?.command('more');
+            if (this.session) void this.session.retryPending();
+            else void this.plugin.savePluginData().catch(() => this.renderError('Progress not saved', null));
         });
         this.scrollStream();
     }
@@ -1085,7 +1577,7 @@ export class StudyPanel {
         fill.setCssProps({ '--sf-fill': `${Math.round(digest.masteryScore * 100)}%` });
         progress.createDiv({
             cls: 'sf-study-digest-text',
-            text: `${digest.covered}/${digest.totalObjectives} objectives touched · ${Math.round(digest.masteryScore * 100)}% mastery · ${digest.mastered} solid`,
+            text: `${digest.covered}/${digest.totalObjectives} objectives touched · evidence score ${Math.round(digest.masteryScore * 100)}%`,
         });
 
         const stats = digestEl.createDiv('sf-study-digest-stats');
@@ -1127,7 +1619,7 @@ export class StudyPanel {
 
     // ---------------------------------------------------------------- report
 
-    private async renderComplete(payload: StudySummaryPayload): Promise<void> {
+    private async renderComplete(payload: StudySummaryPayload, restored = false): Promise<void> {
         if (this.finished && this.resultRecorded) return;
         this.finished = true;
         this.stopTicker();
@@ -1135,8 +1627,9 @@ export class StudyPanel {
         this.unsubscribeSession = null;
         this.controller.setStudyingNote?.(null);
 
-        const host = this.overflowEl;
+        const host = this.learningEl;
         if (!host) return;
+        this.switchWorkspaceView('learn');
         host.empty();
 
         const header = host.createDiv('sf-study-header');
@@ -1151,7 +1644,7 @@ export class StudyPanel {
         const ring = scoreRow.createDiv('sf-study-score-ring');
         ring.createDiv({ cls: 'sf-study-score-value', text: `${score}%` });
         ring.setAttribute('data-score', score >= 80 ? 'high' : score >= 50 ? 'mid' : 'low');
-        ring.style.setProperty('--sf-study-score', String(score));
+        ring.setCssProps({ '--sf-study-score': String(score) });
         const scoreText = scoreRow.createDiv('sf-study-score-text');
         scoreText.createDiv({ cls: 'sf-study-score-title', text: payload.session.completed ? 'Session complete' : 'Session ended early' });
         scoreText.createDiv({
@@ -1224,6 +1717,7 @@ export class StudyPanel {
         again.addEventListener('click', () => {
             this.finished = false;
             this.resultRecorded = false;
+            this.freshStart = true;
             this.session = null;
             void this.init();
         });
@@ -1231,16 +1725,29 @@ export class StudyPanel {
         exportBtn.addEventListener('click', () => void this.controller.exportSession(payload));
         const close = actions.createEl('button', { text: 'Done', cls: 'sf-btn sf-btn-primary' });
         close.addEventListener('click', () => {
+            if (restored) {
+                this.session = null;
+                this.finished = false;
+                // The saved thread is still finished; the next Start must open
+                // a new sitting rather than restore the report again.
+                this.freshStart = true;
+                this.renderBriefing();
+                return;
+            }
             this.session = null;
             this.options.onSessionEnd?.(payload);
         });
 
-        if (!this.resultRecorded) {
+        if (!restored && !this.resultRecorded) {
             this.resultRecorded = true;
             await this.controller.applySessionResult(payload);
-            await this.plugin.savePluginData();
+            try {
+                if ((await this.plugin.savePluginData()) === false) throw new Error('The result was not saved.');
+            } catch (error) {
+                new Notice(`Session result not saved: ${String(error)}. Retry before closing.`);
+            }
             void this.plugin.getSidebarView()?.refresh();
         }
-        this.options.onSessionEnd?.(payload);
+        if (!restored) this.options.onSessionEnd?.(payload);
     }
 }

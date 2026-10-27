@@ -10,6 +10,7 @@
 
 /** Bumped when the shape of persisted study data changes. */
 import { StudyVisualPack } from './study-visuals';
+import type { StudyWorkspace } from './study-workspace';
 
 export const STUDY_DATA_VERSION = 2;
 
@@ -268,6 +269,8 @@ export interface ObjectiveProgressState {
 
 /** Persisted progress for one note. */
 export interface StudyProgressStore {
+    /** Optional for legacy files; checkpointed independent objective chats. */
+    workspace?: StudyWorkspace;
     notePath: string;
     updatedAt: number;
     /** Sessions started for this note, completed or not. */
@@ -465,6 +468,7 @@ export interface StudySessionOptions {
 
 /** What the session engine emits to the UI. */
 export type StudySessionEvent =
+    | { type: 'restored' }
     | { type: 'status'; text: string }
     | { type: 'stage'; stage: StudyStage }
     | { type: 'thinking'; active: boolean; label: string }

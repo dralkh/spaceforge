@@ -32,6 +32,7 @@
 
 import { PluginStateData } from '../models/plugin-data';
 import { SpaceforgeSettings } from '../models/settings';
+import { objectiveDefinition } from './study-plan-service';
 
 /** Where the projection lives, relative to the vault root. */
 export const PROGRESS_DIR = 'spaceforge/state';
@@ -198,7 +199,25 @@ export function projectProgress(
     for (const key of PORTABLE_STATE_KEYS) {
         if (LOCAL_ONLY_STATE.includes(key)) continue;
         const value = (state as unknown as Record<string, unknown>)[key];
-        if (value !== undefined) portableState[key] = value;
+        if (key === 'studyProgress' && isRecord(value)) {
+            portableState[key] = Object.fromEntries(Object.entries(value).map(([path, store]) => {
+                if (!isRecord(store)) return [path, store];
+                const portable = { ...store };
+                // Exact checkpoints/drafts are device state, not mergeable events.
+                delete portable.workspace;
+                return [path, portable];
+            }));
+        } else if (key === 'studySessions' && isRecord(value)) {
+            // Session transcripts contain quoted note text and free-text answers.
+            // Keep those on the device that made them; the portable copy carries
+            // ids, timings and counts so progress still merges across devices.
+            portableState[key] = Object.fromEntries(Object.entries(value).map(([path, sessions]) => [
+                path,
+                Array.isArray(sessions)
+                    ? sessions.map(session => isRecord(session) ? { ...session, transcript: [], summary: null } : session)
+                    : sessions,
+            ]));
+        } else if (value !== undefined) portableState[key] = value;
     }
     return {
         schema: PROGRESS_SCHEMA,
@@ -252,10 +271,28 @@ export function mergeProgress(
         if (incoming === undefined) continue;
         const current = state[key];
         const rule = RULES[key];
+        if (['studyPlans', 'studyProgress', 'studySessions'].includes(key)) continue;
         const merged = mergeValue(key, current, incoming, rule, report);
         if (merged !== current) state[key] = merged;
+        if (JSON.stringify(merged) !== JSON.stringify(current) && !report.replaced.includes(key)) report.replaced.push(key);
     }
 
+    const study = mergeStudyState(state, other.state as unknown as Record<string, unknown>);
+    for (const key of ['studyPlans', 'studyProgress', 'studySessions']) {
+        if (JSON.stringify(state[key]) !== JSON.stringify(study[key])) report.replaced.push(key);
+        const collection = study[key];
+        if (key === 'studySessions' && isRecord(collection)) {
+            const value = state[key];
+            const current = isRecord(value) ? value : {};
+            for (const [path, list] of Object.entries(collection)) {
+                const existing = current[path];
+                const before = Array.isArray(existing) ? existing : [];
+                const seen = new Set(before.filter(isRecord).map(record => record.id));
+                if (Array.isArray(list)) report.addedSessions += list.filter(isRecord).filter(record => !seen.has(record.id)).length;
+            }
+        }
+        state[key] = study[key];
+    }
     return { settings, state: state as unknown as PluginStateData, report };
 }
 
@@ -321,12 +358,143 @@ function mergeDictLogs(key: string, current: unknown, incoming: unknown, rule: S
     for (const [id, list] of Object.entries(incoming)) {
         const mine = base[id];
         const merged = mergeLog(key, mine, list, rule, report);
-        if (Array.isArray(merged) && Array.isArray(mine) && merged.length > mine.length) {
-            report.addedSessions += merged.length - mine.length;
+        if (Array.isArray(merged) && merged.length > (Array.isArray(mine) ? mine.length : 0)) {
+            report.addedSessions += merged.length - (Array.isArray(mine) ? mine.length : 0);
         }
         base[id] = merged;
     }
     return base;
+}
+
+/** Merge Study atomically: a mastery record only follows a matching definition.
+ * Recovery uses keepCurrent to fill holes without replacing authoritative data.
+ */
+export function mergeStudyState(local: Record<string, unknown>, incoming: Record<string, unknown>, keepCurrent = false): Record<string, unknown> {
+    const dict = (value: unknown): Record<string, unknown> => isRecord(value) ? value : {};
+    const localPlans = dict(local.studyPlans);
+    const otherPlans = dict(incoming.studyPlans);
+    const localProgress = dict(local.studyProgress);
+    const otherProgress = dict(incoming.studyProgress);
+    const localSessions = dict(local.studySessions);
+    const otherSessions = dict(incoming.studySessions);
+    const plans = { ...localPlans };
+    const progress = { ...localProgress };
+    const sessions = { ...localSessions };
+    const paths = new Set([...Object.keys(localPlans), ...Object.keys(otherPlans), ...Object.keys(localProgress), ...Object.keys(otherProgress), ...Object.keys(otherSessions)]);
+    for (const path of paths) {
+        const rawMine = dict(localProgress[path]);
+        const rawTheirs = dict(otherProgress[path]);
+        const restoredAt = Math.max(numberOr0(rawMine.restoredAt), numberOr0(rawTheirs.restoredAt));
+        const mineCurrent = numberOr0(rawMine.restoredAt) >= restoredAt;
+        const theirsCurrent = numberOr0(rawTheirs.restoredAt) >= restoredAt;
+        const mine = mineCurrent ? rawMine : {};
+        const theirs = theirsCurrent ? rawTheirs : {};
+        const deletedAt = Math.max(numberOr0(rawMine.deletedAt), numberOr0(rawTheirs.deletedAt));
+        if (deletedAt > 0 && deletedAt >= restoredAt) {
+            // A receipt wins over offline saves, even with a later wall clock.
+            progress[path] = { ...(numberOr0(rawMine.deletedAt) >= numberOr0(rawTheirs.deletedAt) ? rawMine : rawTheirs), deletedAt };
+            delete plans[path];
+            delete sessions[path];
+            continue;
+        }
+        const myPlan = mineCurrent ? dict(localPlans[path]) : {};
+        const theirPlan = theirsCurrent ? dict(otherPlans[path]) : {};
+        const plan = !Object.keys(myPlan).length || (!keepCurrent && numberOr0(theirPlan.updatedAt ?? theirPlan.generatedAt) > numberOr0(myPlan.updatedAt ?? myPlan.generatedAt)) ? theirPlan : myPlan;
+        if (Object.keys(plan).length > 0) plans[path] = plan;
+        else delete plans[path];
+        const definitions = (source: Record<string, unknown>, sourcePlan: Record<string, unknown>): Record<string, unknown> => {
+            const result = { ...dict(source.objectiveDefinitions) };
+            if (Array.isArray(sourcePlan.objectives)) {
+                for (const objective of sourcePlan.objectives) {
+                    if (isRecord(objective) && typeof objective.id === 'string' && typeof objective.title === 'string' && typeof objective.statement === 'string') {
+                        result[objective.id] ??= objectiveDefinition(objective as never);
+                    }
+                }
+            }
+            return result;
+        };
+        const activeDefinitions = definitions({}, plan);
+        const myDefinitions = definitions(mine, myPlan);
+        const theirDefinitions = definitions(theirs, theirPlan);
+        const myObjectives = dict(mine.objectives);
+        const theirObjectives = dict(theirs.objectives);
+        const newer = !Object.keys(mine).length || (!keepCurrent && numberOr0(theirs.updatedAt) > numberOr0(mine.updatedAt)) ? theirs : mine;
+        if (keepCurrent && !Object.keys(mine).length && plan === theirPlan) {
+            if (otherProgress[path]) progress[path] = otherProgress[path];
+        } else if (localProgress[path] || otherProgress[path]) {
+            const objectives: Record<string, unknown> = {};
+            const witnesses: Record<string, unknown> = {};
+            const archivedObjectives = { ...dict(theirs.archivedObjectives), ...dict(mine.archivedObjectives) };
+            const pendingObjectives = { ...dict(theirs.pendingObjectives), ...dict(mine.pendingObjectives) };
+            const incompatibleObjectives = { ...dict(mine.incompatibleObjectives), ...dict(theirs.incompatibleObjectives) };
+            for (const id of new Set([...Object.keys(myObjectives), ...Object.keys(theirObjectives)])) {
+                const expected = activeDefinitions[id];
+                if (expected === undefined && archivedObjectives[id] && !pendingObjectives[id]) continue;
+                const accepts = (definition: unknown): boolean => expected === undefined || definition === expected;
+                const a = accepts(myDefinitions[id]) ? myObjectives[id] : undefined;
+                const b = accepts(theirDefinitions[id]) ? theirObjectives[id] : undefined;
+                for (const [value, definition] of [[myObjectives[id], myDefinitions[id]], [theirObjectives[id], theirDefinitions[id]]]) {
+                    if (value && !accepts(definition)) incompatibleObjectives[JSON.stringify([id, definition])] = { definition, progress: value };
+                }
+                // A different objective's answer must not advance this clock.
+                const clock = (value: unknown): number => isRecord(value) ? Math.max(numberOr0(value.updatedAt), numberOr0(value.lastSeenAt), numberOr0(value.lastSuccessAt)) : 0;
+                const chosen = a === undefined || (!keepCurrent && clock(b) > clock(a)) ? b : a;
+                if (chosen !== undefined) {
+                    objectives[id] = chosen;
+                    witnesses[id] = chosen === b ? theirDefinitions[id] : myDefinitions[id];
+                }
+            }
+            const suggestions = new Map<string, Record<string, unknown>>();
+            for (const source of [mine, theirs]) {
+                const defs = source === mine ? myDefinitions : theirDefinitions;
+                if (!Array.isArray(source.scheduleSuggestions)) continue;
+                for (const suggestion of source.scheduleSuggestions) {
+                    if (!isRecord(suggestion) || typeof suggestion.objectiveId !== 'string') continue;
+                    const id = suggestion.objectiveId;
+                    if (!objectives[id] || (activeDefinitions[id] !== undefined && defs[id] !== activeDefinitions[id])) continue;
+                    if (numberOr0(suggestion.madeAt) >= numberOr0(suggestions.get(id)?.madeAt)) suggestions.set(id, suggestion);
+                }
+            }
+            progress[path] = {
+                ...newer, objectives, objectiveDefinitions: witnesses,
+                ...(!keepCurrent ? { workspace: mine.workspace } : {}),
+                planFingerprint: plan.contentFingerprint ?? newer.planFingerprint,
+                archivedObjectives, pendingObjectives,
+                incompatibleObjectives, scheduleSuggestions: [...suggestions.values()],
+                tutorMemory: [...new Set([...(Array.isArray(mine.tutorMemory) ? mine.tutorMemory : []), ...(Array.isArray(theirs.tutorMemory) ? theirs.tutorMemory : [])])].slice(-20),
+            };
+        }
+        const localById = new Map<string, Record<string, unknown>>();
+        if (Array.isArray(localSessions[path])) {
+            for (const record of localSessions[path] as unknown[]) {
+                if (isRecord(record) && typeof record.id === 'string') localById.set(record.id, record);
+            }
+        }
+        const records = new Map<string, Record<string, unknown>>();
+        for (const list of [mineCurrent ? localSessions[path] : undefined, theirsCurrent ? otherSessions[path] : undefined]) {
+            if (!Array.isArray(list)) continue;
+            for (const record of list) {
+                if (!isRecord(record) || typeof record.id !== 'string') continue;
+                const previous = records.get(record.id);
+                const clock = (entry: Record<string, unknown>): number => numberOr0(entry.updatedAt ?? entry.endedAt ?? entry.startedAt);
+                if (!previous || (!keepCurrent && clock(record) > clock(previous))) {
+                    // A portable record has no transcript/summary; never let it
+                    // erase the fuller copy that exists on this device.
+                    const local = localById.get(record.id);
+                    const merged = { ...record };
+                    if ((!Array.isArray(merged.transcript) || merged.transcript.length === 0) && Array.isArray(local?.transcript)) {
+                        merged.transcript = local?.transcript ?? [];
+                    }
+                    if ((merged.summary === null || merged.summary === undefined) && typeof local?.summary === 'string') {
+                        merged.summary = local?.summary ?? merged.summary;
+                    }
+                    records.set(record.id, merged);
+                }
+            }
+        }
+        if (localSessions[path] || otherSessions[path]) sessions[path] = [...records.values()].sort((a, b) => numberOr0(b.startedAt) - numberOr0(a.startedAt)).slice(0, 200);
+    }
+    return { studyPlans: plans, studyProgress: progress, studySessions: sessions };
 }
 
 function mergeCounters(current: unknown, incoming: unknown): unknown {

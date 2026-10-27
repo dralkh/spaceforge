@@ -40,6 +40,7 @@ import {
     buildTutorMessages,
 } from './study-prompts';
 import { parseJsonLoose, parseTutorTurn } from '../utils/tutor-protocol';
+import { StudyObjectiveThread, StudyPendingRequest, StudyWorkspace, repairStudyWorkspace, studySnapshot, studyUniqueId } from '../models/study-workspace';
 
 /** What the modal shows before a session starts. */
 export interface StudyBriefing {
@@ -119,6 +120,21 @@ export class StudySessionService {
     private busy = false;
     private finished = false;
     private focusOrder: string[] = [];
+    private activeThreadId: string | null = null;
+    private draft = '';
+    private stage = StudyStage.Orient;
+    private pendingRequest: StudyPendingRequest | null = null;
+    private committedRequestIds: string[] = [];
+    private saveQueue: Promise<void> = Promise.resolve();
+    private bufferedEvents: StudySessionEvent[] | null = null;
+    private started = false;
+    /**
+     * Draft text types at keystroke speed; durable progress does not. A pending
+     * draft is written once per burst, and immediately on suspend/finish/answer.
+     */
+    private draftTimer: number | null = null;
+    private draftDirty = false;
+    private static readonly DRAFT_SAVE_MS = 600;
 
     constructor(
         plugin: SpaceforgePlugin,
@@ -136,7 +152,8 @@ export class StudySessionService {
         this.noteContent = noteContent;
         this.plan = plan;
         this.progress = planService.ensureProgress(plan);
-        this.options = options;
+        this.repairWorkspace();
+        this.options = { ...options };
         this.chatClient = createChatClient(plugin.settings);
         this.noteTitle = (notePath.split('/').pop() ?? notePath).replace(/\.md$/, '');
 
@@ -146,7 +163,7 @@ export class StudySessionService {
         }
 
         this.session = {
-            id: `study-${Date.now()}`,
+            id: studyUniqueId('study'),
             notePath,
             mode: options.mode,
             webSearch: options.webSearch,
@@ -163,7 +180,7 @@ export class StudySessionService {
             webLookups: 0,
             sources: [],
         };
-        this.planService.noteSessionStarted(notePath);
+
     }
 
     // ---------------------------------------------------------------- events
@@ -176,6 +193,11 @@ export class StudySessionService {
     }
 
     private emit(event: StudySessionEvent): void {
+        if (event.type === 'stage') this.stage = event.stage;
+        if (this.bufferedEvents) {
+            this.bufferedEvents.push(event);
+            return;
+        }
         for (const listener of [...this.listeners]) {
             try {
                 listener(event);
@@ -187,12 +209,211 @@ export class StudySessionService {
 
     /** Close the window: no more model calls for this instance. */
     abort(): void {
+        this.suspend();
+    }
+
+    /** Unmount pauses work; it never logs an ended sitting. */
+    suspend(): void {
         this.generation++;
         this.busy = false;
+        this.cancelDraftTimer();
+        if (this.pendingRequest) this.pendingRequest.status = 'interrupted';
+        this.checkpoint();
+        this.saveInBackground();
+    }
+
+    getActiveObjectiveId(): string | null {
+        // The thread is the workspace the reader is in. A model that asks
+        // about a different objective does not silently move that workspace.
+        return this.thread()?.objective?.id ?? this.pendingPrompt?.objectiveId ?? this.focusOrder[0] ?? null;
+    }
+
+    getDraft(): string { return this.draft; }
+
+    setDraft(text: string): void {
+        this.draft = text;
+        const thread = this.thread();
+        if (thread) thread.draft = text;
+        this.draftDirty = true;
+        this.cancelDraftTimer();
+        this.draftTimer = window.setTimeout(() => {
+            this.draftTimer = null;
+            this.checkpoint();
+            this.saveInBackground();
+        }, StudySessionService.DRAFT_SAVE_MS);
+    }
+
+    private cancelDraftTimer(): void {
+        if (this.draftTimer !== null) {
+            window.clearTimeout(this.draftTimer);
+            this.draftTimer = null;
+        }
+    }
+
+    getVisibleTranscript(): StudyTurnRecord[] { return this.session.transcript; }
+
+    hasSavedCheckpoint(): boolean {
+        const workspace = this.progress.workspace;
+        return !!workspace?.activeThreadId && !!workspace.threads[workspace.activeThreadId];
+    }
+
+    /** Await draft/lifecycle saves; rejects on failure so hosts can report it. */
+    flush(): Promise<void> {
+        this.cancelDraftTimer();
+        return this.draftDirty ? this.persist() : this.saveQueue;
+    }
+
+    private workspace(): StudyWorkspace {
+        return this.progress.workspace ?? (this.progress.workspace = {
+            schema: 1, id: studyUniqueId('workspace'), activeThreadId: null, threads: {}, updatedAt: Date.now(),
+        });
+    }
+
+    /** Never let a partial save or a retired objective crash a fresh sitting. */
+    private repairWorkspace(): void {
+        const repaired = repairStudyWorkspace(
+            this.progress.workspace,
+            new Set(this.plan.objectives.map(objective => objective.id)),
+        );
+        if (repaired.changed) {
+            this.progress.workspace = repaired.workspace;
+            this.progress.updatedAt = Date.now();
+        }
+    }
+
+    private thread(): StudyObjectiveThread | null {
+        return this.activeThreadId ? this.progress.workspace?.threads[this.activeThreadId] ?? null : null;
+    }
+
+    private checkpoint(): void {
+        const thread = this.thread();
+        if (!thread) return;
+        // A rename moves the progress record by reference; the engine must
+        // follow the moved note before writing the next checkpoint or the
+        // thread keeps pointing at the old path forever.
+        const boundPath = this.progress.notePath;
+        if (boundPath && boundPath !== this.notePath) {
+            this.notePath = boundPath;
+            this.session.notePath = boundPath;
+        }
+        thread.draft = this.draft;
+        this.draftDirty = false;
+        thread.checkpoint = studySnapshot({
+            session: this.session, options: this.options, pendingPrompt: this.pendingPrompt,
+            recentTurns: this.recentTurns, focusOrder: this.focusOrder, stage: this.stage,
+            allowedUrls: [...this.allowedUrls], researchRounds: this.researchRounds,
+            turnErrorCounts: this.turnErrorCounts, masteredBefore: [...this.masteredBefore],
+            touched: [...this.touched], finished: this.finished, pendingRequest: this.pendingRequest,
+            committedRequestIds: this.committedRequestIds,
+        });
+        this.workspace().activeThreadId = this.activeThreadId;
+        this.progress.updatedAt = this.workspace().updatedAt = Date.now();
+    }
+
+    private restore(thread: StudyObjectiveThread): void {
+        this.cancelDraftTimer();
+        const cp = studySnapshot(thread.checkpoint);
+        this.activeThreadId = thread.id;
+        this.session = cp.session;
+        this.options = cp.options;
+        this.pendingPrompt = cp.pendingPrompt;
+        this.recentTurns = cp.recentTurns;
+        this.focusOrder = cp.focusOrder;
+        this.stage = cp.stage;
+        this.allowedUrls = new Set(cp.allowedUrls);
+        this.researchRounds = cp.researchRounds;
+        this.turnErrorCounts = cp.turnErrorCounts;
+        this.masteredBefore = new Set(cp.masteredBefore);
+        this.touched = new Set(cp.touched);
+        this.finished = cp.finished;
+        this.pendingRequest = cp.pendingRequest;
+        if (this.pendingRequest) this.pendingRequest.status = 'interrupted';
+        this.committedRequestIds = cp.committedRequestIds;
+        this.draft = thread.draft;
+        this.workspace().activeThreadId = thread.id;
+        this.started = true;
+        this.emit({ type: 'restored' });
+        this.emit({ type: 'stage', stage: this.stage });
+        this.emitDigest();
+        if (this.pendingRequest) this.emit({ type: 'status', text: 'The last request was interrupted. Your submitted answer is saved; retry explicitly to continue.' });
+    }
+
+    private newThread(objectiveId: string | null): void {
+        const workspace = this.workspace();
+        const objective = this.plan.objectives.find(o => o.id === objectiveId) ?? null;
+        this.activeThreadId = studyUniqueId('thread');
+        this.session = { ...this.session, id: studyUniqueId('study'), mode: this.options.mode,
+            webSearch: this.options.webSearch, startedAt: Date.now(), endedAt: null, turnCount: 0,
+            objectivesTouched: [], objectivesMastered: [], errorCounts: {}, transcript: [],
+            summary: null, score: null, completed: false, webLookups: 0, sources: [] };
+        this.pendingPrompt = null;
+        this.recentTurns = [];
+        this.focusOrder = objectiveId ? [objectiveId] : this.computeFocusOrder();
+        this.finished = false;
+        this.pendingRequest = null;
+        this.committedRequestIds = [];
+        this.draft = '';
+        this.allowedUrls.clear();
+        this.researchRounds = 0;
+        this.turnErrorCounts = {};
+        this.touched.clear();
+        this.masteredBefore = new Set(this.plan.objectives.filter(o => this.progress.objectives[o.id]?.status === StudyObjectiveStatus.Mastered).map(o => o.id));
+        this.stage = this.initialStage();
+        workspace.threads[this.activeThreadId] = { id: this.activeThreadId, objective: studySnapshot(objective), archived: false, draft: '', checkpoint: {} as StudyObjectiveThread['checkpoint'] };
+        this.started = true;
+        this.checkpoint();
+    }
+
+    private persist(): Promise<void> {
+        this.checkpoint();
+        this.saveQueue = this.saveQueue
+            .catch(() => { /* allow explicit recovery */ })
+            .then(async () => {
+                const saved = await this.plugin.savePluginData();
+                // Undefined is accepted for older hosts/tests; false is the
+                // explicit "not durable" answer and must never read as success.
+                if (saved === false) throw new Error('Study progress was not saved.');
+            });
+        return this.saveQueue;
+    }
+
+    private storageError(error: unknown): void {
+        this.emit({ type: 'error', message: 'Could not save Study conversation.', detail: `${String(error)}. Your work is kept in memory; free storage and retry.` });
+    }
+
+    private saveInBackground(): void {
+        void this.persist().catch(error => this.storageError(error));
+    }
+
+    /** Explicit recovery only: interrupted requests are never resent on load. */
+    async retryPending(): Promise<void> {
+        if (this.busy) return;
+        if (!this.pendingRequest) { await this.retrySave(); return; }
+        if (this.finished) return;
+        await this.runTurn(this.pendingRequest.learnerAnswer, this.pendingRequest.forceWrapUp);
+    }
+
+    /** Retry a storage failure without replaying a committed model response. */
+    async retrySave(): Promise<void> {
+        try { await this.persist(); this.emit({ type: 'restored' }); }
+        catch (error) { this.storageError(error); }
     }
 
     isBusy(): boolean {
         return this.busy;
+    }
+
+    /** Whether a new learner answer can be accepted without losing input. */
+    canAnswer(): boolean {
+        return !this.busy && !this.finished && this.pendingRequest === null;
+    }
+
+    isFinished(): boolean {
+        return this.finished;
+    }
+
+    getPendingRequest(): StudyPendingRequest | null {
+        return this.pendingRequest;
     }
 
     getSessionRecord(): StudySessionRecord {
@@ -355,9 +576,20 @@ export class StudySessionService {
             status('No AI provider configured');
             return null;
         }
+        // The note exists (its body was just read), so a deletion receipt left
+        // by a rename must not keep it unchartable: this is the explicit act
+        // that supersedes the receipt.
+        planService.reviveForNote(notePath);
 
         const noteTitle = (notePath.split('/').pop() ?? notePath).replace(/\.md$/, '');
         const previous = options.rechart ? planService.getPlan(notePath) : null;
+        // Keep original definitions available until every section has appeared.
+        // Mastery is read from the latest live store; stable IDs are retained by mergePlans.
+        const mergeBase = (): StudyPlan | null => {
+            const latest = planService.getPlan(notePath) ?? previous;
+            if (!latest || !previous) return latest;
+            return { ...latest, objectives: [...latest.objectives, ...previous.objectives.filter(original => !latest.objectives.some(o => o.id === original.id))] };
+        };
         const fingerprint = StudyPlanService.fingerprint(noteContent);
 
         // Figures first: they are part of the material, and their names appear
@@ -442,7 +674,7 @@ export class StudySessionService {
 
                 // Persist after every section: an interrupted job is not a lost job.
                 const partial = this.composePlan(noteTitle, notePath, noteContent, collected, sections, images, partialChartState(fingerprint, sections, done, failures), planService);
-                const merged = planService.mergePlans(previous ?? planService.getPlan(notePath), partial);
+                const merged = planService.mergePlans(mergeBase(), partial);
                 report.plan = merged.plan;
                 // Continue with the normalised objectives (ids assigned,
                 // prerequisites resolved) so later sections reuse titles and
@@ -475,7 +707,7 @@ export class StudySessionService {
         if (collected.length > 0 && stateChanged) {
             try {
                 const finalPlan = this.composePlan(noteTitle, notePath, noteContent, collected, sections, images, partialChartState(fingerprint, sections, done, failures), planService);
-                const merged = planService.mergePlans(previous ?? planService.getPlan(notePath), finalPlan);
+                const merged = planService.mergePlans(mergeBase(), finalPlan);
                 report.plan = merged.plan;
                 await plugin.savePluginData();
             } catch {
@@ -711,10 +943,25 @@ export class StudySessionService {
 
     /** Run the opening turn. */
     async start(): Promise<void> {
-        this.focusOrder = this.computeFocusOrder();
+        if (this.started) { this.emit({ type: 'restored' }); return; }
+        const workspace = this.workspace();
+        const saved = workspace.activeThreadId ? workspace.threads[workspace.activeThreadId] : null;
+        const savedIsCurrent = saved !== null
+            && !saved.archived
+            && saved.objective !== null
+            && this.plan.objectives.some(objective => objective.id === saved.objective!.id);
+        if (saved && savedIsCurrent && !this.options.freshStart) {
+            this.restore(saved);
+            return;
+        }
+        if (saved) saved.archived = true;
+        const fresh = this.options.freshStart;
+        this.planService.noteSessionStarted(this.notePath);
+        this.newThread(saved?.objective?.id ?? this.computeFocusOrder()[0] ?? null);
+        this.options.freshStart = false;
         this.emit({ type: 'stage', stage: this.initialStage() });
         this.emit({ type: 'plan', plan: this.plan });
-        if (this.options.freshStart) {
+        if (fresh) {
             this.emit({ type: 'status', text: 'Starting fresh — previous mastery still counts as evidence.' });
         }
         await this.runTurn(null);
@@ -729,11 +976,23 @@ export class StudySessionService {
 
     /** Accept the learner's answer and continue the loop. */
     async answer(text: string): Promise<void> {
+        if (this.busy) return;
+        if (this.finished) {
+            this.emit({ type: 'status', text: 'This sitting is finished. Start a new sitting to continue.' });
+            return;
+        }
+        if (this.pendingRequest) {
+            this.emit({ type: 'status', text: 'The previous answer was not sent. Retry it before typing a new answer.' });
+            return;
+        }
         const answerText = text.trim();
         if (answerText.length === 0) return;
 
         const objectiveId = this.pendingPrompt?.objectiveId ?? this.currentFocusObjectiveId();
         this.recordTranscript('user', 'answer', answerText, objectiveId, null, null, null);
+        this.cancelDraftTimer();
+        this.draft = '';
+        this.draftDirty = false;
         this.emit({
             type: 'user-turn',
             turn: this.session.transcript[this.session.transcript.length - 1],
@@ -744,6 +1003,14 @@ export class StudySessionService {
 
     /** Steering commands the engine can handle without asking the model. */
     async command(command: StudyCommand): Promise<void> {
+        // A command is a different intention, not a retry. If an answer is
+        // waiting to be sent, abandon it explicitly; otherwise runTurn would
+        // resend the old answer and silently ignore the command.
+        if (command !== 'hint' && !this.busy && this.pendingRequest) {
+            this.pendingRequest = null;
+            this.checkpoint();
+            this.emit({ type: 'status', text: 'The unsent answer was dropped; continuing with your choice.' });
+        }
         switch (command) {
             case 'hint':
                 this.emit({
@@ -774,6 +1041,7 @@ export class StudySessionService {
     setWebSearch(enabled: boolean): void {
         this.options.webSearch = enabled && this.searchService.status().ok;
         this.session.webSearch = this.options.webSearch;
+        this.saveInBackground();
         this.emit({
             type: 'status',
             text: this.options.webSearch
@@ -785,6 +1053,7 @@ export class StudySessionService {
     setMode(mode: StudyMode): void {
         this.options.mode = mode;
         this.session.mode = mode;
+        this.saveInBackground();
         this.emit({ type: 'status', text: `Mode changed to ${mode}.` });
     }
 
@@ -796,8 +1065,30 @@ export class StudySessionService {
     async focusOn(objectiveId: string): Promise<void> {
         const objective = this.plan.objectives.find(entry => entry.id === objectiveId);
         if (!objective) return;
-        this.focusOrder = [objectiveId, ...this.focusOrder.filter(id => id !== objectiveId)];
-        this.pendingPrompt = null;
+        if (this.thread()?.objective?.id === objectiveId && !this.finished) {
+            this.emit({ type: 'restored' });
+            return;
+        }
+        this.generation++;
+        this.busy = false;
+        this.cancelDraftTimer();
+        if (this.pendingRequest) this.pendingRequest.status = 'interrupted';
+        this.checkpoint();
+        // A finished thread is a report, not a resumable chat. Retire it before
+        // looking for an editable thread for this objective.
+        const finished = Object.values(this.workspace().threads).find(t => !t.archived && t.checkpoint.finished && t.objective?.id === objectiveId);
+        if (finished) finished.archived = true;
+        const existing = Object.values(this.workspace().threads).find(t => !t.archived && !t.checkpoint.finished && t.objective?.id === objectiveId);
+        const freshStart = !this.started && this.options.freshStart;
+        if (freshStart && existing) existing.archived = true;
+        if (existing && !freshStart) {
+            this.restore(existing);
+            try { await this.persist(); } catch (error) { this.storageError(error); }
+            return;
+        }
+        this.newThread(objectiveId);
+        this.options.freshStart = false;
+        this.emit({ type: 'restored' });
         this.emit({ type: 'status', text: `Focusing on: ${objective.title}` });
         await this.runTurn(
             `(The learner picked this objective to work on: ${objectiveId} — "${objective.statement}". Start there now: teach it briefly if it is new, otherwise test it.)`
@@ -809,25 +1100,26 @@ export class StudySessionService {
         if (this.finished) return;
         if (this.busy) return;
 
-        const chat = this.chatClient;
-        if (!chat) {
-            const provider = inspectChatProvider(this.plugin.settings);
-            this.emit({
-                type: 'error',
-                message: 'Study cannot reach a model.',
-                detail: provider.reason ?? 'Check the API provider configuration in settings.',
-            });
-            return;
-        }
-
         this.busy = true;
         const generation = this.generation;
+        if (!this.pendingRequest) this.researchRounds = 0;
+        const request: StudyPendingRequest = this.pendingRequest ?? { id: studyUniqueId('request'), learnerAnswer, forceWrapUp, status: 'pending' };
+        this.pendingRequest = request;
+        if (this.committedRequestIds.includes(request.id)) { this.busy = false; return; }
         const atTurnLimit = this.session.turnCount >= Math.max(4, this.options.turnLimit) - 1;
+        let storageFailed = false;
 
         try {
-            let research: string | null = null;
-            this.researchRounds = 0;
-            let repair = false;
+            try { await this.persist(); } catch (error) { storageFailed = true; request.status = 'failed'; this.checkpoint(); this.storageError(error); return; }
+            if (generation !== this.generation) return;
+            const chat = this.chatClient;
+            if (!chat) {
+                const provider = inspectChatProvider(this.plugin.settings);
+                this.emit({ type: 'error', message: 'Study cannot reach a model.', detail: provider.reason ?? 'Check the API provider configuration in settings.' });
+                return;
+            }
+            let research: string | null = request.researchBlock ?? null;
+            let repair = request.protocolRepair ?? false;
             let turn: TutorTurn | null = null;
             // A single turn can take up to five passes: one structured retry
             // plus up to three lookup rounds, with slack.
@@ -872,12 +1164,20 @@ export class StudySessionService {
                 // Ask for a structured retry once before degrading to prose.
                 if (!turn.structured && !repair) {
                     repair = true;
+                    request.protocolRepair = true;
+                    await this.persist();
+                    if (generation !== this.generation) return;
                     continue;
                 }
                 // Serve a lookup request, then continue the same turn.
                 if (turn.research && turn.research.queries.length > 0 && this.options.webSearch && this.researchRounds < 3) {
                     research = await this.performResearch(turn);
+                    if (generation !== this.generation) return;
                     this.researchRounds++;
+                    request.researchBlock = research;
+                    request.protocolRepair = false;
+                    await this.persist();
+                    if (generation !== this.generation) return;
                     repair = false;
                     continue;
                 }
@@ -887,9 +1187,29 @@ export class StudySessionService {
             this.emit({ type: 'thinking', active: false, label: '' });
             if (!turn) return;
 
+            if (generation !== this.generation || this.committedRequestIds.includes(request.id)) return;
+            // Commit once in memory, then await storage before revealing results.
+            this.bufferedEvents = [];
+            this.committedRequestIds.push(request.id);
+            this.pendingRequest = null;
             this.applyTurn(turn);
+            const events = this.bufferedEvents;
+            this.bufferedEvents = null;
+            try { await this.persist(); } catch (error) { storageFailed = true; this.storageError(error); return; }
+            if (generation !== this.generation) return;
+            for (const event of events) this.emit(event);
+        } catch (error) {
+            storageFailed = true;
+            if (generation === this.generation) this.storageError(error);
         } finally {
-            this.busy = false;
+            if (generation === this.generation) {
+                if (this.pendingRequest) this.pendingRequest.status = 'failed';
+                this.checkpoint();
+                if (this.pendingRequest && !storageFailed) {
+                    try { await this.persist(); } catch (error) { this.storageError(error); }
+                }
+                if (generation === this.generation) this.busy = false;
+            }
         }
     }
 
@@ -910,7 +1230,9 @@ export class StudySessionService {
         const queries = request.queries.slice(0, 3);
 
         this.emit({ type: 'research', queries, results: 0, done: false });
+        const generation = this.generation;
         const outcomes = await this.searchService.searchMany(queries);
+        if (generation !== this.generation) return null;
         let found = 0;
         const lines: string[] = [];
 
@@ -1156,7 +1478,7 @@ export class StudySessionService {
         correct: boolean | null
     ): void {
         const turn: StudyTurnRecord = {
-            id: `t-${this.session.transcript.length + 1}`,
+            id: studyUniqueId('message'),
             role,
             kind,
             text,
@@ -1170,6 +1492,7 @@ export class StudySessionService {
         if (this.session.transcript.length > STUDY_MAX_TURNS_PER_SESSION) {
             this.session.transcript = this.session.transcript.slice(-STUDY_MAX_TURNS_PER_SESSION);
         }
+
         if (role === 'user') {
             this.recentTurns.push({ role: 'user', text, objectiveId: objectiveId ?? null });
         }
@@ -1207,8 +1530,19 @@ export class StudySessionService {
      * it writes is in memory, and the caller decides when to persist.
      */
     finish(completed: boolean, summary?: string | null): StudySummaryPayload {
+        this.cancelDraftTimer();
         if (!this.finished) {
+            if (!this.bufferedEvents) { this.generation++; this.busy = false; }
+            this.pendingRequest = null;
             this.finished = true;
+            // A rename moves the progress record while this engine is still
+            // open. The moved store is the binding; saving under the old path
+            // would strand the sitting beside a note that no longer exists.
+            const boundPath = this.progress.notePath;
+            if (boundPath && this.planService.getPlan(boundPath)) {
+                this.notePath = boundPath;
+                this.session.notePath = boundPath;
+            }
             this.session.endedAt = Date.now();
             this.session.completed = completed;
             // A session that is closed mid-way has no tutor-written summary, and
@@ -1221,6 +1555,22 @@ export class StudySessionService {
             this.planService.noteSessionFinished(this.notePath, this.session.summary, completed);
         }
 
+        const payload = this.buildSummaryPayload();
+
+        this.pendingPrompt = null;
+        this.emit({ type: 'stage', stage: StudyStage.Complete });
+        this.emit({ type: 'complete', summary: payload });
+        this.checkpoint();
+        if (!this.bufferedEvents) this.saveInBackground();
+        return payload;
+    }
+
+    /** The report for a finished sitting, without mutating or emitting again. */
+    getFinishedSummary(): StudySummaryPayload | null {
+        return this.finished ? this.buildSummaryPayload() : null;
+    }
+
+    private buildSummaryPayload(): StudySummaryPayload {
         const digest = this.getDigest();
         const mastered = this.session.objectivesMastered;
         const fragile = this.session.objectivesTouched.filter(id => {
@@ -1228,8 +1578,7 @@ export class StudySessionService {
             return state !== undefined &&
                 (state.status === StudyObjectiveStatus.Fragile || state.status === StudyObjectiveStatus.Learning);
         });
-
-        const payload: StudySummaryPayload = {
+        return {
             notePath: this.notePath,
             session: this.session,
             score: this.session.score ?? 0,
@@ -1244,11 +1593,6 @@ export class StudySessionService {
                 score: this.session.score ?? 0,
             }),
         };
-
-        this.pendingPrompt = null;
-        this.emit({ type: 'stage', stage: StudyStage.Complete });
-        this.emit({ type: 'complete', summary: payload });
-        return payload;
     }
 
     /**

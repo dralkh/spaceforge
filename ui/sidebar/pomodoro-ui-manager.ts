@@ -460,7 +460,10 @@ export class PomodoroUIManager {
         this.plugin.pluginState.pomodoroUserOverrideMinutes = minutes;
         this.plugin.pluginState.pomodoroUserAddToEstimation = addToEstimation;
 
-        void this.plugin.savePluginData();
+        void this.plugin.savePluginData().then(
+            saved => { if (saved === false) new Notice('Pomodoro settings could not be saved.'); },
+            () => new Notice('Pomodoro settings could not be saved.'),
+        );
     }
 
     /**

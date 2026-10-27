@@ -27,6 +27,7 @@ https://github.com/user-attachments/assets/42cdccfe-6865-4942-bc6d-cd9e0376e071
     *   Charts a note into **atomic learning objectives** once, then teaches them one at a time through explain → recall → apply, diagnosing *why* an answer was wrong rather than only that it was.
     *   Tracks understanding, recall and transfer separately per objective, and only counts recall as durable when it was produced on **two different days**.
     *   Remembers everything between sessions: reopening Study resumes at the objective that actually needs work, with the tutor's notes on what you keep confusing.
+    *   **One workspace per note**: Learn, Visualize, Mind map and Summary share a single surface, and each objective keeps its own conversation and draft — switching objectives never loses an answer. A pending question or the last session report is restored when you come back.
     *   **Domain-aware**: the same engine adapts to medicine, law, mathematics, languages, music theory, practical skills and everything else, and you can correct its reading of the subject.
     *   **Optional web lookup** to verify mechanisms and current facts mid-session, with citations restricted to sources actually retrieved.
     *   Session results feed straight back into the spaced-repetition schedule, and a report can be written into your vault as study notes and cards.
@@ -136,7 +137,8 @@ Two honesty notes about the data: when you first upgrade, the day counters are s
 3.  The briefing shows where you stand: how many objectives exist, which are solid, which are fragile, and which are due. Below it, every figure in the note is listed as a thumbnail — click one to preview it, and the tutor refers to them by name while it teaches.
 4.  Pick how the session should run — **Guided** (explain → recall → apply), **Rapid drill**, **Repair** (attack recurring errors), **New situations** (transfer only) or **Exam block** (feedback withheld until the end) — and whether the tutor may look things up on the web.
 5.  Answer in your own words. The tutor grades the reasoning, names the specific mistake (recall failure vs. confusion vs. overlooked detail) and adjusts what comes next; the objective rail on the left fills in as it goes. Number keys or A–I pick a choice when the tutor offers options.
-6.  Finish with a summary you can save into the vault as study notes and cards. The note's review schedule is updated from the same result unless you turn that off in settings.
+6.  Switch objectives with the chooser under the header (or the rail on a wide panel). Each objective keeps its own conversation and draft, so moving between them never loses an answer; a note with a pending question or a draft resumes where you stopped.
+7.  Finish with a summary you can save into the vault as study notes and cards. The note's review schedule is updated from the same result unless you turn that off in settings. The last report is restored when you reopen the note.
 
 Notes are charted once and then only re-charted if you ask or if the note changes; your mastery follows the objectives it belongs to. Objective reviews are suggested by the session and shown in the briefing and the report, and they are labelled as suggestions rather than a proven optimum.
 

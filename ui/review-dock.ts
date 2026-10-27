@@ -345,7 +345,10 @@ export class ReviewDock {
         this.grip.setAttribute('title', 'Drag to resize · double-click to reset');
         this.grip.addEventListener('dblclick', () => {
             this.plugin.settings.reviewDockHeight = 0;
-            void this.plugin.savePluginData();
+            void this.plugin.savePluginData().then(
+                saved => { if (saved === false) new Notice('Dock height could not be saved.'); },
+                () => new Notice('Dock height could not be saved.'),
+            );
             this.applyHeight();
         });
         this.attachResize();
@@ -378,7 +381,10 @@ export class ReviewDock {
             const height = this.inner ? Math.round(this.inner.getBoundingClientRect().height) : 0;
             if (height > 0) {
                 this.plugin.settings.reviewDockHeight = height;
-                void this.plugin.savePluginData();
+                void this.plugin.savePluginData().then(
+                    saved => { if (saved === false) new Notice('Dock height could not be saved.'); },
+                    () => new Notice('Dock height could not be saved.'),
+                );
             }
         };
         const onDown = (event: PointerEvent) => {

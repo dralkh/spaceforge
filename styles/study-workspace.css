@@ -1,0 +1,79 @@
+/* Review Study only: one note, one canvas, reader-sized type. */
+.sf-study-panel { container-type: inline-size; }
+.sf-study-workspace { min-width: 0; overflow: hidden; font-size: var(--sf-font-text); }
+.sf-study-workspace-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 6px 10px; border-bottom: 1px solid var(--background-modifier-border); }
+.sf-study-workspace .sf-study-workspace-note { appearance: none; background: transparent; box-shadow: none; border: 0; padding: 0; height: auto; min-height: 32px; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); font-size: var(--sf-font-text); font-weight: var(--font-semibold); text-align: start; }
+.sf-study-workspace-progress { display: flex; flex: 1 1 12em; flex-direction: column; gap: 3px; color: var(--text-muted); font-size: var(--sf-font-ui); }
+.sf-study-workspace-progress progress { width: 100%; max-width: 24em; height: 4px; accent-color: var(--interactive-accent); }
+.sf-study-workspace-views { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--background-modifier-border); }
+.sf-study-workspace .sf-study-workspace-view { appearance: none; background: transparent; box-shadow: none; border: 1px solid transparent; border-radius: var(--radius-s); height: auto; min-height: 32px; padding: 4px 8px; font-size: var(--sf-font-ui); color: var(--text-muted); white-space: normal; }
+.sf-study-workspace .sf-study-workspace-view:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.sf-study-workspace .sf-study-workspace-view.is-selected { color: var(--text-normal); border-color: var(--background-modifier-border); background: var(--background-secondary); }
+.sf-study-workspace button:focus-visible, .sf-study-workspace select:focus-visible, .sf-study-workspace summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.sf-study-workspace-learn, .sf-study-workspace-material, .sf-study-material-surface { min-width: 0; }
+/* One scroller per state: the briefing or the stream scrolls, while the
+   heading, view row, objective chooser and composer stay in place. A short
+   dock must never put the answer field below a screen of tutor prose. */
+.sf-study-workspace-learn, .sf-study-workspace-material { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.sf-study-workspace-material { overflow-y: auto; }
+.sf-study-workspace .sf-study-briefing { padding: 10px; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.sf-study-workspace .sf-brief-section { padding: 0; }
+.sf-study-workspace-options { padding: 6px 0; border-top: 1px solid var(--background-modifier-border); }
+.sf-study-workspace-options > summary { cursor: pointer; min-height: 32px; display: list-item; align-content: center; color: var(--text-muted); font-size: var(--sf-font-ui); }
+.sf-study-workspace .sf-study-header { padding: 4px 10px; }
+.sf-study-workspace .sf-study-session-menu { display: none; align-items: center; justify-content: center; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; appearance: none; background: transparent; box-shadow: none; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); color: var(--text-muted); }
+.sf-study-workspace .sf-study-chips { gap: 4px; }
+.sf-study-workspace .sf-study-chip { min-height: 32px; height: auto; white-space: normal; box-shadow: none; }
+.sf-study-workspace .sf-study-body { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.sf-study-workspace .sf-study-rail-column { display: none; }
+.sf-study-workspace-objective { display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: var(--sf-font-ui); }
+.sf-study-workspace-objective select { flex: 1; min-width: 0; max-width: 100%; height: auto; min-height: 32px; font-size: var(--sf-font-ui); }
+.sf-study-workspace .sf-study-main { min-width: 0; min-height: 0; overflow: hidden; }
+.sf-study-workspace .sf-study-stage-rail { padding: 4px 10px; gap: 4px; flex-wrap: wrap; flex: 0 0 auto; }
+.sf-study-workspace .sf-study-stage-position { display: none; color: var(--text-muted); font-size: var(--sf-font-ui); }
+.sf-study-workspace .sf-study-stream { padding: 8px 10px; flex: 1 1 auto; min-height: 2em; max-height: none; overflow-y: auto; }
+.sf-study-workspace .sf-study-turn { max-width: 100%; padding: 8px; animation: none; }
+.sf-study-workspace .sf-study-question-scope { color: var(--text-muted); font-size: var(--sf-font-ui); }
+.sf-study-workspace .sf-study-composer { padding: 6px 10px; }
+.sf-study-workspace .sf-study-input { min-height: 3em; }
+.sf-study-workspace .sf-study-quick-more > summary { cursor: pointer; min-height: 32px; display: list-item; align-content: center; color: var(--text-muted); font-size: var(--sf-font-ui); }
+.sf-study-workspace .sf-study-quick { gap: 4px; }
+.sf-study-workspace .sf-study-quick-btn { min-height: 32px; height: auto; white-space: normal; }
+.sf-study-workspace .sf-study-digest { padding: 6px 10px; }
+.sf-study-workspace .sf-study-material { padding: 8px 10px; }
+.sf-study-workspace .sf-study-material-head { gap: 6px; }
+.sf-study-workspace .sf-study-material-state:empty { display: none; }
+.sf-study-workspace .sf-study-obj { width: 100%; height: auto; min-height: 32px; text-align: start; white-space: normal; box-shadow: none; }
+.sf-study-workspace.is-short .sf-study-session-menu { display: flex; }
+.sf-study-workspace.is-short .sf-study-header { display: none; }
+.sf-study-workspace.is-short .sf-study-workspace-progress { display: none; }
+.sf-study-workspace.is-short .sf-study-workspace-heading { padding: 2px 10px; }
+.sf-study-workspace.is-short .sf-study-workspace-views { padding: 2px 8px; }
+.sf-study-workspace.is-short .sf-study-workspace-objective { padding: 2px 10px; }
+.sf-study-workspace.is-short .sf-study-quick-more { display: none; }
+.sf-study-workspace.is-short .sf-study-workspace-objective { display: flex; }
+@container (min-width: 768px) {
+  .sf-study-workspace .sf-study-body { grid-template-columns: minmax(12em, 15em) minmax(0, 1fr); }
+  .sf-study-workspace .sf-study-rail-column { display: flex; min-width: 0; }
+  .sf-study-workspace .sf-study-workspace-objective { display: none; }
+  .sf-study-workspace.is-short .sf-study-workspace-objective { display: none; }
+}
+@container (max-width: 479px) {
+  .sf-study-workspace .sf-study-stage { display: none; }
+  .sf-study-workspace .sf-study-stage-position { display: block; }
+}
+@media (max-height: 480px) {
+  .sf-study-workspace .sf-study-body { grid-template-columns: minmax(0, 1fr); }
+  .sf-study-workspace .sf-study-rail-column { display: none; }
+  .sf-study-workspace .sf-study-workspace-objective { display: flex; }
+  .sf-study-workspace .sf-study-stage-rail { display: none; }
+}
+@media (pointer: coarse) {
+  .sf-study-workspace button, .sf-study-workspace summary, .sf-study-workspace select { min-height: 44px; }
+}
+
+/* At 320 px the four view names still fit in one row with the chrome's
+   horizontal padding reduced; wrapping "Summary" alone costs a whole line. */
+@container (max-width: 359px) {
+  .sf-study-workspace .sf-study-workspace-view { padding-left: 5px; padding-right: 5px; }
+}

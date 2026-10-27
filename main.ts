@@ -24,7 +24,7 @@ import {
     parsePluginData,
     readTextOrNull,
     schedulesOf,
-    writeJsonAtomically,
+    writeJsonWithPreviousCopy,
     type DataFileCandidate,
 } from './utils/data-file';
 import { DataRecoveryModal } from './ui/data-recovery-modal';
@@ -158,7 +158,7 @@ export default class SpaceforgePlugin extends Plugin {
 
     private beforeUnloadHandler: (event: Event) => void; // Declared as a class property
     /** The save that is currently writing, and whether state changed while it ran. */
-    private saveInFlight: Promise<void> | null = null;
+    private saveInFlight: Promise<boolean> | null = null;
     private saveDirty = false;
 
     reviewController: ReviewController;
@@ -262,7 +262,6 @@ export default class SpaceforgePlugin extends Plugin {
         // so it needs no persistence and cannot drift from the vault.
         this.studyChartQueue = new StudyChartQueueService(this, this.studyPlanService);
         this.studyController.attachToChartQueue();
-        this.setupStudyCharting();
 
         // The auto-pilot: a note whose chart just became ready is finished in
         // the background — its study material, then its questions — when the
@@ -319,6 +318,9 @@ export default class SpaceforgePlugin extends Plugin {
         this.contextMenuHandler = new ContextMenuHandler(this);
 
         this.initializeMCQComponents(); // This will now use mcqGenerationService
+        // onLayoutReady can run immediately on a plugin reload. Register only
+        // after every preparation dependency exists, including MCQ generation.
+        this.setupStudyCharting();
 
         EstimationUtils.setPlugin(this);
         this.addIcons();
@@ -351,21 +353,46 @@ export default class SpaceforgePlugin extends Plugin {
         this.registerEvent(this.app.vault.on('modify', (file) => {
             if (file instanceof TFile) this.wordCounts.forget(file.path);
         }));
+        this.registerEvent(this.app.vault.on('create', (file) => {
+            // A path that exists again is not deleted: clear a rename receipt so
+            // a note created at an old path can be charted and studied.
+            if (file instanceof TFile && file.extension === 'md') this.studyPlanService.reviveForNote(file.path);
+        }));
         this.registerEvent(this.app.vault.on('delete', async (file) => {
+            // Keep history for missing notes, but fence late generation first.
+            this.studyChartQueue.cancelForNote(file.path);
+            this.studyPlanService.markNoteMissing(file.path);
             if (file instanceof TFile && file.extension === "md") {
                 this.wordCounts.forget(file.path);
                 this.reviewScheduleService.removeFromReview(file.path);
-                await this.savePluginData();
+            } else if (file instanceof TFolder) {
+                for (const path of Object.keys(this.reviewScheduleService.schedules)) {
+                    if (path.startsWith(`${file.path}/`)) {
+                        this.wordCounts.forget(path);
+                        this.reviewScheduleService.removeFromReview(path);
+                    }
+                }
             }
+            await this.savePluginData();
             void this.getSidebarView()?.refresh();
         }));
         this.registerEvent(this.app.vault.on('rename', async (file, oldPath) => {
+            this.studyPlanService.renameForNote(oldPath, file.path);
+            this.studyChartQueue.handleRename(oldPath, file.path);
             if (file instanceof TFile && file.extension === "md") {
                 this.wordCounts.forget(oldPath);
                 this.wordCounts.forget(file.path);
                 this.reviewScheduleService.handleNoteRename(oldPath, file.path);
-                await this.savePluginData();
+            } else if (file instanceof TFolder) {
+                for (const path of Object.keys(this.reviewScheduleService.schedules)) {
+                    if (!path.startsWith(`${oldPath}/`)) continue;
+                    const moved = file.path + path.slice(oldPath.length);
+                    this.wordCounts.forget(path);
+                    this.wordCounts.forget(moved);
+                    this.reviewScheduleService.handleNoteRename(path, moved);
+                }
             }
+            await this.savePluginData();
             void this.getSidebarView()?.refresh();
         }));
 
@@ -443,6 +470,7 @@ export default class SpaceforgePlugin extends Plugin {
 
         this.app.workspace.onLayoutReady(() => {
             const queued = queue.syncFromSchedules(Object.keys(this.reviewScheduleService.schedules));
+            this.reconcileStudyPreparation();
             if (queued > 0) {
                 window.setTimeout(() => { void queue.tick(); }, 10 * 1000);
             }
@@ -458,6 +486,23 @@ export default class SpaceforgePlugin extends Plugin {
             void this.getSidebarView()?.refresh();
             void status;
         });
+    }
+
+    /** Backfill ready plans when automatic preparation is enabled or restored. */
+    reconcileStudyPreparation(): void {
+        void this.studyChartQueue.reconcilePreparation().catch(error => {
+            console.error('[spaceforge] could not reconcile study preparation:', error);
+        });
+    }
+
+    /** A disable/enable cycle must not accept an older in-flight response. */
+    cancelStudyPreparation(step: 'all' | 'materials' | 'questions' = 'all'): void {
+        for (const path of Object.keys(this.studyPlanService.plans)) {
+            // Turning Study off must also stop queued charting, not just the
+            // follow-up steps; turning off one follow-up must not.
+            if (step === 'all') this.studyChartQueue.cancelForNote(path);
+            else this.studyChartQueue.cancelPreparation(path, step);
+        }
     }
 
     /** Queue every scheduled note that still needs charting (command palette). */
@@ -760,18 +805,18 @@ export default class SpaceforgePlugin extends Plugin {
         const raw = await readTextOrNull(adapter, path);
         const parsed = parsePluginData(raw) as SpaceforgePluginData | null;
 
-        if (parsed && Object.keys(schedulesOf(parsed)).length > 0) {
+        if (parsed && (Object.keys(schedulesOf(parsed)).length > 0 || this.hasStoredStudyData(parsed))) {
             this.refreshGoodCopy(path, parsed);
             return parsed;
         }
 
         const candidates = await collectRecoverableCandidates(adapter, this.dataDirectory(), dataFileName(), candidate => this.fileMtime(candidate));
-        const best = candidates.find(candidate => candidate.schedules > 0);
+        const best = candidates.find(candidate => candidate.schedules > 0 || this.hasStoredStudyData(candidate.data));
         if (!best) {
             if (parsed) return parsed; // genuinely empty library: leave it as it is
             if (raw !== null) {
                 const kept = await this.preserveUnreadableFile(path, raw);
-                console.error('[spaceforge] the data file could not be read and no copy holds any reviews');
+                console.error('[spaceforge] the data file could not be read and no copy holds any reviews or study progress');
                 new Notice(`Spaceforge: the data file could not be read, and no backup holds your notes. The unreadable file was kept as ${kept ?? '—'}.`, 12000);
             }
             return undefined;
@@ -782,6 +827,17 @@ export default class SpaceforgePlugin extends Plugin {
         const { merged, addedSchedules, addedHistory } = mergePluginStates(base, best.data);
         new Notice(`Spaceforge: recovered ${addedSchedules.length} note(s) and ${addedHistory} review(s) from ${best.name}.${keptName ? ` The unreadable file was kept as ${keptName}.` : ''}`, 12000);
         return merged;
+    }
+
+    /** A learning-only vault is not an empty library and must be recoverable. */
+    private hasStoredStudyData(data: { pluginState?: unknown } | null): boolean {
+        const state = data?.pluginState;
+        if (!state || typeof state !== 'object') return false;
+        const records = state as Record<string, unknown>;
+        return ['studyPlans', 'studyProgress', 'studySessions'].some(key => {
+            const value = records[key];
+            return value !== null && typeof value === 'object' && Object.keys(value).length > 0;
+        });
     }
 
     /** Where this device keeps its own side of the vault projection. */
@@ -806,7 +862,7 @@ export default class SpaceforgePlugin extends Plugin {
 
     private async writeProjectionBookkeeping(book: { device: string; rev: number; hash: string | null; appliedRev: number }): Promise<void> {
         try {
-            await writeJsonAtomically(this.app.vault.adapter, this.projectionBookkeepingPath(), book, message => console.warn('[spaceforge]', message));
+            await writeJsonWithPreviousCopy(this.app.vault.adapter, this.projectionBookkeepingPath(), book, message => console.warn('[spaceforge]', message));
         } catch (error) {
             console.warn('[spaceforge] could not write the projection bookkeeping:', error);
         }
@@ -934,7 +990,7 @@ export default class SpaceforgePlugin extends Plugin {
 
     /** Keep a copy of the last state that loaded cleanly, to recover from next time. */
     private refreshGoodCopy(path: string, data: SpaceforgePluginData): void {
-        void writeJsonAtomically(this.app.vault.adapter, goodCopyPath(path), data, message => console.warn('[spaceforge]', message))
+        void writeJsonWithPreviousCopy(this.app.vault.adapter, goodCopyPath(path), data, message => console.warn('[spaceforge]', message))
             .catch(error => console.warn('[spaceforge] could not refresh the good copy:', error));
     }
 
@@ -1169,23 +1225,29 @@ export default class SpaceforgePlugin extends Plugin {
      * reload in the middle of a save left an empty data.json behind. Callers that
      * await this get a write that includes their changes; a save already running just
      * marks the state dirty and loops once more.
+     *
+     * Resolves false when the file was not written. It never rejects: a UI event
+     * handler that forgets to catch must not become an unhandled rejection, and
+     * durable callers (Study) check the result explicitly.
      */
-    async savePluginData(): Promise<void> {
+    async savePluginData(): Promise<boolean> {
         if (this.saveInFlight) {
             this.saveDirty = true;
             return this.saveInFlight;
         }
         const run = (async () => {
+            let ok = true;
             do {
                 this.saveDirty = false;
-                await this.performSave();
-            } while (this.saveDirty);
+                ok = await this.performSave();
+            } while (this.saveDirty && ok);
+            return ok;
         })();
         this.saveInFlight = run.finally(() => { this.saveInFlight = null; });
         return this.saveInFlight;
     }
 
-    private async performSave(): Promise<void> {
+    private async performSave(): Promise<boolean> {
         try {
             // Ensure settings object exists and is valid, applying defaults if necessary
             if (!this.settings || typeof this.settings !== 'object') {
@@ -1254,14 +1316,10 @@ export default class SpaceforgePlugin extends Plugin {
                         new Notice(`Created directory for custom data: ${dirPathOnly}`, 3000);
                     }
 
-                    // Atomic save: a temp file is renamed over the target, so an
-                    // interrupted write can never truncate the real data file.
-                    // The custom path may be inside the vault, but it is written
-                    // through the adapter on purpose: the Vault API has no way to
-                    // write to a temporary name and rename over the target, and a
-                    // plain Vault.modify truncates before it writes — exactly the
-                    // failure this guards against.
-                    await writeJsonAtomically(this.app.vault.adapter, effectiveSavePath, dataToSave, message => console.warn('[spaceforge]', message));
+                    // Keep a permanent .previous copy before replacing the body.
+                    // The adapter also addresses the plugin configuration folder;
+                    // temporary sync-visible names are deliberately never used.
+                    await writeJsonWithPreviousCopy(this.app.vault.adapter, effectiveSavePath, dataToSave, message => console.warn('[spaceforge]', message));
                     // new Notice(`Spaceforge: Data saved to custom path: ${effectiveSavePath}`, 3000); // Removed notice
 
                     // Migration/Cleanup: If we just successfully saved to a custom path,
@@ -1275,29 +1333,43 @@ export default class SpaceforgePlugin extends Plugin {
                     }
                 } catch (writeError) {
                     const msg = writeError instanceof Error ? writeError.message : String(writeError);
-                    new Notice(`Error saving data to custom path ${effectiveSavePath}: ${msg}. Falling back to default path for this save.`, 10000);
-                    // Fallback save to default location if custom path write fails
+                    new Notice(`Error saving data to custom path ${effectiveSavePath}: ${msg}. Falling back to the default folder for this save.`, 10000);
+                    // Preserve a recovery copy without using saveData(), which
+                    // truncates without a backup. A failed configured destination
+                    // is still a failure for callers awaiting durable progress.
                     try {
-                        await this.saveData(dataToSave); // Plugin's internal save
-                        new Notice(`Data saved to default plugin folder due to error with custom path`, 5000);
-                    } catch {
-                        new Notice(`Critical error: failed to save data to both custom and default locations`, 10000);
+                        await writeJsonWithPreviousCopy(this.app.vault.adapter, defaultPluginDataPath, dataToSave, message => console.warn('[spaceforge]', message));
+                        this.scheduleProgressProjection();
+                        new Notice('Data saved to the default plugin folder; the configured path failed.', 8000);
+                    } catch (fallbackError) {
+                        new Notice('Critical error: failed to save data to both the configured and default locations', 10000);
+                        console.error('[spaceforge] could not write the fallback data file:', fallbackError);
                     }
+                    return false;
                 }
             } else {
                 // Saving to default plugin storage path. Obsidian's own saveData()
                 // truncates the file before writing it, which is what a quick restart
-                // catches in the act - write through a temp file and rename instead.
-                await writeJsonAtomically(this.app.vault.adapter, defaultPluginDataPath, dataToSave, message => console.warn('[spaceforge]', message));
+                // catches in the act — retain a permanent .previous copy first.
+                try {
+                    await writeJsonWithPreviousCopy(this.app.vault.adapter, defaultPluginDataPath, dataToSave, message => console.warn('[spaceforge]', message));
+                } catch (error) {
+                    new Notice('Error saving data. Check console for details', 5000);
+                    console.error('[spaceforge] could not save progress:', error);
+                    return false;
+                }
                 // new Notice(`Spaceforge: Data saved to default plugin storage.`, 3000); // Removed notice
             }
 
             // The real file is on disk; the vault-side projection follows a few
             // seconds behind it, so a burst of reviews costs one write.
             this.scheduleProgressProjection();
+            return true;
 
-        } catch {
+        } catch (error) {
             new Notice("Error saving data. Check console for details", 5000);
+            console.error('[spaceforge] could not save progress:', error);
+            return false;
         }
     }
 

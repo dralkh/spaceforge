@@ -160,6 +160,7 @@ Rules for the object:
 - Omit or null out any field that does not apply; do not invent placeholder content for it.
 - "say" is required on every turn. No answer keys, no grading notes and no meta-commentary inside "say".
 - "next" is required unless sessionComplete is true.
+- "next".text is the question card the learner answers. Do not repeat or paraphrase it at the end of "say": finish "say" on the teaching, so the question appears once.
 - "verdict" is required whenever the learner just made an attempt, including "I don't know".
 - Score "progress" only for the objective this turn was about.
 - Set "sessionComplete" to true with a "summary" when every objective has been recalled unaided at least once and applied at least once, or when the learner says they are finished, or when told to wrap up.`;
