@@ -100,6 +100,12 @@ test('interval previews and due labels', () => {
     assert.equal(formatDueLabel(now - 3 * 86400000, now), '3d overdue');
     assert.equal(formatDueLabel(now, now), 'due now');
     assert.equal(formatDueLabel(now + 2 * 86400000, now), 'due in 2d');
+    // A due label carries the clock: hours and minutes under a day, and the
+    // leftover hours for the first week, where they still change the decision.
+    assert.equal(formatDueLabel(now - (3 * 3600 + 20 * 60) * 1000, now), '3h 20m overdue');
+    assert.equal(formatDueLabel(now + (2 * 3600 + 15 * 60) * 1000, now), 'due in 2h 15m');
+    assert.equal(formatDueLabel(now - (3 * 86400000 + 4 * 3600000), now), '3d 4h overdue');
+    assert.equal(formatDueLabel(now - 8 * 86400000 - 4 * 3600000, now), '8d overdue');
 });
 
 test('lapse info comes from whichever algorithm owns it', () => {

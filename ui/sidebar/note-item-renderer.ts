@@ -1,6 +1,7 @@
 import { Menu, Notice, TFile, setIcon } from "obsidian";
 import SpaceforgePlugin from "../../main";
 import { ReviewSchedule } from "../../models/review-schedule";
+import { formatDueLabel } from "../../models/review-flow";
 import { DateUtils } from "../../utils/dates";
 import { EstimationUtils } from "../../utils/estimation";
 import { ConfirmationModal } from "../confirmation-modal";
@@ -25,9 +26,8 @@ export class NoteItemRenderer {
         noteEl.removeAttribute("title");
         if (dateStr === "Due notes") {
             noteEl.addClass("overdue-note");
-            const daysOverdue = Math.abs(Math.floor((note.nextReviewDate - DateUtils.startOfUTCDay()) / (24 * 60 * 60 * 1000)));
             const originalDueDate = new Date(note.nextReviewDate).toLocaleDateString();
-            noteEl.setAttribute("title", `Originally due: ${originalDueDate} (${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'} overdue)`);
+            noteEl.setAttribute("title", `Originally due: ${originalDueDate} (${formatDueLabel(note.nextReviewDate, Date.now())})`);
         }
 
         // Selected status

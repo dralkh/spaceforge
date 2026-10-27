@@ -189,6 +189,11 @@
     'meters meters meters';
   gap: 4px var(--sf-space-sm);
   align-items: center;
+  /* The rail and the briefing list are scrolling flex columns. Without this a
+     flex item shrinks to its 32 px floor when the list is taller than the rail,
+     and the two-line title plus meta spill under the next card — measured at
+     ten objectives, every subtitle was covered. */
+  flex: 0 0 auto;
   padding: 8px 10px;
   border-radius: var(--sf-radius-sm);
   border: 1px solid transparent;
@@ -2294,8 +2299,9 @@
   }
 }
 
-/* The dock under a note is a band the reader sizes; in a window or the sidebar
-   it is the pane itself and takes the room its host gives it. */
+/* The dock under a note is a band the reader sizes; in a split, a window or the
+   sidebar it is the pane itself and takes the room its host gives it. */
+.sf-host-split .sf-dock,
 .sf-host-window .sf-dock,
 .sf-host-sidebar .sf-dock {
   flex: 1 1 auto;
@@ -2306,6 +2312,7 @@
 /* Same selector shape as the rule that pins the height under a note
    (`.sf-dock-host.is-open .sf-dock-inner`), or its `min(58vh, 640px)` — and the
    dragged size — would win here and leave the host's own height unused. */
+.sf-host-split .sf-dock-host.is-open .sf-dock-inner,
 .sf-host-window .sf-dock-host.is-open .sf-dock-inner,
 .sf-host-sidebar .sf-dock-host.is-open .sf-dock-inner {
   height: auto;
@@ -2321,6 +2328,7 @@
 
 /* A drag handle is for a band inside a note; away from one there is nothing to
    drag — the host decides, so the control goes. */
+.sf-host-split .sf-dock-grip,
 .sf-host-window .sf-dock-grip,
 .sf-host-sidebar .sf-dock-grip {
   display: none;

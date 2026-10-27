@@ -105,6 +105,14 @@
   display: block;
 }
 
+@container (max-width: 480px) {
+  /* In a split or sidebar the dropdown's own text says what it is; the label
+     was costing the selected objective the width it needs to stay readable. */
+  .sf-study-workspace .sf-study-workspace-objective-label {
+    display: none;
+  }
+}
+
 /* Four labels in 268 px: the tabs were wrapping to two rows before the first
    tutor sentence. The smallest UI step buys the row back without truncating a
    name. */

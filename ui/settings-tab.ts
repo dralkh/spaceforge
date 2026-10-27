@@ -573,18 +573,19 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
         new Setting(reviewFlowContainer)
             .setName('Where the review session lives')
-            .setDesc('Under the note being reviewed, in a window of its own, or in the sidebar beside your calendar and list. You can move it whenever you like from the session menu on the bar.')
+            .setDesc('Under the note being reviewed, beside it in a vertical split, in a window of its own, or in the sidebar beside your calendar and list. You can move it whenever you like from the session menu on the bar.')
             .addDropdown(dropdown => dropdown
                 .addOption('note', 'Under the note')
+                .addOption('split', 'Beside the note (vertical split)')
                 .addOption('window', 'In a window of its own')
                 .addOption('sidebar', 'In the sidebar')
                 .setValue(this.plugin.settings.reviewSessionHost)
                 .onChange(async (value: string) => {
-                    const host = value === 'window' || value === 'sidebar' ? value : 'note';
+                    const host = value === 'window' || value === 'sidebar' || value === 'split' ? value : 'note';
                     this.plugin.settings.reviewSessionHost = host;
                     await this.plugin.savePluginData();
-                    if (host === 'sidebar') {
-                        await this.plugin.reviewFlowController?.moveToHost('sidebar');
+                    if (host === 'sidebar' || host === 'split') {
+                        await this.plugin.reviewFlowController?.moveToHost(host);
                     } else {
                         this.plugin.reviewFlowController?.setHost(host);
                     }

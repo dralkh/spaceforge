@@ -99,6 +99,10 @@ export class ReviewFlowController {
     private hostContainer: HTMLElement | null = null;
     /** The window the session itself was moved into, when that is its home. */
     private sessionWindow: WorkspaceLeaf | null = null;
+    /** The main-area leaf to the right of the note, when the dock sits beside it. */
+    private sessionSplit: WorkspaceLeaf | null = null;
+    /** True while the split leaf is being created, so a layout change cannot add a second. */
+    private splitOpening = false;
     /** The container currently carrying our host class, so it can be taken off. */
     private hostClassEl: HTMLElement | null = null;
     /** True while a walk-back to a visible home is in flight, so it never loops. */
@@ -248,6 +252,10 @@ export class ReviewFlowController {
         this.strip.unmount();
         this.dock?.destroy();
         this.dock = null;
+        // The split is the session's pane, not the reader's: ending the run
+        // leaves no empty Review tab behind. The remembered home stays split,
+        // so the next run opens beside the note again.
+        if (this.host === 'split') this.closeSessionSplit();
         // A review pane with nothing in it still claims to be the session: the
         // reader's next press of Review has to find the tab free, or the press
         // does nothing at all. The remembered home is left as the reader wrote
@@ -369,6 +377,9 @@ export class ReviewFlowController {
         const window = this.sessionWindow;
         this.sessionWindow = null;
         window?.detach();
+        const split = this.sessionSplit;
+        this.sessionSplit = null;
+        split?.detach();
     }
 
     /**
@@ -394,6 +405,7 @@ export class ReviewFlowController {
             void this.plugin.savePluginData();
         }
         if (host === 'window') {
+            if (previous === 'split') this.closeSessionSplit();
             const leavingPane = persist && previous === 'sidebar';
             // The pane is handed back *after* the session has left it: hiding a
             // container the session is still inside is its own bug.
@@ -403,7 +415,18 @@ export class ReviewFlowController {
             );
             return;
         }
+        if (host === 'split') {
+            // A split is the reader's own pane: the window, if any, has to go
+            // first or the session would be in two homes at once.
+            if (previous === 'window') this.closeSessionWindow();
+            if (persist && previous === 'sidebar') this.handBackSidebarPane();
+            // A preference can be chosen before there is a run; the pane is
+            // opened when the run starts, not as an empty frame now.
+            if (this.model.isActive()) void this.openSessionSplit();
+            return;
+        }
         this.closeSessionWindow();
+        this.closeSessionSplit();
         // Only a move *away* from the sidebar hands the pane back: entering it
         // is the pane doing the claiming.
         if (persist && previous === 'sidebar' && host !== 'sidebar') this.handBackSidebarPane();
@@ -469,6 +492,10 @@ export class ReviewFlowController {
      * choice is left exactly as they wrote it, for the next run.
      */
     private ensureHostReady(): void {
+        if (this.host === 'split') {
+            if (!this.splitView()?.containerEl?.isConnected) void this.openSessionSplit();
+            return;
+        }
         if (this.host !== 'sidebar') return;
         if (!this.sidebarShowsSession()) {
             this.setHost('note', null, false);
@@ -530,6 +557,14 @@ export class ReviewFlowController {
      */
     handleSessionWindowClosed(): void {
         this.sessionWindow = null;
+        if (this.host === 'split') {
+            // An expected close sets `sessionSplit` to null before detaching;
+            // a press on the pane's own ✕ leaves it set.
+            if (this.sessionSplit === null) return;
+            this.sessionSplit = null;
+            this.setHost('note', null, false);
+            return;
+        }
         if (this.host !== 'window') return;
         this.setHost('note', null, false);
     }
@@ -577,6 +612,55 @@ export class ReviewFlowController {
     }
 
     /**
+     * The session beside its note: a main-area split to the right.
+     *
+     * The note keeps the pane it was in and the bar and dock take the new
+     * pane, so the divider is Obsidian's own and drags like any other. Unlike
+     * the popout window this leaf lives in the workspace: the session is still
+     * on the screen the reader is working on, just no longer under the note.
+     */
+    private async openSessionSplit(): Promise<void> {
+        if (this.splitOpening) return;
+        this.splitOpening = true;
+        try {
+            const existing = this.sessionSplit?.view?.containerEl?.isConnected ? this.sessionSplit : null;
+            const adopted = existing
+                ?? this.plugin.app.workspace.getLeavesOfType(REVIEW_WINDOW_VIEW).find(leaf =>
+                    leaf.view?.containerEl?.isConnected
+                    && leaf.getViewState?.().state?.spaceforgeSplit === true);
+            if (adopted) {
+                this.sessionSplit = adopted;
+                void this.plugin.app.workspace.revealLeaf(adopted);
+                if (this.model.isActive()) this.remountSurfaces();
+                return;
+            }
+            const noteLeaf = this.leaf?.view?.containerEl?.isConnected
+                && this.leaf.view?.getViewType?.() === 'markdown'
+                && this.leaf.view.containerEl.getBoundingClientRect().width > 0
+                ? this.leaf
+                : this.plugin.app.workspace.getLeaf();
+            const leaf = this.plugin.app.workspace.createLeafBySplit(noteLeaf, 'vertical', false);
+            this.sessionSplit = leaf;
+            await leaf.setViewState({
+                type: REVIEW_WINDOW_VIEW,
+                active: false,
+                state: { spaceforgeSplit: true },
+            });
+            void this.plugin.app.workspace.revealLeaf(leaf);
+            if (this.model.isActive()) this.remountSurfaces();
+        } finally {
+            this.splitOpening = false;
+        }
+    }
+
+    /** The session has left its split: the pane goes with it. */
+    private closeSessionSplit(): void {
+        const leaf = this.sessionSplit;
+        this.sessionSplit = null;
+        leaf?.detach();
+    }
+
+    /**
      * The session has left its window: the window goes with it.
      *
      * Leaving it open is the same bug as a duplicate panel — an empty frame that
@@ -590,8 +674,23 @@ export class ReviewFlowController {
     }
 
     private sessionView(): ReviewWindowView | null {
-        const view = this.sessionWindow?.view;
-        return view instanceof ReviewWindowView ? view : null;
+        return this.sessionHostView(this.sessionWindow);
+    }
+
+    private splitView(): ReviewWindowView | null {
+        return this.sessionHostView(this.sessionSplit);
+    }
+
+    /**
+     * A view that can host the session, found by its contract rather than by
+     * `instanceof`: after a plugin reload the leaf still holds a view built by
+     * the previous module load, and a class check says it is a stranger while
+     * the object still has the one method we need.
+     */
+    private sessionHostView(leaf: WorkspaceLeaf | null): ReviewWindowView | null {
+        const view = leaf?.view as unknown as { getSessionHostEl?: () => HTMLElement } | null;
+        if (!view || typeof view.getSessionHostEl !== 'function') return null;
+        return view as unknown as ReviewWindowView;
     }
 
     /** Take the surfaces out of the leaf and put them at the session's home. */
@@ -650,7 +749,7 @@ export class ReviewFlowController {
 
     private applyHostClass(container: HTMLElement): void {
         if (this.hostClassEl && this.hostClassEl !== container) {
-            this.hostClassEl.removeClass('sf-host-note', 'sf-host-window', 'sf-host-sidebar');
+            this.hostClassEl.removeClass('sf-host-note', 'sf-host-split', 'sf-host-window', 'sf-host-sidebar');
         }
         this.hostClassEl = container;
         container.addClass(`sf-host-${this.host}`);
@@ -669,9 +768,11 @@ export class ReviewFlowController {
     private resolveSessionContainer(): HTMLElement | null {
         const home = this.host === 'sidebar'
             ? this.sidebarHomeContainer()
-            : this.host === 'window'
-                ? (this.sessionView()?.getSessionHostEl() ?? null)
-                : this.noteContainer();
+            : this.host === 'split'
+                ? (this.splitView()?.getSessionHostEl() ?? null)
+                : this.host === 'window'
+                    ? (this.sessionView()?.getSessionHostEl() ?? null)
+                    : this.noteContainer();
         if (home && home.isConnected && !home.closest('.sf-hidden')) return home;
         if (this.host === 'note') return null;
         // The tab, or the window, is not on screen yet: rather than a run with
@@ -1367,7 +1468,14 @@ export class ReviewFlowController {
     }
 
     private resolveLeaf(): WorkspaceLeaf {
-        if (this.leaf && this.leaf.view?.containerEl?.isConnected) return this.leaf;
+        // Only a markdown leaf can hold the note. A session leaf left as
+        // `this.leaf` (a split or a window) would otherwise be replaced by the
+        // note on the next item, tearing the session down with it.
+        if (this.leaf
+            && this.leaf.view?.containerEl?.isConnected
+            && this.leaf.view?.getViewType?.() === 'markdown') {
+            return this.leaf;
+        }
         // With the session in a window or the sidebar, the note stays in the pane
         // the reader is working in; the popout placement is about the note itself.
         if (this.host === 'note' && this.plugin.settings.reviewSessionPlacement === 'window') {
@@ -1417,6 +1525,10 @@ export class ReviewFlowController {
 
     private mountStrip(): void {
         if (!this.model.isActive()) return;
+        // A remembered split whose leaf was closed comes back beside the note
+        // it is about to show, not beside whichever leaf happened to be active
+        // when the app loaded.
+        if (this.host === 'split' && !this.splitView()?.containerEl?.isConnected) void this.openSessionSplit();
         const container = this.resolveSessionContainer();
         if (!container) {
             // The pane is gone (or was never a note's): the bar is taken down

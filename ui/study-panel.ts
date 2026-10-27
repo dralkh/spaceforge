@@ -957,7 +957,7 @@ export class StudyPanel {
         this.modeButton = modeButton;
 
         const chooserRow = host.createDiv('sf-study-workspace-objective');
-        chooserRow.createSpan({ text: 'Objective' });
+        chooserRow.createSpan({ cls: 'sf-study-workspace-objective-label', text: 'Objective' });
         this.objectiveChooser = chooserRow.createEl('select', { cls: 'dropdown', attr: { 'aria-label': 'Objective' } });
         this.objectiveChooser.addEventListener('change', () => {
             this.captureWorkspace();

@@ -34,7 +34,7 @@ export type DeckSessionPlacement = 'modal' | 'split' | 'window';
  * The reader's screen is not always the pane the note is in: a session belongs
  * under the note, in a window of its own, or in the sidebar's review tab.
  */
-export type ReviewSessionHost = 'note' | 'window' | 'sidebar';
+export type ReviewSessionHost = 'note' | 'split' | 'window' | 'sidebar';
 
 /** The four grades every algorithm can be expressed in. */
 export type GradeBucket = 'again' | 'hard' | 'good' | 'easy';
@@ -214,15 +214,36 @@ export function formatScheduledInterval(intervalDays: number, nextReviewDate: nu
     return formatDuration(delta);
 }
 
-/** "3d overdue" / "due now" for the strip header. */
+/**
+ * A due span with the clock in it: minutes under an hour, hours and minutes
+ * under a day, and days with the leftover hours while the label stays short.
+ *
+ * `formatDuration` rounds to whole hours, which is right on a grade button
+ * ("5h") but hides the twenty minutes the reader is actually waiting for.
+ */
+function formatDueSpan(ms: number): string {
+    const totalMinutes = Math.max(1, Math.round(ms / 60000));
+    if (totalMinutes < 60) return `${totalMinutes}m`;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours < 24) return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainder = hours % 24;
+    // A week is where the hours stop being a decision: "8d 4h overdue" is a
+    // longer label for the same choice, and it pushes the controls off a
+    // 268 px bar onto their own row.
+    return remainder && days < 7 ? `${days}d ${remainder}h` : `${days}d`;
+}
+
+/** "3h 20m overdue" / "due in 2h 15m" for the strip header. */
 export function formatDueLabel(nextReviewDate: number, now: number): string {
     const delta = nextReviewDate - now;
     if (delta <= 0) {
         const late = -delta;
         if (late < 60000) return 'due now';
-        return `${formatDuration(late)} overdue`;
+        return `${formatDueSpan(late)} overdue`;
     }
-    return `due in ${formatDuration(delta)}`;
+    return `due in ${formatDueSpan(delta)}`;
 }
 
 /** Snapshot kept so the last grade can be reverted (Anki's "undo"). */

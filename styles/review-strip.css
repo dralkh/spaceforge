@@ -615,6 +615,7 @@
 /* A window and the sidebar give the session a column of its own rather than a
    band under a note, so the bar drops the band's edges and reflows into the
    room it is handed instead of trusting a viewport-sized media query. */
+.sf-host-split .sf-strip,
 .sf-host-window .sf-strip,
 .sf-host-sidebar .sf-strip {
   border-left: none;

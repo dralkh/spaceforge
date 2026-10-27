@@ -177,6 +177,16 @@ test('dynamically sized things are driven by the custom properties the code sets
         'the sidebar progress bar must read --sf-session-progress');
 });
 
+test('objective cards keep their content height in the scrolling rail', () => {
+    // Both the session rail and the briefing list are flex columns. With the
+    // default flex-shrink the items collapsed to their 32 px floor once the
+    // list was taller than its box, and the two-line title plus meta painted
+    // under the next card. Pin the non-shrinking item, not just its min-height.
+    const study = read('styles/study.css');
+    assert.match(ruleBody(study, '.sf-study-obj'), /flex:\s*0 0 auto/,
+        'the objective row must not shrink below its content');
+});
+
 test('no source file assigns an inline style directly', () => {
     // Plugin guideline: styling belongs in the stylesheet so themes can change
     // it. Custom properties are data; `el.style.foo = bar` is styling.

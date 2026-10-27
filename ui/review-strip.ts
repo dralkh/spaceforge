@@ -529,6 +529,11 @@ export class ReviewStrip {
             .setChecked(this.host === 'note')
             .onClick(() => this.handlers.onHost('note')));
         menu.addItem(item => item
+            .setTitle('Split the review to the right')
+            .setIcon('columns-2')
+            .setChecked(this.host === 'split')
+            .onClick(() => this.handlers.onHost('split')));
+        menu.addItem(item => item
             .setTitle('Move the review into a window')
             .setIcon('picture-in-picture-2')
             .setChecked(this.host === 'window')

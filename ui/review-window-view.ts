@@ -15,6 +15,8 @@ export const REVIEW_WINDOW_VIEW = 'spaceforge-review-window';
 export class ReviewWindowView extends ItemView {
     private sessionEl: HTMLElement | null = null;
     private readonly onWindowClosed: () => void;
+    /** True when this leaf is the workspace split beside the note, not a popout. */
+    private splitHost = false;
 
     constructor(leaf: WorkspaceLeaf, onWindowClosed: () => void = () => undefined) {
         super(leaf);
@@ -25,8 +27,23 @@ export class ReviewWindowView extends ItemView {
         return REVIEW_WINDOW_VIEW;
     }
 
+    /**
+     * Remember which kind of leaf this is. The controller adopts an existing
+     * split after a reload; without this the view state was `{}` and the only
+     * way to tell a split from a popout window was gone.
+     */
+    getState(): Record<string, unknown> {
+        return this.splitHost ? { spaceforgeSplit: true } : {};
+    }
+
+    setState(state: unknown, _result: unknown): Promise<void> {
+        const record = state as { spaceforgeSplit?: unknown } | null;
+        this.splitHost = record?.spaceforgeSplit === true;
+        return Promise.resolve();
+    }
+
     getDisplayText(): string {
-        return 'Review session';
+        return 'Review';
     }
 
     getIcon(): string {

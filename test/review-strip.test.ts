@@ -259,14 +259,17 @@ test('the overflow menu only offers questions when MCQs are available', () => {
     assert.deepEqual(menuItems.map(item => item.title), [
         'Skip this note (s)',
         'Keep the review under the note',
+        'Split the review to the right',
         'Move the review into a window',
         'Move the review into the sidebar',
         'Remove from review schedule',
     ]);
     assert.equal(menuItems.filter(item => /MCQ/.test(item.title)).length, 0);
-    menuItems[3].click();
-    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar']);
     menuItems[4].click();
+    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar']);
+    menuItems[2].click();
+    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar', 'split']);
+    menuItems[5].click();
     assert.equal(withoutMCQ.calls.removals, 1);
 
     const withMCQ = makeStrip(true);
@@ -277,6 +280,7 @@ test('the overflow menu only offers questions when MCQs are available', () => {
         'Generate new MCQs',
         'Skip this note (s)',
         'Keep the review under the note',
+        'Split the review to the right',
         'Move the review into a window',
         'Move the review into the sidebar',
         'Remove from review schedule',
