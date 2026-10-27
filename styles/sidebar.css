@@ -1094,3 +1094,148 @@
   background-color: var(--background-modifier-hover);
   border-left-color: var(--interactive-accent);
 }
+
+/* --------------------------------------------------------------- narrow pane
+ * The sidebar's smallest width is a pane width, not a window width: media
+ * queries never fire in a right split. These container rules are the narrow
+ * layout the reader sees at 300px. */
+
+.review-date-section {
+  container-type: inline-size;
+  container-name: sf-date-section;
+}
+
+.review-header-row .review-view-toggle {
+  overflow: hidden;
+}
+
+.review-view-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The section heading, its bulk actions and the time estimate are one header.
+   At the narrow width the heading must get a full row of its own: sharing the
+   row made it 29px wide and every character became a line. */
+@container sf-date-section (max-width: 360px) {
+  .review-date-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .review-date-header-container {
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-right: 0;
+    overflow: visible;
+  }
+
+  .review-date-heading {
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  .review-date-action-button {
+    flex: 0 0 auto;
+  }
+
+  .review-date-time {
+    align-self: flex-start;
+    padding: 2px 6px;
+  }
+}
+
+/* One row of five icon actions is wider than a 300px card once the drag
+   handle is counted. Give the buttons their own wrapping row instead of
+   clipping the last ones at the card edge. */
+.review-notes-container {
+  container-type: inline-size;
+  container-name: sf-notes;
+}
+
+@container sf-notes (max-width: 340px) {
+  .review-note-buttons {
+    flex: 1 0 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+
+  .review-note-actions {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .review-note-actions .review-note-button,
+  .review-note-actions .review-note-postpone,
+  .review-note-actions .review-note-remove {
+    flex: 0 1 auto;
+    min-width: 32px;
+    padding: 5px 8px;
+  }
+
+  .review-note-drag-handle {
+    margin-left: auto;
+    padding: 5px 6px;
+  }
+}
+
+/* The session kebab moves into the first section header, beside Postpone all.
+   It is the reader's one session menu, not a second header row. */
+.review-date-menu {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  height: 24px;
+  padding: 0 8px;
+}
+
+/* The session actions moved into the section header. With no charting work to
+   report, this container is empty; its margin was the unexplained gap under
+   Previous/Next. */
+.review-buttons-container:not(.has-chart-status) {
+  margin-bottom: 0;
+}
+
+/* The three view names share a fixed row with the statistics button. At 260px
+   "Calendar" is the longest and loses its last letters; one step down the house
+   type scale, with the horizontal padding reduced, keeps every tab whole. */
+.review-header-row {
+  container-type: inline-size;
+}
+
+@container (max-width: 280px) {
+  .review-view-btn {
+    padding-left: 2px;
+    padding-right: 2px;
+    font-size: var(--sf-font-small);
+  }
+
+  .review-stats-btn {
+    width: 28px;
+  }
+}
+
+/* The sidebar can be dragged narrower than 260px. Below 240px the three view
+   names cannot share the row with the statistics button; let the toggle take
+   two rows rather than clipping "Calendar" or hiding "Review". */
+@container (max-width: 240px) {
+  .review-view-toggle {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .review-view-btn {
+    flex: 1 1 calc(50% - 1px);
+  }
+}

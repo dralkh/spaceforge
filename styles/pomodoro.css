@@ -325,3 +325,44 @@
     border-radius: var(--radius-s);
     border-left: 3px solid var(--sf-info);
 }
+
+/* The timer section is one card, not two nested padded cards. The inner
+   container was adding another 16px of padding beside the outer one, which is
+   what pushed the timer's right edge under the pane at the narrow width. */
+.sidebar-pomodoro-section-container {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.sidebar-pomodoro-section {
+  container-type: inline-size;
+  container-name: sf-pomodoro;
+}
+
+@container sf-pomodoro (max-width: 330px) {
+  .pomodoro-main-controls {
+    gap: 4px;
+  }
+
+  .pomodoro-timer-display {
+    flex: 1 1 8ch;
+    min-width: 0;
+    padding: 4px 6px;
+    font-size: var(--sf-font-text);
+    margin: 0 2px;
+  }
+
+  .pomodoro-cycle-progress {
+    overflow-wrap: anywhere;
+  }
+}
+
+@container sf-pomodoro (max-width: 240px) {
+  .pomodoro-timer-display {
+    font-size: var(--sf-font-ui);
+  }
+}

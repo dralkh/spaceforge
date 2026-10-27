@@ -4,7 +4,15 @@ import { StudyVisualBoardView } from './study-visual-board';
 import { StudyVisualDiagramView } from './study-visual-diagram';
 import { StudyVisualGraphView } from './study-visual-graph';
 import { StudyVisualLabView } from './study-visual-lab';
-import { StudyVisualSequenceView } from './study-visual-sequence';
+import { StudySequenceState, StudyVisualSequenceView } from './study-visual-sequence';
+
+export interface StudyGalleryAssetState { lab?: Record<string, number>; sequence?: StudySequenceState }
+export interface StudyGalleryState {
+    open?: string[];
+    assets?: Record<string, StudyGalleryAssetState>;
+    onChange?: (open: string[]) => void;
+    onAssetChange?: () => void;
+}
 
 /**
  * The visualise gallery: several assets, each one interactive, each one teaching
@@ -38,24 +46,37 @@ export class StudyVisualGalleryView {
     private teardowns: (() => void)[] = [];
     private cardTeardowns = new Map<HTMLElement, () => void>();
     private open = new Set<string>();
+    private onChange: ((open: string[]) => void) | undefined;
+    private state: StudyGalleryState = {};
+    private closers = new Map<HTMLElement, () => void>();
+    private collapseAllEl: HTMLButtonElement | null = null;
 
     /** Mount the gallery; returns its teardown. */
-    mount(container: HTMLElement, visuals: StudyVisual[]): () => void {
+    mount(container: HTMLElement, visuals: StudyVisual[], state: StudyGalleryState = {}): () => void {
+        this.state = state;
+        this.onChange = state.onChange;
         this.root = container.createDiv('sf-vg');
         if (visuals.length === 0) {
             this.root.createDiv({ cls: 'sf-vg-empty', text: 'No visual assets in this pack yet.' });
             return () => this.destroy();
         }
-        this.root.createDiv({ cls: 'sf-vg-count', text: `${visuals.length} visual asset${visuals.length === 1 ? '' : 's'}` });
+        const toolbar = this.root.createDiv('sf-vg-toolbar');
+        toolbar.createDiv({ cls: 'sf-vg-count', text: `${visuals.length} visual asset${visuals.length === 1 ? '' : 's'}` });
+        if (visuals.length > 1) {
+            this.collapseAllEl = toolbar.createEl('button', { cls: 'sf-vg-collapse-all', text: 'Collapse all' });
+            this.collapseAllEl.setAttribute('type', 'button');
+            this.collapseAllEl.addEventListener('click', () => this.collapseAll());
+        }
         // the first asset opens; the reader opens the rest
-        this.open.add(this.keyOf(visuals[0], 0));
+        this.open = new Set(state.open ?? [this.keyOf(visuals[0], 0)]);
 
         visuals.forEach((visual, index) => this.renderCard(visual, index));
+        this.updateToolbar();
         return () => this.destroy();
     }
 
-    private keyOf(visual: StudyVisual, index: number): string {
-        return `${visual.kind}:${index}`;
+    private keyOf(visual: StudyVisual, _index: number): string {
+        return JSON.stringify(visual);
     }
 
     private renderCard(visual: StudyVisual, index: number): void {
@@ -80,7 +101,19 @@ export class StudyVisualGalleryView {
             chevron.empty();
             setIcon(chevron, open ? 'chevron-down' : 'chevron-right');
             if (open) {
-                if (!teardown) teardown = this.mountAsset(body, visual);
+                if (!teardown) {
+                    // One malformed asset must not take the gallery down with it.
+                    // The model's data is coerced, but a renderer can still meet
+                    // a host or a value it cannot draw; leave the other cards
+                    // usable and say so in this card.
+                    try {
+                        teardown = this.mountAsset(body, visual);
+                    } catch {
+                        body.empty();
+                        body.createDiv({ cls: 'sf-vg-error', text: 'This visual could not be drawn. Open another asset, or regenerate the material.' });
+                        teardown = () => { body.empty(); };
+                    }
+                }
             } else if (teardown) {
                 // A component that is merely hidden is still a component: it
                 // measures its host (zero, when hidden) and holds listeners.
@@ -94,23 +127,40 @@ export class StudyVisualGalleryView {
             teardown?.();
             teardown = null;
         });
+        this.closers.set(card, () => setOpen(false));
         head.addEventListener('click', () => {
             const nowOpen = !this.open.has(key);
             if (nowOpen) this.open.add(key);
             else this.open.delete(key);
+            this.onChange?.([...this.open]);
             setOpen(nowOpen);
+            this.updateToolbar();
         });
+    }
+
+    /** Close every card: the reader asked for the index back. */
+    private collapseAll(): void {
+        for (const close of this.closers.values()) close();
+        this.open.clear();
+        this.onChange?.([]);
+        this.updateToolbar();
+    }
+
+    private updateToolbar(): void {
+        if (this.collapseAllEl) this.collapseAllEl.disabled = this.open.size === 0;
     }
 
     /** One asset, in the renderer that owns its kind. */
     private mountAsset(body: HTMLElement, visual: StudyVisual): () => void {
+        const assets = this.state.assets ??= {};
+        const state = assets[this.keyOf(visual, 0)] ??= {};
         switch (visual.kind) {
             case 'lab':
-                return new StudyVisualLabView().mount(body, visual);
+                return new StudyVisualLabView().mount(body, visual, { values: state.lab, onChange: values => { state.lab = values; this.state.onAssetChange?.(); } });
             case 'diagram':
                 return new StudyVisualDiagramView().mount(body, visual);
             case 'sequence':
-                return new StudyVisualSequenceView().mount(body, visual);
+                return new StudyVisualSequenceView().mount(body, visual, { value: state.sequence, onChange: value => { state.sequence = value; this.state.onAssetChange?.(); } });
             case 'graph':
                 return new StudyVisualGraphView().mount(body, visual);
             default:
@@ -127,6 +177,8 @@ export class StudyVisualGalleryView {
             }
         }
         this.cardTeardowns.clear();
+        this.closers.clear();
+        this.collapseAllEl = null;
         for (const teardown of this.teardowns.splice(0)) {
             try {
                 teardown();

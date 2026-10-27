@@ -962,8 +962,9 @@ export class StudyVisualBoardView {
             const label = tr.createEl('th', { cls: 'sf-vb-row-label', text: row.label });
             label.setAttribute('scope', 'row');
             if (row.mark) this.renderMark(label, row.mark);
-            for (const cell of row.cells) {
+            row.cells.forEach((cell, columnIndex) => {
                 const td = tr.createEl('td', { cls: 'sf-vb-cell' });
+                td.setAttribute('data-label', matrix.columns[columnIndex] ?? '');
                 // A cell is drawn as a few words: past the cap it is cut with a
                 // visible ellipsis, and the whole of it becomes the cell's title
                 // — so a cell can be read in full without becoming a paragraph
@@ -980,7 +981,7 @@ export class StudyVisualBoardView {
                 // A cell that must be cut to be drawn says so with a title; the
                 // control keeps that title only while the cell is not covered.
                 cells.push({ cell: td, button, title: cut ? cell : '' });
-            }
+            });
         }
 
         const reveal = new RevealControl(control, bar, cells, matrix.kind === 'compare');
@@ -1023,12 +1024,13 @@ export class StudyVisualBoardView {
             }
             const label = tr.createEl('th', { cls: 'sf-vb-row-label', text: row.label });
             label.setAttribute('scope', 'row');
-            for (const cell of row.cells) {
+            row.cells.forEach((cell, columnIndex) => {
                 const td = tr.createEl('td', { cls: 'sf-vb-cell' });
+                td.setAttribute('data-label', matrix.columns[columnIndex] ?? '');
                 const drawn = cellText(cell);
                 if (drawn !== cell) td.setAttribute('title', cell);
                 td.createSpan({ cls: 'sf-vb-cell-text', text: drawn });
-            }
+            });
             if (row.mark) {
                 const guess = label.createDiv('sf-vb-guess');
                 guess.setAttribute('role', 'group');
@@ -1119,6 +1121,8 @@ export class StudyVisualBoardView {
             node.setCssProps({ '--sf-vb-angle': `${ringAngle(index, cycle.steps.length)}deg` });
             node.createSpan({ cls: 'sf-vb-ring-num', text: String(index + 1) });
             node.createSpan({ cls: 'sf-vb-ring-label', text: step.label });
+            node.setAttribute('title', `${index + 1} · ${step.label}`);
+            node.setAttribute('aria-label', `${index + 1}. ${step.label}`);
             marks.push(node);
         });
         const arrow = ring.createSpan('sf-vb-ring-arrow');
@@ -1128,7 +1132,15 @@ export class StudyVisualBoardView {
             .map((step, index) => ({ step, index }))
             .filter(entry => (entry.step.branches?.length ?? 0) > 0 || entry.step.detail !== undefined);
         if (noted.length > 0) {
-            const notes = parent.createDiv('sf-vb-cycle-notes');
+            // The stepper already reads the current step's sentence. The full
+            // step-by-step notes are reference material, so they start folded:
+            // an eight-step cycle otherwise triples the card's height before
+            // the reader has pressed anything.
+            const details = parent.createEl('details', { cls: 'sf-vb-cycle-details' });
+            const summary = details.createEl('summary', { cls: 'sf-vb-cycle-summary' });
+            summary.createSpan({ cls: 'sf-vb-cycle-summary-label', text: 'Step details' });
+            summary.createSpan({ cls: 'sf-vb-cycle-summary-count', text: String(noted.length) });
+            const notes = details.createDiv('sf-vb-cycle-notes');
             for (const entry of noted) {
                 const note = notes.createDiv('sf-vb-cycle-note');
                 note.createDiv({ cls: 'sf-vb-cycle-note-from', text: `${entry.index + 1} · ${entry.step.label}` });

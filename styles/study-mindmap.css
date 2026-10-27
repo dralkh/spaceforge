@@ -55,6 +55,7 @@
 /* ============================== Shell ============================== */
 
 .sf-mm-map {
+  container-type: inline-size;
   --sf-mm-label-max: 216px;
   --sf-mm-node-gap: var(--sf-space-xs);
   --sf-mm-branch-gap: var(--sf-space-md);
@@ -617,5 +618,17 @@
   .sf-mm-map .sf-mm-btn,
   .sf-mm-toggle-mark {
     transition: none;
+  }
+}
+
+/* At a 248px host the toolbar's title loses its last word to an ellipsis even
+   though this title is the map's name. It wraps instead; the toolbar already
+   rows its controls under it when the width cannot hold both. */
+@container (max-width: 340px) {
+  .sf-mm-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: break-word;
   }
 }

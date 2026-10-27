@@ -37,9 +37,11 @@
 
 .sf-vg-head {
     display: flex;
-    align-items: center;
+    white-space: normal;
+    align-items: flex-start;
     gap: 8px;
     width: 100%;
+    height: auto;
     min-height: 2.3em;
     padding: 2px 4px;
     border: none;
@@ -63,8 +65,12 @@
 .sf-vg-title {
     flex: 1 1 auto;
     min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
     overflow-wrap: anywhere;
     font-size: var(--sf-font-ui);
+    line-height: 1.25;
 }
 
 .sf-vg-chevron {
@@ -90,4 +96,48 @@
 
 .sf-vg-body.sf-hidden {
     display: none;
+}
+
+.sf-vg-error {
+    padding: var(--sf-space-sm);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    color: var(--text-muted);
+    font-size: var(--sf-font-ui);
+    line-height: 1.4;
+}
+
+.sf-vg-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.sf-vg-toolbar .sf-vg-count {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sf-vg-collapse-all {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 24px;
+    padding: 1px 6px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: var(--sf-font-small);
+    cursor: pointer;
+}
+
+.sf-vg-collapse-all:hover:not(:disabled) {
+    border-color: var(--interactive-accent);
+    color: var(--text-normal);
+}
+
+.sf-vg-collapse-all:disabled {
+    opacity: 0.5;
+    cursor: default;
 }

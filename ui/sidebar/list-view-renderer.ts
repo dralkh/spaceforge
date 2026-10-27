@@ -264,17 +264,21 @@ export class ListViewRenderer {
         if (notesForDisplay.length > 0) {
             if (!reviewButtonsContainer) {
                 reviewButtonsContainer = container.createDiv("review-buttons-container");
-                // The session's actions, behind one three-dot button: start a
-                // run, study the decks, walk the list.
+                // Background charting status, updated on every refresh.
+                reviewButtonsContainer.createDiv("review-chart-status");
+            }
+            // The session's actions, behind one three-dot button: start a run,
+            // study the decks, walk the list. It is created here and moved into
+            // the first date header after the sections are built, beside
+            // Postpone all, so it does not spend a row of the narrow sidebar on
+            // a lone kebab.
+            if (!reviewButtonsContainer.querySelector('.review-session-menu')) {
                 const menuBtn = reviewButtonsContainer.createEl("button", {
                     cls: "review-session-menu",
                     attr: { 'aria-label': "Session actions", title: "Session actions" },
                 });
-                setIcon(menuBtn, "more-horizontal");
+                setIcon(menuBtn, "more-vertical");
                 menuBtn.addEventListener("click", (event) => this.openSessionMenu(event));
-
-                // Background charting status, updated on every refresh.
-                reviewButtonsContainer.createDiv("review-chart-status");
             }
             reviewButtonsContainer.classList.remove('sf-hidden');
             this.updateChartStatus(reviewButtonsContainer);
@@ -654,6 +658,29 @@ export class ListViewRenderer {
         } else if (noNotesForDateMsg) {
             noNotesForDateMsg.toggleClass('sf-hidden', true);
         }
+
+        this.moveSessionMenu(container);
+    }
+
+    /**
+     * Keep the one session menu beside the section actions it belongs with.
+     *
+     * At 300px a standalone kebab under Previous/Next costs a row and reads as
+     * a stray control; in the first section header it shares the row with
+     * Postpone all. The button itself is moved, not recreated, so its click
+     * handler and the menu it opens stay the same object.
+     */
+    private moveSessionMenu(container: HTMLElement): void {
+        const menu = container.querySelector<HTMLElement>('.review-session-menu');
+        const firstHeader = container.querySelector<HTMLElement>('.review-date-section .review-date-header-container');
+        if (!menu || !firstHeader) return;
+        if (menu.parentElement !== firstHeader) {
+            menu.addClass('review-date-menu');
+            firstHeader.appendChild(menu);
+        }
+        for (const extra of Array.from(container.querySelectorAll<HTMLElement>('.review-date-header-container .review-date-menu'))) {
+            if (extra !== menu) extra.remove();
+        }
     }
 
     private _ensureAndUpdateActiveSessionSection(container: HTMLElement): void {
@@ -893,6 +920,7 @@ export class ListViewRenderer {
         if (!queue || !this.plugin.settings.studyEnabled) {
             statusEl.empty();
             statusEl.addClass('sf-hidden');
+            container.removeClass('has-chart-status');
             return;
         }
 
@@ -901,9 +929,11 @@ export class ListViewRenderer {
         if (!anyWork) {
             statusEl.empty();
             statusEl.addClass('sf-hidden');
+            container.removeClass('has-chart-status');
             return;
         }
         statusEl.removeClass('sf-hidden');
+        container.addClass('has-chart-status');
         statusEl.empty();
 
         const icon = statusEl.createSpan('review-chart-status-icon');

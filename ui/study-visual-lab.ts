@@ -265,13 +265,15 @@ export class StudyVisualLabView {
     private paramsView: ParamView[] = [];
     private outputsView: OutputView[] = [];
     private values = new Map<string, number>();
+    private onStateChange?: (values: Record<string, number>) => void;
     private bindings: Binding[] = [];
     /** The score line of the mission, and how many readings it counts. */
     private scoreEl: HTMLElement | null = null;
     private missionTotal = 0;
 
-    mount(container: HTMLElement, lab: StudyLab): () => void {
+    mount(container: HTMLElement, lab: StudyLab, state: { values?: Record<string, number>; onChange?: (values: Record<string, number>) => void } = {}): () => void {
         this.unmount();
+        this.onStateChange = undefined;
         const root = container.createDiv('sf-lab');
         this.root = root;
         // Movement is opt-in: a reader who asked for reduced motion gets the same
@@ -303,6 +305,11 @@ export class StudyVisualLabView {
 
         // First paint: the readouts and the drawings belong to the values on
         // screen the moment the lab exists, not to the first time a control moves.
+        for (const param of lab.params) {
+            const value = state.values?.[param.id];
+            if (typeof value === 'number' && Number.isFinite(value)) this.setParam(param, String(value));
+        }
+        this.onStateChange = state.onChange;
         this.update();
 
         return () => this.unmount();
@@ -541,6 +548,7 @@ export class StudyVisualLabView {
     private update(): void {
         const variables: Record<string, number> = {};
         for (const [id, value] of this.values) variables[id] = value;
+        this.onStateChange?.({ ...variables });
 
         for (const view of this.paramsView) {
             const value = this.values.get(view.param.id) ?? view.param.value;

@@ -748,3 +748,58 @@
     gap: 4px;
   }
 }
+
+/* The sidebar's grade palette is a compact single file, not six full-width
+   paragraphs. The label, its interval and the key stay on one line; the row is
+   ~24px, so all six fit in a fraction of the panel and every name is whole. */
+.sf-host-sidebar .sf-strip-grades {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sf-host-sidebar .sf-strip-grade {
+  flex: initial;
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  align-items: center;
+  padding: 1px 6px;
+}
+
+.sf-host-sidebar .sf-strip-grade-main {
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  line-height: 1.15;
+}
+
+.sf-host-sidebar .sf-strip-grade-label {
+  font-size: var(--sf-font-small);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: normal;
+}
+
+.sf-host-sidebar .sf-strip-grade-interval {
+  font-size: var(--sf-font-small);
+  line-height: 1.15;
+}
+
+.sf-host-sidebar .sf-strip-grade-key {
+  margin-left: auto;
+  min-width: 14px;
+  height: 14px;
+  font-size: var(--sf-font-small);
+}
+
+/* At the smallest split the intervals must not force every grade name onto two
+   lines again. The label and the key stay; the interval is the one detail the
+   compact palette drops, and the full advice remains in the bar's menu. */
+@container sf-strip (max-width: 230px) {
+  .sf-host-sidebar .sf-strip-grade-interval {
+    display: none;
+  }
+}

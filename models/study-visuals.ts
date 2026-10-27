@@ -329,16 +329,34 @@ function asArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
 }
 
-function coerceNode(raw: unknown, depth: number): StudyMindMapNode | null {
+/** A finite number held inside a range. */
+function clampNumber(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
+}
+
+/** Keep ids unique inside one asset; duplicate ids break selection and state. */
+function uniqueId(value: string, used: Set<string>): string {
+    if (!used.has(value)) {
+        used.add(value);
+        return value;
+    }
+    let index = 2;
+    while (used.has(`${value}-${index}`)) index += 1;
+    const next = `${value}-${index}`;
+    used.add(next);
+    return next;
+}
+
+function coerceNode(raw: unknown, depth: number, used = new Set<string>()): StudyMindMapNode | null {
     if (!raw || typeof raw !== 'object') return null;
     const source = raw as Record<string, unknown>;
     const label = asString(source.label, 120) ?? asString(source.title, 120);
     if (!label) return null;
-    const node: StudyMindMapNode = { id: asString(source.id, 60) ?? label, label };
+    const node: StudyMindMapNode = { id: uniqueId(asString(source.id, 60) ?? label, used), label };
     const detail = asString(source.detail, 220);
     if (detail) node.detail = detail;
     if (depth < 4) {
-        const children = asArray(source.children).map(child => coerceNode(child, depth + 1)).filter((child): child is StudyMindMapNode => child !== null);
+        const children = asArray(source.children).map(child => coerceNode(child, depth + 1, used)).filter((child): child is StudyMindMapNode => child !== null);
         if (children.length > 0) node.children = children.slice(0, 12);
     }
     return node;
@@ -355,6 +373,7 @@ function coerceMatrix(raw: Record<string, unknown>): StudyMatrix | null {
         if (!label) continue;
         const cells = asArray(row.cells).map(cell => asString(cell, 160) ?? '').slice(0, columns.length);
         while (cells.length < columns.length) cells.push('');
+        if (cells.every(cell => cell.length === 0)) continue;
         const marked: StudyMatrixRow = { label, cells, emphasis: row.emphasis === true };
         if (row.mark === 'better' || row.mark === 'worse' || row.mark === 'equal') marked.mark = row.mark;
         rows.push(marked);
@@ -368,12 +387,13 @@ function coerceMatrix(raw: Record<string, unknown>): StudyMatrix | null {
 
 function coerceFlow(raw: Record<string, unknown>): StudyFlow | null {
     const steps: StudyFlowStep[] = [];
+    const usedIds = new Set<string>();
     for (const entry of asArray(raw.steps).slice(0, 14)) {
         if (!entry || typeof entry !== 'object') continue;
         const step = entry as Record<string, unknown>;
         const label = asString(step.label, 120);
         if (!label) continue;
-        const coerced: StudyFlowStep = { id: asString(step.id, 60) ?? label, label };
+        const coerced: StudyFlowStep = { id: uniqueId(asString(step.id, 60) ?? label, usedIds), label };
         const detail = asString(step.detail, 200);
         if (detail) coerced.detail = detail;
         if (step.kind === 'decision' || step.kind === 'outcome' || step.kind === 'step') coerced.kind = step.kind;
@@ -431,6 +451,7 @@ function asNumber(value: unknown): number | null {
 
 function coerceLab(raw: Record<string, unknown>): StudyLab | null {
     const params: StudyLabParam[] = [];
+    const usedParamIds = new Set<string>();
     for (const entry of asArray(raw.params).slice(0, 6)) {
         if (!entry || typeof entry !== 'object') continue;
         const source = entry as Record<string, unknown>;
@@ -440,7 +461,7 @@ function coerceLab(raw: Record<string, unknown>): StudyLab | null {
         const max = asNumber(source.max);
         const value = asNumber(source.value);
         if (!id || !label || min === null || max === null || value === null || max <= min) continue;
-        const param: StudyLabParam = { id, label, min, max, value };
+        const param: StudyLabParam = { id: uniqueId(id, usedParamIds), label, min, max, value: clampNumber(value, min, max) };
         const unit = asString(source.unit, 20);
         if (unit) param.unit = unit;
         const step = asNumber(source.step);
@@ -449,6 +470,7 @@ function coerceLab(raw: Record<string, unknown>): StudyLab | null {
     }
     if (params.length === 0) return null;
     const outputs: StudyLabOutput[] = [];
+    const usedOutputIds = new Set<string>();
     for (const entry of asArray(raw.outputs).slice(0, 4)) {
         if (!entry || typeof entry !== 'object') continue;
         const source = entry as Record<string, unknown>;
@@ -456,7 +478,7 @@ function coerceLab(raw: Record<string, unknown>): StudyLab | null {
         const label = asString(source.label, 80);
         const expression = asString(source.expression, 200);
         if (!id || !label || !expression) continue;
-        const output: StudyLabOutput = { id, label, expression };
+        const output: StudyLabOutput = { id: uniqueId(id, usedOutputIds), label, expression };
         const unit = asString(source.unit, 20);
         if (unit) output.unit = unit;
         const note = asString(source.note, 160);
@@ -464,14 +486,31 @@ function coerceLab(raw: Record<string, unknown>): StudyLab | null {
         if (source.render === 'bar' || source.render === 'gauge' || source.render === 'value') output.render = source.render;
         const scaleMin = asNumber(source.scaleMin);
         const scaleMax = asNumber(source.scaleMax);
-        if (scaleMin !== null) output.scaleMin = scaleMin;
-        if (scaleMax !== null) output.scaleMax = scaleMax;
+        let lowScale = scaleMin;
+        let highScale = scaleMax;
+        if (lowScale !== null && highScale !== null && highScale <= lowScale) {
+            lowScale = null;
+            highScale = null;
+        }
         const band = asArray(source.band);
         if (band.length === 2) {
             const low = asNumber(band[0]);
             const high = asNumber(band[1]);
-            if (low !== null && high !== null && high > low) output.band = [low, high];
+            if (low !== null && high !== null && high > low) {
+                output.band = [low, high];
+                // A declared scale that does not contain the band would draw the
+                // normal range outside the track; widen it to include both.
+                if (lowScale === null || highScale === null) {
+                    lowScale = null;
+                    highScale = null;
+                } else {
+                    lowScale = Math.min(lowScale, low);
+                    highScale = Math.max(highScale, high);
+                }
+            }
         }
+        if (lowScale !== null) output.scaleMin = lowScale;
+        if (highScale !== null) output.scaleMax = highScale;
         const insideLabel = asString(source.insideLabel, 80);
         const outsideLabel = asString(source.outsideLabel, 80);
         if (insideLabel) output.insideLabel = insideLabel;
@@ -505,6 +544,8 @@ function coerceLab(raw: Record<string, unknown>): StudyLab | null {
 
 function coerceDiagram(raw: Record<string, unknown>): StudyDiagram | null {
     const shapes: StudyDiagramShape[] = [];
+    const usedShapeIds = new Set<string>();
+    const usedHotspotIds = new Set<string>();
     for (const entry of asArray(raw.shapes).slice(0, 30)) {
         if (!entry || typeof entry !== 'object') continue;
         const source = entry as Record<string, unknown>;
@@ -514,16 +555,17 @@ function coerceDiagram(raw: Record<string, unknown>): StudyDiagram | null {
         const kind = source.kind;
         if (!id || x === null || y === null) continue;
         if (kind !== 'box' && kind !== 'ellipse' && kind !== 'arrow' && kind !== 'label') continue;
-        const shape: StudyDiagramShape = { id, kind, x, y };
+        const shape: StudyDiagramShape = { id: uniqueId(id, usedShapeIds), kind, x: clampNumber(x, 0, 100), y: clampNumber(y, 0, 100) };
         const w = asNumber(source.w);
         const h = asNumber(source.h);
         const x2 = asNumber(source.x2);
         const y2 = asNumber(source.y2);
-        if (w !== null) shape.w = w;
-        if (h !== null) shape.h = h;
-        if (x2 !== null) shape.x2 = x2;
-        if (y2 !== null) shape.y2 = y2;
+        if (w !== null) shape.w = clampNumber(w, 1, 100);
+        if (h !== null) shape.h = clampNumber(h, 1, 100);
+        if (x2 !== null) shape.x2 = clampNumber(x2, 0, 100);
+        if (y2 !== null) shape.y2 = clampNumber(y2, 0, 100);
         const text = asString(source.text, 80);
+        if ((kind === 'box' || kind === 'ellipse' || kind === 'label') && !text) continue;
         if (text) shape.text = text;
         if (source.tone === 'primary' || source.tone === 'accent' || source.tone === 'muted') shape.tone = source.tone;
         if (source.flow === true) shape.flow = true;
@@ -540,7 +582,7 @@ function coerceDiagram(raw: Record<string, unknown>): StudyDiagram | null {
         const y = asNumber(source.y);
         const detail = asString(source.detail, 240);
         if (!id || !label || x === null || y === null || !detail) continue;
-        hotspots.push({ id, label, x, y, detail });
+        hotspots.push({ id: uniqueId(id, usedHotspotIds), label, x: clampNumber(x, 0, 100), y: clampNumber(y, 0, 100), detail });
     }
     if (shapes.length === 0) return null;
     const diagram: StudyDiagram = { kind: 'diagram', title: asString(raw.title, 120) ?? 'Diagram', teach: asString(raw.teach, 200) ?? '', shapes, hotspots };
@@ -553,13 +595,14 @@ function coerceDiagram(raw: Record<string, unknown>): StudyDiagram | null {
 
 function coerceSequence(raw: Record<string, unknown>): StudySequence | null {
     const steps: StudySequenceStep[] = [];
+    const usedStepIds = new Set<string>();
     for (const entry of asArray(raw.steps).slice(0, 12)) {
         if (!entry || typeof entry !== 'object') continue;
         const source = entry as Record<string, unknown>;
         const id = asString(source.id, 40);
         const label = asString(source.label, 120);
         if (!id || !label) continue;
-        const step: StudySequenceStep = { id, label };
+        const step: StudySequenceStep = { id: uniqueId(id, usedStepIds), label };
         const detail = asString(source.detail, 200);
         if (detail) step.detail = detail;
         steps.push(step);
@@ -574,6 +617,7 @@ function coerceSequence(raw: Record<string, unknown>): StudySequence | null {
 
 function coerceGraph(raw: Record<string, unknown>): StudyGraph | null {
     const series: StudyGraphSeries[] = [];
+    const usedSeriesIds = new Set<string>();
     for (const entry of asArray(raw.series).slice(0, 4)) {
         if (!entry || typeof entry !== 'object') continue;
         const source = entry as Record<string, unknown>;
@@ -593,7 +637,7 @@ function coerceGraph(raw: Record<string, unknown>): StudyGraph | null {
             points.push(labelled);
         }
         if (points.length < 2) continue;
-        const coerced: StudyGraphSeries = { id, label, points };
+        const coerced: StudyGraphSeries = { id: uniqueId(id, usedSeriesIds), label, points };
         if (source.tone === 'primary' || source.tone === 'accent' || source.tone === 'muted') coerced.tone = source.tone;
         series.push(coerced);
     }
@@ -606,6 +650,14 @@ function coerceGraph(raw: Record<string, unknown>): StudyGraph | null {
     for (const [key, target] of [['xMin', 'xMin'], ['xMax', 'xMax'], ['yMin', 'yMin'], ['yMax', 'yMax']] as const) {
         const value = asNumber(raw[key]);
         if (value !== null) (graph as unknown as Record<string, number>)[target] = value;
+    }
+    if (graph.xMin !== undefined && graph.xMax !== undefined && graph.xMax <= graph.xMin) {
+        delete graph.xMin;
+        delete graph.xMax;
+    }
+    if (graph.yMin !== undefined && graph.yMax !== undefined && graph.yMax <= graph.yMin) {
+        delete graph.yMin;
+        delete graph.yMax;
     }
     const pearl = asString(raw.pearl, 200);
     if (pearl) graph.pearl = pearl;
@@ -666,7 +718,14 @@ export function coerceVisualPack(raw: unknown, meta: { domain: string; sourceHas
     const root = coerceNode(mindMapRaw && typeof mindMapRaw === 'object' ? (mindMapRaw as Record<string, unknown>).root ?? mindMapRaw : null, 0);
     if (!root) return null;
 
-    const visuals = asArray(source.visuals).map(coerceVisual).filter((visual): visual is StudyVisual => visual !== null).slice(0, 6);
+    const seen = new Set<string>();
+    const visuals = asArray(source.visuals).map(coerceVisual).filter((visual): visual is StudyVisual => {
+        if (visual === null) return false;
+        const key = `${visual.kind}\u0000${visual.title}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).slice(0, 5);
 
     const summaryRaw = (source.summary ?? {}) as Record<string, unknown>;
     const bullets = asArray(summaryRaw.bullets).map(coerceBullet).filter((bullet): bullet is StudyBullet => bullet !== null).slice(0, 30);

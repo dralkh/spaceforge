@@ -1230,3 +1230,137 @@
     width: 5.6em;
   }
 }
+
+/* A cycle's step notes are reference material, not the drawing. Folded by
+   default, the ring stays the first thing on screen and an eight-step cycle
+   does not become a 1300px card in a 260px host. */
+.sf-vb-cycle-details {
+  border-top: 1px dashed var(--background-modifier-border);
+  padding-top: var(--sf-space-sm);
+}
+
+.sf-vb-cycle-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sf-space-sm);
+  min-height: 24px;
+  cursor: pointer;
+  color: var(--sf-text-muted);
+  font-size: var(--sf-font-ui);
+}
+
+.sf-vb-cycle-summary-label {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sf-vb-cycle-summary-count {
+  min-width: 1.5em;
+  padding: 0 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-vb-cycle-details[open] .sf-vb-cycle-notes {
+  margin-top: var(--sf-space-sm);
+}
+
+/* At sidebar width a ring of eight labels cannot be read: the labels collide
+   with their neighbours and with the callout, which is what made the asset look
+   broken. Keep the numbered ring as the map; the step bar below carries the
+   current step's full label and detail, and every node keeps its label in its
+   title. At a wide host the labels return. */
+@container (max-width: 340px) {
+  .sf-vb-ring-step {
+    width: 2.4em;
+    max-width: 18%;
+  }
+
+  .sf-vb-ring-step:nth-child(n + 7) {
+    width: 2.4em;
+  }
+
+  .sf-vb-ring-label {
+    display: none;
+  }
+
+  .sf-vb-ring-num {
+    line-height: 2.4em;
+    text-align: center;
+  }
+
+  .sf-vb-ring-step.is-current .sf-vb-ring-num {
+    color: var(--text-normal);
+  }
+}
+
+/* At sidebar width a four-column table is a horizontal scroll that shows the
+   row name and hides the evidence. A comparison is read row by row, so at this
+   width each row becomes its own small table card: the row's name, then each
+   cell under its own column label. The DOM is still a table, so its headers and
+   cells remain the table a screen reader gets. */
+@container (max-width: 340px) {
+  .sf-vb-table-scroll {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .sf-vb-table,
+  .sf-vb-table-body,
+  .sf-vb-row,
+  .sf-vb-row-label,
+  .sf-vb-cell {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sf-vb-table {
+    min-width: 0;
+  }
+
+  .sf-vb-table thead {
+    display: none;
+  }
+
+  .sf-vb-row {
+    margin-bottom: var(--sf-space-sm);
+    padding: var(--sf-space-sm);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--sf-radius-sm);
+    background: var(--background-primary);
+  }
+
+  .sf-vb-row:nth-child(even) {
+    background: var(--background-primary);
+  }
+
+  .sf-vb-row-label {
+    padding: 0 0 var(--sf-space-xs);
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .sf-vb-cell {
+    padding: var(--sf-space-xs) 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .sf-vb-cell:last-child {
+    border-bottom: 0;
+  }
+
+  .sf-vb-cell::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--sf-text-muted);
+    font-size: var(--sf-font-small);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}

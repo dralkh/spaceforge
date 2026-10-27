@@ -465,6 +465,17 @@ test('a cycle is a ring: every step on it in order, a direction cue, branches sa
     assert.equal(into.textOf('sf-vb-pearl-text'), cycle.pearl);
 });
 
+test('a cycle keeps its step notes behind one folded disclosure', () => {
+    const cycle = cycleFixture();
+    const { into } = mountBoard([cycle]);
+    const details = into.byClass('sf-vb-cycle-details')[0];
+    assert.equal(details.tag, 'details');
+    assert.equal(details.attrs.open, undefined, 'the reference notes start folded');
+    assert.equal(details.textOf('sf-vb-cycle-summary-label'), 'Step details');
+    assert.equal(into.byClass('sf-vb-cycle-note').length, 2);
+    assert.equal(into.byClass('sf-vb-stepper').length, 1, 'the stepper remains the live control');
+});
+
 test('a timeline runs down a rule: one marker per entry, the time as the marker', () => {
     const timeline = timelineFixture();
     const { into } = mountBoard([timeline]);

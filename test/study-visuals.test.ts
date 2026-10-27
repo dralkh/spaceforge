@@ -414,3 +414,65 @@ test('motion, flow, pulse and marks survive coercion', () => {
         assert.equal(compare.rows[1].mark, undefined, 'an unknown mark is no mark');
     }
 });
+
+test('out-of-range visual data is repaired before any renderer sees it', () => {
+    const pack = coerceVisualPack({
+        mindMap: { root: { id: 'r', label: 'Root', children: [{ id: 'r', label: 'Child' }] } },
+        visuals: [
+            {
+                kind: 'diagram', title: 'Placed', teach: 'Clamp me',
+                shapes: [
+                    { id: 's', kind: 'box', x: -20, y: 120, w: 300, h: 0, text: 'One' },
+                    { id: 's', kind: 'arrow', x: 99, y: 50, x2: 140, y2: -10 },
+                ],
+                hotspots: [{ id: 'p', label: 'Part', x: 120, y: -5, detail: 'Detail' }],
+            },
+            {
+                kind: 'lab', title: 'Bounded', teach: 'Bounded',
+                params: [
+                    { id: 'p', label: 'P', min: 0, max: 100, value: 200 },
+                    { id: 'p', label: 'Q', min: 0, max: 10, value: -3 },
+                ],
+                outputs: [{ id: 'o', label: 'Out', expression: 'p * 2', scaleMin: 0, scaleMax: 10, band: [20, 30] }],
+            },
+            {
+                kind: 'graph', title: 'Axes', teach: 'Axes', xMin: 10, xMax: 10,
+                series: [{ id: 's', label: 'S', points: [{ x: 0, y: 1 }, { x: 1, y: 2 }] },
+                    { id: 's', label: 'T', points: [{ x: 0, y: 3 }, { x: 1, y: 4 }] }],
+            },
+            {
+                kind: 'sequence', title: 'Order', teach: 'Order',
+                steps: [{ id: 'x', label: 'One' }, { id: 'x', label: 'Two' }, { id: 'x', label: 'Three' }],
+            },
+        ],
+        summary: { title: 'S', bullets: ['b'] },
+    }, { domain: 'g', sourceHash: 'h' });
+    assert.ok(pack);
+    const diagram = pack.visuals.find(visual => visual.kind === 'diagram');
+    assert.ok(diagram && diagram.kind === 'diagram');
+    assert.equal(diagram.shapes[0].x, 0);
+    assert.equal(diagram.shapes[0].y, 100);
+    assert.equal(diagram.shapes[0].w, 100);
+    assert.equal(diagram.shapes[0].h, 1);
+    assert.equal(diagram.shapes[1].x2, 100);
+    assert.equal(diagram.shapes[1].y2, 0);
+    assert.notEqual(diagram.shapes[0].id, diagram.shapes[1].id, 'duplicate shape ids are made unique');
+    assert.equal(diagram.hotspots[0].x, 100);
+    assert.equal(diagram.hotspots[0].y, 0);
+    assert.equal(pack.mindMap.root.children![0].id, 'r-2', 'duplicate map ids are made unique');
+
+    const lab = pack.visuals.find(visual => visual.kind === 'lab');
+    assert.ok(lab && lab.kind === 'lab');
+    assert.equal(lab.params[0].value, 100, 'a value outside its range is clamped');
+    assert.equal(lab.params[1].value, 0);
+    assert.notEqual(lab.params[0].id, lab.params[1].id);
+    assert.ok(lab.outputs[0].scaleMin! <= 20 && lab.outputs[0].scaleMax! >= 30, 'the scale contains its band');
+
+    const graph = pack.visuals.find(visual => visual.kind === 'graph');
+    assert.ok(graph && graph.kind === 'graph');
+    assert.equal(graph.xMin, undefined, 'a degenerate range is dropped, not divided by zero');
+    assert.notEqual(graph.series[0].id, graph.series[1].id);
+    const sequence = pack.visuals.find(visual => visual.kind === 'sequence');
+    assert.ok(sequence && sequence.kind === 'sequence');
+    assert.equal(new Set(sequence.steps.map(step => step.id)).size, 3);
+});

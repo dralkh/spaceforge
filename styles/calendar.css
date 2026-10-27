@@ -1606,3 +1606,63 @@
 .is-stacked .calendar-day.empty {
   display: none;
 }
+
+/* The month header at a sidebar width: the title may shrink, but Today and the
+   month arrows are labels and must never be clipped by their flex row. */
+.calendar-header {
+  gap: 2px;
+  min-width: 0;
+}
+
+.calendar-nav-btn,
+.calendar-today-btn,
+.calendar-add-event-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.calendar-month-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@container sf-calendar (max-width: 360px) {
+  .calendar-header {
+    gap: 1px;
+  }
+
+  .calendar-nav-btn {
+    padding: 4px 6px;
+  }
+
+  .calendar-today-btn {
+    margin-left: 4px;
+    padding: 4px 8px;
+    font-size: var(--sf-font-small);
+  }
+
+  .calendar-add-event-btn {
+    padding: 4px 6px;
+  }
+}
+
+/* At the very narrow sidebar the month name, the arrows, Today and Add event
+   cannot all share one line without squeezing the month to three characters.
+   Give the month its own row and the controls the next one. */
+@container sf-calendar (max-width: 280px) {
+  .calendar-header {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .calendar-month-title {
+    order: -1;
+    flex: 1 0 100%;
+    text-align: left;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}

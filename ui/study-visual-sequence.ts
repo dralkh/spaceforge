@@ -188,7 +188,10 @@ interface StepCard {
  * view's own, and a teardown takes all of it — including the cards' own
  * listeners, which are re-bound every time the deck is redrawn.
  */
+export interface StudySequenceState { order: number[]; current: number; round: number }
+
 export class StudyVisualSequenceView {
+    private onStateChange?: (state: StudySequenceState) => void;
     private container: HTMLElement | null = null;
     private sequence: StudySequence | null = null;
     private root: HTMLElement | null = null;
@@ -229,8 +232,9 @@ export class StudyVisualSequenceView {
     // ------------------------------------------------------------ lifecycle
 
     /** Render the sequence inside `container` and return its teardown. */
-    mount(container: HTMLElement, sequence: StudySequence): () => void {
+    mount(container: HTMLElement, sequence: StudySequence, state: { value?: StudySequenceState; onChange?: (state: StudySequenceState) => void } = {}): () => void {
         this.unmount();
+        this.onStateChange = undefined;
         this.container = container;
         this.sequence = sequence;
 
@@ -244,6 +248,16 @@ export class StudyVisualSequenceView {
         else this.buildStepper(root);
 
         if (sequence.pearl) this.renderPearl(root, sequence.pearl);
+
+        const saved = state.value;
+        if (saved) {
+            this.current = Math.max(0, Math.min(sequence.steps.length - 1, saved.current));
+            this.round = saved.round;
+            if (saved.order.length === sequence.steps.length && new Set(saved.order).size === sequence.steps.length && saved.order.every(index => Number.isInteger(index) && index >= 0 && index < sequence.steps.length)) this.order = [...saved.order];
+            if (sequence.shuffle) this.renderCards();
+            else this.renderStep();
+        }
+        this.onStateChange = state.onChange;
 
         return () => this.unmount();
     }
@@ -350,6 +364,7 @@ export class StudyVisualSequenceView {
      * where it now sits.
      */
     private renderCards(): void {
+        this.onStateChange?.({ order: [...this.order], current: this.current, round: this.round });
         const board = this.boardEl;
         if (!board) return;
         this.releaseCardListeners();
@@ -788,6 +803,7 @@ export class StudyVisualSequenceView {
 
     /** The step on screen: the one card, and how far along the reader is. */
     private renderStep(): void {
+        this.onStateChange?.({ order: [...this.order], current: this.current, round: this.round });
         const steps = this.steps();
         const total = steps.length;
         const step = steps[this.current];

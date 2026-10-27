@@ -139,6 +139,19 @@ test('each kind reaches its own renderer, not a generic one', () => {
     assert.ok(byClass(root, 'sf-vb-table').length >= 1, 'compare, through the board');
 });
 
+test('Collapse all returns the gallery to its index', () => {
+    const { root } = mount();
+    for (const card of byClass(root, 'sf-vg-card')) {
+        if (!card.classList.contains('is-open')) card.byClass('sf-vg-head')[0].click();
+    }
+    assert.ok(byClass(root, 'sf-vg-card').every(card => card.classList.contains('is-open')));
+    const button = byClass(root, 'sf-vg-collapse-all')[0];
+    assert.equal(button.tag, 'button');
+    button.click();
+    assert.ok(byClass(root, 'sf-vg-card').every(card => !card.classList.contains('is-open')));
+    assert.equal(button.disabled, true);
+});
+
 test('the gallery says how many assets it holds', () => {
     const { root } = mount();
     assert.equal(textsOfClass(root, 'sf-vg-count')[0], '5 visual assets');

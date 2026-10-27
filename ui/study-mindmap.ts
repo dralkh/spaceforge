@@ -100,6 +100,8 @@ interface MindMapNodeView {
 }
 
 export interface StudyMindMapViewOptions {
+    state?: { collapsed: string[]; focused: string | null };
+    onStateChange?: (state: { collapsed: string[]; focused: string | null }) => void;
     /** Called when the focused node changes; null when focus is cleared. */
     onFocusChange?: (id: string | null) => void;
 }
@@ -165,13 +167,19 @@ export class StudyMindMapView {
         this.activeKey = this.views.has(ROOT_KEY) ? ROOT_KEY : null;
         // A map too deep to read whole opens with everything below the second
         // level closed, so the shape of the subject is what the reader sees first.
+        const restored = this.options.state;
         this.setCollapsedDepth(defaultCollapsedDepth(map.root));
+        if (restored) {
+            this.collapsed = new Set(restored.collapsed.filter(key => this.views.has(key)));
+            this.applyCollapsedClasses();
+        }
         this.rebuildOrder();
         this.applyCursor();
         this.applyBand();
         this.updateCount();
         this.renderDetail(null);
         this.watchResize();
+        if (restored?.focused) this.focusNode(restored.focused);
 
         return () => this.unmount();
     }
@@ -273,6 +281,7 @@ export class StudyMindMapView {
     }
 
     private applyCollapsedClasses(): void {
+        this.options.onStateChange?.({ collapsed: [...this.collapsed], focused: this.focusedKey ? this.views.get(this.focusedKey)?.id ?? null : null });
         for (const view of this.views.values()) {
             const collapsed = this.collapsed.has(view.key);
             view.nodeEl.toggleClass('is-collapsed', collapsed);
@@ -738,6 +747,7 @@ export class StudyMindMapView {
 
     /** The detail panel: the focused node, where it sits, and what it means. */
     private renderDetail(view: MindMapNodeView | null): void {
+        this.options.onStateChange?.({ collapsed: [...this.collapsed], focused: view?.id ?? null });
         const labelEl = this.detailLabelEl;
         const pathEl = this.detailPathEl;
         const textEl = this.detailTextEl;
