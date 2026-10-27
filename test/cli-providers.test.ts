@@ -180,15 +180,17 @@ test('codexAgent.listModels reads the current JSON document and the old line for
     );
 });
 
-test('cursorAgent.buildArgs: one-shot ask mode, --model appended when set', () => {
+test('cursorAgent.buildArgs: one-shot ask mode, prompt as the trailing positional, --model before it', () => {
     const bare = cursorAgent.buildArgs({ prompt: 'x' });
     const modeAt = bare.indexOf('--mode');
     assert.ok(modeAt >= 0, 'asks in a mode that cannot edit the vault');
     assert.deepEqual(bare.slice(modeAt, modeAt + 2), ['--mode', 'ask']);
+    assert.equal(bare[bare.length - 1], 'x', 'the prompt is the positional argument cursor-agent requires');
     assert.ok(!bare.includes('--model'));
 
-    const withModel = cursorAgent.buildArgs({ prompt: 'x', model: 'claude-4.5-sonnet' });
-    assert.deepEqual(withModel.slice(-2), ['--model', 'claude-4.5-sonnet']);
+    const withModel = cursorAgent.buildArgs({ prompt: 'the prompt', model: 'claude-4.5-sonnet' });
+    assert.deepEqual(withModel.slice(-3), ['--model', 'claude-4.5-sonnet', 'the prompt']);
+    assert.equal(cursorAgent.stdinPrompt, false, 'print mode never reads stdin, so the prompt travels in argv');
 });
 
 test('hermesAgent.buildArgs: -z one-shot with the prompt in argv and stdinPrompt false', () => {
@@ -253,6 +255,22 @@ test('getCliAgent/listCliAgents: unique ids, complete guidance, catalog models, 
     assert.equal(CLI_AGENTS.length, agents.length);
     assert.equal(getCliAgent('nope'), undefined);
     assert.equal(getCliAgent(undefined), undefined);
+});
+
+test('every agent actually delivers the prompt: stdin when it streams, argv when it does not', () => {
+    // The class of defect this pins: an agent declaring `stdinPrompt: false` and
+    // forgetting to put the prompt in argv sends nothing at all, and the CLI
+    // answers with its own usage error ("No prompt provided for print mode").
+    // Cursor shipped that way; the invariant belongs to the registry, not to it.
+    const prompt = 'unique-prompt-marker-42';
+    for (const agent of listCliAgents()) {
+        const args = agent.buildArgs({ prompt });
+        if (agent.stdinPrompt === false) {
+            assert.ok(args.includes(prompt), `${agent.id}: builds argv but never includes the prompt`);
+        } else {
+            assert.ok(!args.includes(prompt), `${agent.id}: streams the prompt on stdin, so it must stay out of argv`);
+        }
+    }
 });
 
 // ------------------------------------------------------ 3. auth failure text
@@ -351,6 +369,30 @@ test('runCliTurn rejects with loginGuidance when the CLI reports an auth failure
     await assert.rejects(runCliTurn(agent, { prompt: 'x', timeoutMs: 10_000 }), (error: unknown) => {
         assert.ok(error instanceof CliTurnError);
         assert.equal((error as Error).message, 'ADHOC-LOGIN-GUIDANCE');
+        return true;
+    });
+});
+
+test('runCliTurn says a failed turn fell back to the CLI default model, only when no model was chosen', async () => {
+    const agent = adhocAgent({
+        buildArgs: () => nodeScript('console.error("provider auth rejected"); process.exit(1)'),
+    });
+
+    await assert.rejects(runCliTurn(agent, { prompt: 'x', timeoutMs: 10_000 }), (error: unknown) => {
+        assert.ok(error instanceof CliTurnError);
+        assert.match((error as Error).message, /provider auth rejected/);
+        assert.match((error as Error).message, /used its own default model/);
+        return true;
+    });
+
+    // 'default' is the catalog's "let the CLI choose" entry, so it counts as no choice.
+    await assert.rejects(runCliTurn(agent, { prompt: 'x', model: 'default', timeoutMs: 10_000 }), (error: unknown) => {
+        assert.match((error as Error).message, /used its own default model/);
+        return true;
+    });
+
+    await assert.rejects(runCliTurn(agent, { prompt: 'x', model: 'chosen-model', timeoutMs: 10_000 }), (error: unknown) => {
+        assert.doesNotMatch((error as Error).message, /used its own default model/);
         return true;
     });
 });

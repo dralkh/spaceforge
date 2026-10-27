@@ -195,11 +195,16 @@ export const cursorAgent: CliAgentDef = {
     id: 'cursor',
     name: 'Cursor Agent',
     bin: 'cursor-agent',
+    // `cursor-agent` takes the prompt as a positional argument and never reads
+    // stdin in print mode — invoked without one it exits 1 with "No prompt
+    // provided for print mode", which is why the prompt is appended here rather
+    // than streamed. The flags stay first so `[prompt...]` is unambiguous.
     buildArgs: (options: CliInvokeOptions) => {
         // -p = one-shot print, --trust skips the workspace prompt, and the ask
         // mode keeps a text task from editing anything.
         const args = ['-p', '--trust', '--output-format', 'text', '--mode', 'ask'];
         if (wantsModel(options.model)) args.push('--model', options.model);
+        args.push(options.prompt ?? '');
         return args;
     },
     versionArgs: ['--version'],

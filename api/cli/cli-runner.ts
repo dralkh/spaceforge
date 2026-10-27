@@ -210,6 +210,14 @@ export async function runCliTurn(def: CliAgentDef, options: CliInvokeOptions): P
 
     const combined = `${capture.stdout}\n${capture.stderr}`;
 
+    // A CLI with no model chosen runs its own default. When that default is the
+    // thing that fails — an unsigned provider, a retired id — its complaint
+    // names neither this field nor the fix, and the reader has no way to know a
+    // choice exists. Say it on the failure paths only, after the CLI has spoken.
+    const modelHint = choseModel(options.model)
+        ? ''
+        : ` ${def.name} used its own default model because none is set for this provider; pick one under this provider's model field and try again.`;
+
     if (capture.notFound) {
         throw new CliTurnError(def.notFoundGuidance, capture.stderr.trim() || null);
     }
@@ -222,8 +230,17 @@ export async function runCliTurn(def: CliAgentDef, options: CliInvokeOptions): P
 
     // Parse first — a CLI's own error event (Codex's `error`, a Claude result with
     // is_error) is a signal the caller must hear, and it arrives as one.
-    const fromStdout = capture.stdout ? parseCliOutput(def, capture.stdout) : null;
-    const fromStderr = capture.stderr ? parseCliOutput(def, capture.stderr) : null;
+    let fromStdout: string | null = null;
+    let fromStderr: string | null = null;
+    try {
+        fromStdout = capture.stdout ? parseCliOutput(def, capture.stdout) : null;
+        fromStderr = capture.stderr ? parseCliOutput(def, capture.stderr) : null;
+    } catch (error) {
+        if (error instanceof CliTurnError) {
+            throw new CliTurnError(`${error.message}${modelHint}`, error.detail);
+        }
+        throw error;
+    }
 
     // Whether a turn *succeeded* is the exit code's business, not the words in
     // it. Scolding an answer for mentioning a 401 would throw away good work;
@@ -243,9 +260,15 @@ export async function runCliTurn(def: CliAgentDef, options: CliInvokeOptions): P
     // the only explanation available.
     const complaint = (capture.stderr || fromStdout || '').trim().split(/\r?\n/)[0] ?? '';
     throw new CliTurnError(
-        `${def.name} failed (exit code ${capture.exitCode})${complaint ? `: ${complaint}` : ' and said nothing about why.'}`,
+        `${def.name} failed (exit code ${capture.exitCode})${complaint ? `: ${complaint}` : ' and said nothing about why.'}${modelHint}`,
         combined.trim().slice(0, 2000) || null
     );
+}
+
+/** Whether the reader chose a model, as opposed to letting the CLI pick. */
+function choseModel(model: string | undefined): boolean {
+    const value = typeof model === 'string' ? model.trim() : '';
+    return value !== '' && value !== 'default';
 }
 
 /** Seconds read badly below a second; the timeout the caller set is what to say. */
