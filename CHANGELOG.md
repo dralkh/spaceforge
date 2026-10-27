@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.7
+
+### Study workspace
+
+- **One surface per note.** Learn, Visualize, Mind map and Summary are tabs in the same panel; the note header, objective chooser and answer field stay in place while the material scrolls.
+- **Per-objective conversations.** Each objective keeps its own transcript, pending question and draft. Switching objectives, or reopening the note, restores the exact conversation, and a reload never resends a question.
+- **Preparation is visible and retryable.** Material and questions are prepared in the background, their state is saved with the plan, and a failed step stays retryable without repeating the step that succeeded. Turning off one step no longer cancels the other.
+- **The last report comes back.** Reopening a finished note shows the session report instead of dropping to the briefing.
+
+### Fixes
+
+- **A note created where an earlier note was renamed away can be charted again.** Rename receipts no longer block a live file; the chart and its progress are stored instead of silently discarded.
+- **Typing an answer no longer rewrites the data file on every keystroke.** Drafts are saved once per burst, and immediately on suspend, finish or answer.
+- **View state no longer stores whole visual packs as keys.** A short key and one entry replace a multi-KB duplicate per pack.
+- **One save policy.** A failed save is reported in place and never becomes an unhandled rejection; the session refuses to send an answer it could not store.
+- **A steering command after a failed answer sends the command**, not the previous answer.
+- **One sitting counts one session**, however many objectives it visits.
+- **Study transcripts are capped at 400 records** per sitting, newest kept.
+
+### Internal
+
+- Stable objective identities keep mastery attached to the objective, not its position, across re-charts and two devices.
+- Chats, drafts and the workspace stay device-local; transcripts are not copied into the portable vault progress file.
+
 ## 1.2.6
 
 ### Fixes

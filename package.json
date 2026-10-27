@@ -1,6 +1,6 @@
 {
   "name": "spaceforge",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "A spaced repetition plugin for efficient knowledge review in Obsidian",
   "main": "main.js",
   "scripts": {
