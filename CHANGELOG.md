@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.9
+
+### Review
+
+- **The dock can sit beside the note.** A vertical split with Obsidian's own draggable divider, chosen from **Settings → Review → Where the review session lives → Beside the note**, or from the bar's menu. Ending the run closes the pane; the next run opens it beside the note again.
+- **Due labels carry the clock.** A due note reads "due in 3h 20m" and an overdue one "2h 15m overdue"; days keep their leftover hours for the first week, while an eight-day-old note stays "8d overdue" so the bar keeps one line. The sidebar row's overdue tooltip uses the same label.
+- **The objective chooser keeps its width in a split.** Below 480 px the "Objective" label steps aside, so the selected objective's name is no longer clipped by its own caption.
+
+### Study
+
+- **Objective cards no longer overlap in the rail.** They were flex children shrinking to their 32 px floor while a two-line title and its meta spilled under the next card; each card now keeps its content height and the rail scrolls.
+
 ## 1.2.8
 
 ### Review bar
