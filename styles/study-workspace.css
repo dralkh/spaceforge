@@ -77,3 +77,46 @@
 @container (max-width: 359px) {
   .sf-study-workspace .sf-study-workspace-view { padding-left: 5px; padding-right: 5px; }
 }
+
+/* A sidebar is a column, not a small window: the strip above it already names
+   the note and carries the run's progress. The panel does not repeat either,
+   and the stage rail is one line ("Step 4 of 8 · Recall check") instead of
+   eight pills over two rows. Together these give the conversation back the
+   ~150 px it was losing before the reader reached a word of it. */
+.sf-dock .sf-study-workspace-note,
+.sf-host-sidebar .sf-study-workspace-note {
+  display: none;
+}
+
+.sf-dock .sf-study-workspace-heading,
+.sf-host-sidebar .sf-study-workspace-heading {
+  padding: 4px 10px;
+}
+
+.sf-host-sidebar .sf-study-header {
+  display: none;
+}
+
+.sf-host-sidebar .sf-study-stage {
+  display: none;
+}
+
+.sf-host-sidebar .sf-study-stage-position {
+  display: block;
+}
+
+/* Four labels in 268 px: the tabs were wrapping to two rows before the first
+   tutor sentence. The smallest UI step buys the row back without truncating a
+   name. */
+@container (max-width: 300px) {
+  .sf-study-workspace .sf-study-workspace-view {
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: var(--sf-font-small);
+  }
+
+  .sf-study-workspace .sf-study-workspace-views {
+    gap: 1px;
+    padding: 2px 4px;
+  }
+}

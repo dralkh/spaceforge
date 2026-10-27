@@ -532,6 +532,20 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(reviewFlowContainer)
+            .setName('Grade layout')
+            .setDesc('How the grade buttons sit in the review bar. Auto uses one row where the names fit and a compact two-column palette in a narrow pane; one row and stacked are fixed choices.')
+            .addDropdown(dropdown => dropdown
+                .addOption('auto', 'Auto (fit the pane)')
+                .addOption('row', 'One row')
+                .addOption('stack', 'Stacked')
+                .setValue(this.plugin.settings.reviewGradeLayout)
+                .onChange(async (value: string) => {
+                    this.plugin.settings.reviewGradeLayout = value === 'row' || value === 'stack' ? value : 'auto';
+                    await this.plugin.savePluginData();
+                    this.plugin.reviewFlowController?.refreshStrip?.();
+                }));
+
+        new Setting(reviewFlowContainer)
             .setName('Where the session opens')
             .setDesc('In a split beside the note, or in a window of its own — which can go on a second monitor and leaves the pane you were working in alone.')
             .addDropdown(dropdown => dropdown

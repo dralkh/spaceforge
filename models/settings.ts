@@ -471,6 +471,16 @@ export interface SpaceforgeSettings {
     reviewStripIntervalPreviews: boolean;
 
     /**
+     * How the grade palette is laid out in the review bar.
+     *
+     * `auto` reads the room the bar was given: one row when the names fit, a
+     * compact two-column palette when they do not. `row` and `stack` are the
+     * reader's own choice, for a host the automatic rule guesses wrong.
+     * Default: 'auto'
+     */
+    reviewGradeLayout: ReviewGradeLayout;
+
+    /**
      * Grade with the plain number keys while a review session is running.
      * Digits are still ignored while the caret is in text, where Alt+number works.
      * Default: true
@@ -698,6 +708,12 @@ export interface SpaceforgeSettings {
 export type McqGradingMode = 'ask' | 'score';
 
 /**
+ * How the review bar lays out its grade palette: fit the host, one row, or
+ * one grade per row. See `reviewGradeLayout` in the settings.
+ */
+export type ReviewGradeLayout = 'auto' | 'row' | 'stack';
+
+/**
  * API Providers for MCQ generation
  */
 export enum ApiProvider {
@@ -922,6 +938,7 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     syncProgressThroughVault: false,
     ankiPushed: {},
     reviewStripIntervalPreviews: true,
+    reviewGradeLayout: 'auto',
     reviewStripGradeKeys: true,
     leechThreshold: 8,
     fsrsParameters: {

@@ -1,5 +1,6 @@
 import { Menu, setIcon } from 'obsidian';
 import { LeechChoice, LeechAction, ReviewAlgorithm, ReviewSessionHost } from '../models/review-flow';
+import type { ReviewGradeLayout } from '../models/settings';
 import type { DockTab } from './review-dock';
 
 export interface StripGradeButton {
@@ -51,6 +52,11 @@ export interface StripState {
     queue?: { notes: number; cards: number } | null;
     algorithm: ReviewAlgorithm;
     grades: StripGradeButton[];
+    /**
+     * How the grades sit: the reader's setting, applied as a data attribute so
+     * the stylesheet owns the three layouts and the bar stays one DOM shape.
+     */
+    gradeLayout?: ReviewGradeLayout;
     decision: StripDecision | null;
     canUndo: boolean;
     /**
@@ -241,7 +247,9 @@ export class ReviewStrip {
         const split = this.counterSplit(state);
         if (split) count.setAttribute('title', split);
         const title = identity.createDiv({ cls: 'sf-strip-title', text: state.title });
-        title.setAttribute('title', state.title);
+        // The scheduler line is dropped from the narrow header; its facts stay
+        // one hover away on the note's own name.
+        title.setAttribute('title', state.meta ? `${state.title} — ${state.meta}` : state.title);
 
         // (b) the scheduler, muted: the algorithm, then the interval it is
         // standing on. "interval 6d" says the number twice inside a group that
@@ -379,6 +387,8 @@ export class ReviewStrip {
 
     private renderGrades(el: HTMLElement, state: StripState): void {
         const grades = el.createDiv({ cls: 'sf-strip-grades' });
+        grades.setAttribute('data-grade-layout', state.gradeLayout ?? 'auto');
+        grades.setAttribute('data-grade-count', String(state.grades.length));
         const suggestion = state.suggestion ?? null;
         const percent = suggestion ? `${Math.round(suggestion.score * 100)}%` : '';
 

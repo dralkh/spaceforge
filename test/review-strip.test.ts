@@ -178,6 +178,17 @@ test('each grade button carries its label, key and resulting interval', () => {
     assert.deepEqual(host.byClass('sf-strip-grade').map(button => button.tag), ['button', 'button', 'button', 'button']);
 });
 
+test('the grade palette carries the layout the reader chose', () => {
+    const { strip, host } = makeStrip();
+    strip.render(reviewingState({ gradeLayout: 'stack' }));
+    assert.equal(host.byClass('sf-strip-grades')[0].getAttribute('data-grade-layout'), 'stack');
+    assert.equal(host.byClass('sf-strip-grades')[0].getAttribute('data-grade-count'), '4');
+
+    // Unset means the automatic layout; the stylesheet resolves it by width.
+    strip.render(reviewingState());
+    assert.equal(host.byClass('sf-strip-grades')[0].getAttribute('data-grade-layout'), 'auto');
+});
+
 test('SM-2 notes get their six grades', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState({

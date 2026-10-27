@@ -288,6 +288,35 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The reader's layout choice, as a data attribute so the three layouts share
+   one DOM shape. `auto` is resolved by the container rule further down. */
+.sf-strip-grades[data-grade-layout="row"] {
+  flex-wrap: nowrap;
+}
+
+.sf-strip-grades[data-grade-layout="row"] .sf-strip-grade {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sf-strip-grades[data-grade-layout="row"] .sf-strip-grade-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-strip-grades[data-grade-layout="stack"] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.sf-strip-grades[data-grade-layout="stack"] .sf-strip-grade {
+  flex: initial;
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+}
+
 /* Study / MCQs / Cards: the bar's own tab row. Its own line, so the status
    above stays a status and these read as places to go; each tab wears its own
    count in its own label, and the row scrolls when the host is too narrow
@@ -596,14 +625,31 @@
 /* The status line takes its own rows: 368px cannot hold identity, scheduler
    and due state abreast, and an ellipsised note title is the one thing in this
    bar the reader cannot do without. The groups wrap; nothing inside them is
-   cut away. */
+   cut away. The scheduler line is the one fact that becomes a hover: it is
+   reference material, and it was costing a whole row above the panel. */
+.sf-host-sidebar .sf-strip {
+  padding: 3px 6px;
+  gap: 3px;
+}
+
 .sf-host-sidebar .sf-strip-status {
-  flex: 1 1 100%;
-  row-gap: var(--sf-space-xs);
+  flex: 1 1 auto;
+  row-gap: 2px;
 }
 
 .sf-host-sidebar .sf-strip-group-identity {
   flex: 1 1 100%;
+}
+
+.sf-host-sidebar .sf-strip-group-schedule {
+  display: none;
+}
+
+/* The keyboard hint is reference, and the grade keys are already printed on
+   the buttons. In the sidebar it was the 22 px that pushed the five controls
+   onto their own row; below 300 px it does the same in a narrow dock. */
+.sf-host-sidebar .sf-strip-help {
+  display: none;
 }
 
 .sf-host-sidebar .sf-strip-title {
@@ -629,17 +675,6 @@
   flex-wrap: nowrap;
 }
 
-.sf-host-sidebar .sf-strip-grade {
-  /* A sidebar is narrower than a label: at two per row the names truncated
-     ("Complete black..."), so each grade takes the row and reads in full. */
-  flex: 1 1 100%;
-  min-width: 0;
-}
-
-.sf-host-sidebar .sf-strip-grades {
-  flex-wrap: wrap;
-}
-
 .sf-host-sidebar .sf-strip-progress,
 .sf-host-window .sf-strip-progress {
   flex: 0 0 auto;
@@ -654,13 +689,55 @@
    narrow, so which layout appears follows the room the bar was given rather
    than which button opened the session. */
 @container sf-strip (max-width: 480px) {
+  /* The header is a three-line grid, not a flex row that wraps: the progress
+     bar and the note span both columns, the due state sits left and the
+     controls sit right on the same line. The old flex row held a full-width
+     status block, so the controls were always a fourth line below the due
+     state even when there was room beside it. */
+  .sf-strip-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 4px;
+    row-gap: 2px;
+  }
+
   .sf-strip-status {
-    flex: 1 1 100%;
-    row-gap: var(--sf-space-xs);
+    display: contents;
+  }
+
+  .sf-strip-progress-bar {
+    grid-column: 1 / -1;
+    margin: 0;
   }
 
   .sf-strip-group-identity {
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
+  }
+
+  .sf-strip-group-due {
+    grid-column: 1;
+  }
+
+  .sf-strip-spacer {
+    display: none;
+  }
+
+  .sf-strip-help {
+    grid-column: 2;
+  }
+
+  .sf-strip-secondary {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  /* The controls lost the row they used to occupy; the pixels they saved buy
+     a finger-sized target instead of a 20 px one. */
+  .sf-strip-action,
+  .sf-strip-help {
+    width: 24px;
+    height: 24px;
   }
 
   /* The note's name reads in full and wraps; a group that cannot fit moves to
@@ -687,14 +764,9 @@
     flex-wrap: nowrap;
   }
 
-  /* One grade per row, so "Complete blackout" is a name and not an ellipsis. */
-  .sf-strip-grade {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-
-  .sf-strip-grades {
-    flex-wrap: wrap;
+  /* The scheduler reference line is a hover in a narrow bar. */
+  .sf-strip-group-schedule {
+    display: none;
   }
 }
 
@@ -736,70 +808,95 @@
   border-color: var(--interactive-accent);
 }
 
-/* At sidebar width the six grades must stop being six paragraphs: the same
-   words, less air, so the whole palette fits without pushing the panel down. */
+/* At sidebar width the grades stop being four paragraphs: the same words, less
+   air, in a two-column palette. Four grades cost two ~30px rows instead of
+   four ~50px ones; six deck grades cost three. The reader can override this
+   with the Grade layout setting, but the default is the compact one. */
 @container sf-strip (max-width: 480px) {
-  .sf-strip-grade {
-    min-height: 2.2em;
+  /* "One row" is the reader's call even when the pane is narrow: the grades
+     keep their names and the intervals step aside, because a row of blank
+     buttons is not a choice. Six long SM-2 names scroll sideways instead of
+     being squeezed to a letter each. */
+  .sf-strip-grades[data-grade-layout="row"] {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .sf-strip-grades[data-grade-layout="row"] .sf-strip-grade {
+    flex: 1 1 0;
+    min-width: 60px;
+    gap: 2px;
+    padding: 1px 4px;
+  }
+
+  .sf-strip-grades[data-grade-layout="row"] .sf-strip-grade-interval {
+    display: none;
+  }
+
+  .sf-strip-grades[data-grade-layout="row"] .sf-strip-grade-key {
+    min-width: 14px;
+    height: 14px;
+    font-size: var(--sf-font-small);
+  }
+
+  .sf-strip-grades[data-grade-layout="auto"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade {
+    flex: initial;
+    min-width: 0;
+    height: auto;
+    min-height: 30px;
     padding: 1px 6px;
   }
 
-  .sf-strip-grades {
-    gap: 4px;
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-main {
+    flex-wrap: wrap;
+    gap: 2px 4px;
+    line-height: 1.15;
   }
-}
 
-/* The sidebar's grade palette is a compact single file, not six full-width
-   paragraphs. The label, its interval and the key stay on one line; the row is
-   ~24px, so all six fit in a fraction of the panel and every name is whole. */
-.sf-host-sidebar .sf-strip-grades {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-label {
+    font-size: var(--sf-font-small);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
 
-.sf-host-sidebar .sf-strip-grade {
-  flex: initial;
-  min-width: 0;
-  height: auto;
-  min-height: 24px;
-  align-items: center;
-  padding: 1px 6px;
-}
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-interval {
+    font-size: var(--sf-font-small);
+  }
 
-.sf-host-sidebar .sf-strip-grade-main {
-  flex-direction: row;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px;
-  line-height: 1.15;
-}
-
-.sf-host-sidebar .sf-strip-grade-label {
-  font-size: var(--sf-font-small);
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  overflow-wrap: normal;
-}
-
-.sf-host-sidebar .sf-strip-grade-interval {
-  font-size: var(--sf-font-small);
-  line-height: 1.15;
-}
-
-.sf-host-sidebar .sf-strip-grade-key {
-  margin-left: auto;
-  min-width: 14px;
-  height: 14px;
-  font-size: var(--sf-font-small);
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-key {
+    margin-left: auto;
+    min-width: 14px;
+    height: 14px;
+    font-size: var(--sf-font-small);
+  }
 }
 
 /* At the smallest split the intervals must not force every grade name onto two
-   lines again. The label and the key stay; the interval is the one detail the
-   compact palette drops, and the full advice remains in the bar's menu. */
+   lines again. The label and the key stay; the full advice remains in the
+   bar's menu. */
 @container sf-strip (max-width: 230px) {
-  .sf-host-sidebar .sf-strip-grade-interval {
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-interval {
     display: none;
   }
+}
+
+@container sf-strip (max-width: 300px) {
+  .sf-strip-help {
+    display: none;
+  }
+}
+
+/* One fact, one line: the sidebar list's charting line sits directly above the
+   Study panel's own chart line while a session is open. The panel's version
+   carries the progress bar and a retry, so the list's copy goes. */
+.sf-host-sidebar:has(.sf-study-panel) .review-chart-status {
+  display: none;
 }

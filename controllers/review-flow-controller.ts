@@ -442,6 +442,16 @@ export class ReviewFlowController {
         if (typeof sidebar?.refresh === 'function') void sidebar.refresh();
     }
 
+    /**
+     * Repaint the bar after a setting that only changes how it is drawn.
+     *
+     * The strip is rebuilt from the model's current state, so a layout choice
+     * lands without touching the run itself.
+     */
+    refreshStrip(): void {
+        this.render();
+    }
+
     getHost(): ReviewSessionHost {
         return this.host;
     }
@@ -1561,6 +1571,7 @@ export class ReviewFlowController {
             queue,
             algorithm,
             grades,
+            gradeLayout: this.plugin.settings.reviewGradeLayout,
             decision: this.model.pendingDecision
                 ? {
                     message: leechPromptText(title, this.model.pendingDecision.lapses, this.model.pendingDecision.threshold),
