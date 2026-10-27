@@ -1,6 +1,6 @@
 {
   "name": "spaceforge",
-  "version": "1.2.9",
+  "version": "1.2.91",
   "description": "A spaced repetition plugin for efficient knowledge review in Obsidian",
   "main": "main.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=true eslint .",
     "typecheck": "tsc -noEmit -skipLibCheck",
     "test": "node test/build-tests.mjs && node --test .test-build/*.test.js",
+    "check:cli": "node test/live/build.mjs && node --test .test-build/live/cli-agents.test.js",
     "soak": "node scripts/soak-progress.mjs"
   },
   "keywords": [

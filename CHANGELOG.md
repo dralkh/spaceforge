@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.91
+
+### Local CLI providers
+
+- **Cursor Agent is sent the prompt.** `cursor-agent -p` takes its prompt as a positional argument and never reads stdin; the provider was invoked without one, so every Cursor turn ended with "No prompt provided for print mode". The prompt is now built into the command, with `--model` still ahead of it.
+- **A failed CLI turn says when no model was chosen.** An empty model field means the CLI runs its own default, and when that default is the thing that fails the message now names the field to change instead of only repeating the CLI's complaint.
+- **`npm run check:cli` checks every registered CLI**, not a hand-written list: detection, the live model list and a real turn per agent, with an absent or unsigned binary reported as skipped and a present-but-failing one as a defect.
+
 ## 1.2.9
 
 ### Review
