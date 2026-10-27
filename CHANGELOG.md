@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.8
+
+### Review bar
+
+- **A narrow pane gets a compact grade palette.** Four grades sit in a 2×2 grid, six in a 2×3 grid; the note, its due state and the controls share two lines instead of four. A wide pane keeps the single row.
+- **Grade layout is the reader's choice.** Settings → Review → Grade layout offers *Auto (fit the pane)*, *One row*, and *Stacked*. *One row* keeps every grade name and lets the intervals step aside; long SM-2 names scroll sideways rather than being squeezed to a letter each.
+- **The keyboard hint and the scheduler reference step aside in a narrow bar.** The shortcuts stay printed on the grade buttons; the scheduler facts stay on the note's hover.
+- **The Study panel no longer repeats the note title.** In the sidebar the stage rail is one line ("Step 4 of 8 · Recall check") instead of eight pills over two rows.
+- **One charting notice, not two.** The sidebar list's chart line is hidden while the Study panel reports the same run with a progress bar.
+
 ## 1.2.7
 
 ### Study workspace
