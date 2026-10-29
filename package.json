@@ -1,6 +1,6 @@
 {
   "name": "spaceforge",
-  "version": "1.2.91",
+  "version": "1.2.92",
   "description": "A spaced repetition plugin for efficient knowledge review in Obsidian",
   "main": "main.js",
   "scripts": {
@@ -13,7 +13,8 @@
     "typecheck": "tsc -noEmit -skipLibCheck",
     "test": "node test/build-tests.mjs && node --test .test-build/*.test.js",
     "check:cli": "node test/live/build.mjs && node --test .test-build/live/cli-agents.test.js",
-    "soak": "node scripts/soak-progress.mjs"
+    "soak": "node scripts/soak-progress.mjs",
+    "lint:review": "ESLINT_USE_FLAT_CONFIG=true eslint . -c eslint.review.config.mjs --max-warnings 0"
   },
   "keywords": [
     "obsidian",
@@ -25,16 +26,16 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^16.11.6",
-    "@typescript-eslint/eslint-plugin": "^8.48.1",
-    "@typescript-eslint/parser": "^8.48.1",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
     "esbuild": "^0.17.19",
     "eslint": "^9.39.5",
     "eslint-plugin-obsidianmd": "^0.4.2",
     "globals": "^16.5.0",
     "obsidian": "latest",
     "tslib": "2.4.0",
-    "typescript": "^4.7.4",
-    "typescript-eslint": "^8.48.1"
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.72.1"
   },
   "dependencies": {
     "fzstd": "^0.1.1",

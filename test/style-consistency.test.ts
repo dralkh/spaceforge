@@ -53,6 +53,22 @@ test('every grade variant an algorithm can produce is styled', () => {
     assert.deepEqual(missing, [], `grade buttons without colours: ${missing.join(', ')}`);
 });
 
+test('the stylesheets avoid the declarations the plugin review rejects', () => {
+    // The review's CSS lint reports `column-gap` as the multicolumn feature,
+    // `display: contents` as partially supported and `:has()` as a broad
+    // invalidation cost. Each has a plain equivalent — `gap`, a wrapper that is
+    // itself a grid, and not writing the rule at all — so none of them ship.
+    const sheets = fs.readdirSync(path.join(root, 'styles')).filter(name => name.endsWith('.css'));
+    const offenders: string[] = [];
+    for (const name of sheets) {
+        const css = read(`styles/${name}`).replace(/\/\*[\s\S]*?\*\//g, '');
+        if (/^\s*column-gap\s*:/m.test(css)) offenders.push(`${name}: column-gap`);
+        if (/display\s*:\s*contents/.test(css)) offenders.push(`${name}: display: contents`);
+        if (/:has\(/.test(css)) offenders.push(`${name}: :has()`);
+    }
+    assert.deepEqual(offenders, [], `declarations the review rejects: ${offenders.join(', ')}`);
+});
+
 test('the stylesheet is part of what the plugin ships', () => {
     assert.match(read('styles/styles.css'), /@import url\('\.\/review-strip\.css'\);/);
 });

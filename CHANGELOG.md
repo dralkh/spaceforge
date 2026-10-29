@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.92
+
+### The community-plugin review
+
+- **Every finding from the review is fixed, at the cause.** The enum comparisons against plain numbers, the `any` leaving the Anki bridge and the progress mirror, the redundant type assertions, `globalThis`, and the three CSS declarations the review rejects (`column-gap`, `display: contents`, `:has()`) are gone — none of them silenced with a cast, a disable or a widened type.
+- **`npm run lint:review` reproduces that report locally.** It runs the reviewer's own rule subset with `--max-warnings 0`, on the toolchain that makes those rules fire (TypeScript 5.9, typescript-eslint 8.72) — the repo's older pair reported nothing, which is why the findings arrived from the store instead of the gate.
+- **The review bar did not move.** 157 px at 268/340/480 px and 98 px at 826 px, measured on the previous build and this one; only the shape of the narrow header's grid changed.
+- **Two tests now pin what the review looks for**: the due state stays the header's own child, and no stylesheet may reintroduce those three declarations.
+
 ## 1.2.91
 
 ### Local CLI providers

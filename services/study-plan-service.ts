@@ -44,7 +44,7 @@ export function objectiveDefinition(objective: StudyObjective): string {
 function newObjectiveId(reserved: Set<string>): string {
     let id: string;
     do {
-        id = `objective-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
+        id = `objective-${window.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`}`;
     } while (reserved.has(id));
     reserved.add(id);
     return id;

@@ -58,6 +58,14 @@ export enum DeckScheduler {
 }
 
 /**
+ * Buried and suspended cards are the negative queues, and they keep the `due`
+ * convention of the queue they came from.
+ */
+function isBuriedOrSuspended(queue: AnkiCardQueue): boolean {
+    return queue < AnkiCardQueue.New;
+}
+
+/**
  * Does this card's `due` count days from the collection's creation?
  *
  * Anki stores a review card's `due` as a day number relative to `col.crt` and a
@@ -66,15 +74,15 @@ export enum DeckScheduler {
  * of the rule. Every conversion between the package's world and the deck
  * document's asks this, so the two never disagree about what a number means.
  */
-export function isDayBasedDue(type: number, queue: number): boolean {
+export function isDayBasedDue(type: AnkiCardType, queue: AnkiCardQueue): boolean {
     if (queue === AnkiCardQueue.Review || queue === AnkiCardQueue.DayLearn) return true;
-    return queue < 0 && type === AnkiCardType.Review;
+    return isBuriedOrSuspended(queue) && type === AnkiCardType.Review;
 }
 
 /** The timestamp-based counterpart of {@link isDayBasedDue}. */
-export function isSecondBasedDue(type: number, queue: number): boolean {
+export function isSecondBasedDue(type: AnkiCardType, queue: AnkiCardQueue): boolean {
     if (queue === AnkiCardQueue.Learning || queue === AnkiCardQueue.PreviewRepeat) return true;
-    return queue < 0 && (type === AnkiCardType.Learning || type === AnkiCardType.Relearning);
+    return isBuriedOrSuspended(queue) && (type === AnkiCardType.Learning || type === AnkiCardType.Relearning);
 }
 
 /**

@@ -1,9 +1,12 @@
-name: Build and attest release assets
+name: Attest release assets
 
-# Obsidian's review checks release assets for GitHub artifact attestations.
-# This workflow rebuilds the plugin from the tagged source, runs the same checks
-# a release must pass locally, attests the built files, and uploads them to the
-# release, so every asset can be verified as built from this repository.
+# Obsidian's review checks release assets for GitHub artifact attestations, and
+# an attestation can only be issued by a workflow that built the file. That is
+# the whole job here: build the tagged tree and attest it.
+#
+# Every quality gate — lint, the review mirror, typecheck, tests, the build
+# comparison and `scripts/verify-release.mjs` — runs locally, on the commit that
+# will be tagged, before the release exists. Nothing here re-runs them.
 
 on:
   release:
@@ -31,22 +34,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint the source
-        run: npm run lint
-
-      # Built before the tests so the bundle-load and stylesheet checks run
-      # against the real artifact instead of skipping a missing main.js.
       - name: Build the release assets
         run: npm run build
-
-      - name: Run the test suite
-        run: npm test
-
-      - name: Verify the tag, manifest, versions and assets agree
-        if: github.event_name == 'release'
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: node scripts/verify-release.mjs "$RELEASE_TAG"
 
       - name: Attest the release assets
         uses: actions/attest-build-provenance@v2

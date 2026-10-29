@@ -57,8 +57,8 @@ export interface AnkiConnectStatus {
 /** What Anki says about one card, in Anki's own day frame. */
 interface AnkiCardSnapshot {
     cardId: number;
-    type: number;
-    queue: number;
+    type: AnkiCardType;
+    queue: AnkiCardQueue;
     due: number;
     interval: number;
     factor: number;
@@ -96,7 +96,10 @@ const defaultPost: AnkiConnectPost = async (url, body) => {
         body: JSON.stringify(body),
         throw: false,
     });
-    return response.json;
+    // `requestUrl` hands back parsed JSON as `any`; the boundary is where that
+    // stops being unknown, so it leaves this function as `unknown` and every
+    // caller narrows what it actually expects.
+    return response.json as unknown;
 };
 
 function messageOf(error: unknown): string {
@@ -557,8 +560,10 @@ export class AnkiConnectService {
     }
 
     private async writeFile(path: string, bytes: Uint8Array): Promise<void> {
+        // A copy, so a view into a larger buffer is written as exactly these
+        // bytes and nothing else.
         const copy = bytes.slice();
-        await this.plugin.app.vault.adapter.writeBinary(path, copy.buffer as ArrayBuffer);
+        await this.plugin.app.vault.adapter.writeBinary(path, copy.buffer);
     }
 
     private async removeFile(path: string): Promise<void> {

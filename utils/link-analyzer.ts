@@ -297,7 +297,7 @@ export class LinkAnalyzer {
         // FOURTH PRIORITY: Look for files with the most outgoing links
         // Prefer regular links over embeds
         const sortedNodes = Object.values(nodes)
-            .sort((a, b) => {
+            .sort((a: FileNode, b: FileNode) => {
                 // First, prioritize by regular link count (non-embed links)
                 const regularLinkDiff = b.regularLinks.length - a.regularLinks.length;
                 if (regularLinkDiff !== 0) {
