@@ -338,7 +338,7 @@ export class StudyPanel {
             new Notice(`Study removed ${savedWorkspace.droppedThreads} unreadable or over-limit conversation${savedWorkspace.droppedThreads === 1 ? '' : 's'}.`, 6000);
         }
         if (savedWorkspace?.changed) this.saveWorkspace();
-        this.viewState = (store?.workspace?.viewState ?? {}) as WorkspaceViewState;
+        this.viewState = store?.workspace?.viewState ?? {};
         this.pruneViewState();
         this.activeView = this.viewState.activeView ?? 'learn';
         this.buildWorkspace();
@@ -1129,9 +1129,11 @@ export class StudyPanel {
     }
 
     private syncSessionOptions(): void {
-        const getOptions = this.session?.getOptions;
-        if (typeof getOptions !== 'function') return;
-        const options = getOptions.call(this.session);
+        // A panel can be handed a session stand-in (tests, an older host) that
+        // does not answer for itself, so the read is guarded before it is made.
+        const session = this.session;
+        if (!session || typeof session.getOptions !== 'function') return;
+        const options = session.getOptions();
         if (!options) return;
         this.mode = options.mode;
         this.webSearch = options.webSearch;

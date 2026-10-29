@@ -197,6 +197,27 @@ export interface StudyChartState {
     updatedAt: number;
 }
 
+/** Lifecycle of one automatic preparation step. */
+export type PreparationState = 'queued' | 'running' | 'ready' | 'error' | 'interrupted';
+export type PreparationStepState = PreparationState | 'skipped';
+
+/**
+ * The state of the automatic follow-ups (materials, then questions) for one
+ * note, stored on its plan so a restart resumes or retries rather than
+ * forgetting what was already attempted.
+ */
+export interface PreparationStatus {
+    notePath: string;
+    state: PreparationState;
+    message: string;
+    materials: PreparationStepState;
+    questions: PreparationStepState;
+    materialAttempts: number;
+    questionAttempts: number;
+    sourceHash: string;
+    updatedAt: number;
+}
+
 /** The chart of a note. Generated once, kept, merged on regeneration. */
 export interface StudyPlan {
     notePath: string;
@@ -230,6 +251,12 @@ export interface StudyPlan {
     images: StudyImageRef[];
     /** How far the charting job has got through this note. */
     chartState: StudyChartState | null;
+    /**
+     * The automatic follow-ups (materials, then questions) for this note: what
+     * ran, what failed and what to retry. Optional because a plan that has
+     * never been prepared simply has nothing to say.
+     */
+    preparation?: PreparationStatus;
     /**
      * The mind map, visual boards and summary generated from this note.
      *

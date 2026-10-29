@@ -113,6 +113,22 @@ test('the status line reads as groups: the note, its scheduler, and the due stat
     assert.equal(host.byClass('sf-strip-group').length, 3);
 });
 
+test('the due state is the header\'s own child, so a narrow host can place it beside the controls', () => {
+    const { strip, host } = makeStrip();
+    strip.render(reviewingState());
+
+    const header = host.byClass('sf-strip-header')[0];
+    const due = host.byClass('sf-strip-group-due')[0];
+    const status = host.byClass('sf-strip-status')[0];
+    assert.ok(header && due && status, 'the bar draws a header, a status block and a due state');
+    // A sibling of the status block, not a child of it: the narrow layout puts
+    // the due state on the controls' line by placing it in the header grid, and
+    // the wrapper no longer has to be flattened with `display: contents` (which
+    // the plugin review rejects) for that to work.
+    assert.equal(due.parentElement, header);
+    assert.notEqual(due.parentElement, status, 'the due state is not part of the status block');
+});
+
 test('the scheduler group keeps the short form on the line and the full string on the hover', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState({ meta: 'SM-2 · interval 6d · ease 2.50' }));

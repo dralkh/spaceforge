@@ -62,6 +62,19 @@ function stringList(value: unknown): string[] {
 }
 
 /**
+ * Per-category error tallies, as persisted. Anything that is not a finite
+ * number is dropped rather than carried into the checkpoint as a count.
+ */
+function readErrorCounts(value: unknown): StudyTutorCheckpoint['turnErrorCounts'] {
+    if (!isRecord(value)) return {};
+    const counts: Record<string, number> = {};
+    for (const [category, count] of Object.entries(value)) {
+        if (typeof count === 'number' && Number.isFinite(count)) counts[category] = count;
+    }
+    return counts;
+}
+
+/**
  * Read a workspace from persisted data without trusting it.
  *
  * A chat is a large, nested object written by an older build, a partial save
@@ -268,7 +281,7 @@ function normalizeCheckpoint(value: unknown): StudyTutorCheckpoint | null {
             objectivesTouched: stringList(session.objectivesTouched),
             objectivesMastered: stringList(session.objectivesMastered),
             sources: stringList(session.sources),
-            errorCounts: isRecord(session.errorCounts) ? session.errorCounts as StudySessionRecord['errorCounts'] : {},
+            errorCounts: readErrorCounts(session.errorCounts),
             startedAt: typeof session.startedAt === 'number' ? session.startedAt : 0,
             endedAt: typeof session.endedAt === 'number' ? session.endedAt : null,
             turnCount: typeof session.turnCount === 'number' ? session.turnCount : 0,
@@ -280,7 +293,7 @@ function normalizeCheckpoint(value: unknown): StudyTutorCheckpoint | null {
             webSearch: options.webSearch === true,
             turnLimit: typeof options.turnLimit === 'number' && Number.isFinite(options.turnLimit) ? options.turnLimit : 8,
             freshStart: options.freshStart === true,
-        } as StudySessionOptions,
+        },
         pendingPrompt,
         recentTurns: Array.isArray(value.recentTurns)
             ? value.recentTurns.filter((turn): turn is { role: 'tutor' | 'user'; text: string; objectiveId: string | null } =>
@@ -291,7 +304,7 @@ function normalizeCheckpoint(value: unknown): StudyTutorCheckpoint | null {
         stage: typeof value.stage === 'string' ? value.stage as StudyStage : 'orient' as StudyStage,
         allowedUrls: stringList(value.allowedUrls),
         researchRounds: typeof value.researchRounds === 'number' ? value.researchRounds : 0,
-        turnErrorCounts: isRecord(value.turnErrorCounts) ? value.turnErrorCounts as StudyTutorCheckpoint['turnErrorCounts'] : {},
+        turnErrorCounts: readErrorCounts(value.turnErrorCounts),
         masteredBefore: stringList(value.masteredBefore),
         touched: stringList(value.touched),
         finished: value.finished === true,
@@ -303,7 +316,7 @@ function normalizeCheckpoint(value: unknown): StudyTutorCheckpoint | null {
 let sequence = 0;
 /** Random identity independent of buffer length, timestamps and plan positions. */
 export function studyUniqueId(prefix: string): string {
-    const uuid = globalThis.crypto?.randomUUID?.();
+    const uuid = window.crypto?.randomUUID?.();
     return `${prefix}-${uuid ?? `${Date.now().toString(36)}-${(++sequence).toString(36)}-${Math.random().toString(36).slice(2)}`}`;
 }
 

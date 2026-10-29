@@ -699,21 +699,21 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
-    column-gap: 4px;
-    row-gap: 2px;
+    gap: 2px 4px;
   }
 
+  /* The status keeps its own box and spans the header's columns: one grid of
+     its own is what stacks the bar and the note inside it, so the header never
+     has to reach through the wrapper with `display: contents`. */
   .sf-strip-status {
-    display: contents;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 
   .sf-strip-progress-bar {
-    grid-column: 1 / -1;
     margin: 0;
-  }
-
-  .sf-strip-group-identity {
-    grid-column: 1 / -1;
   }
 
   .sf-strip-group-due {
@@ -895,9 +895,8 @@
   }
 }
 
-/* One fact, one line: the sidebar list's charting line sits directly above the
-   Study panel's own chart line while a session is open. The panel's version
-   carries the progress bar and a retry, so the list's copy goes. */
-.sf-host-sidebar:has(.sf-study-panel) .review-chart-status {
-  display: none;
-}
+/* The sidebar list's charting line and the Study panel's chart line never share
+   a pane: the list lives in `.spaceforge-container`, the session in its own
+   child, so a rule that tried to suppress one from the other's presence was a
+   `:has()` that could never match. The panel's line carries the progress bar and
+   the retry, which is why the panel is the one that matters. */

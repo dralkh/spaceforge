@@ -161,9 +161,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * not appear twice. */
 function unionRows(mine: unknown, theirs: unknown): unknown {
     if (!Array.isArray(mine) || !Array.isArray(theirs)) return mine;
-    const seen = new Set(mine.map(row => JSON.stringify(row)));
-    const out = [...mine];
-    for (const row of theirs) {
+    // `Array.isArray` narrows to `any[]`; the rows are raw SQL values we only
+    // ever stringify, so they are handled as unknown from here on.
+    const localRows: unknown[] = mine;
+    const otherRows: unknown[] = theirs;
+    const seen = new Set(localRows.map(row => JSON.stringify(row)));
+    const out = [...localRows];
+    for (const row of otherRows) {
         const key = JSON.stringify(row);
         if (seen.has(key)) continue;
         seen.add(key);

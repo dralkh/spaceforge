@@ -214,7 +214,7 @@ export function projectProgress(
             portableState[key] = Object.fromEntries(Object.entries(value).map(([path, sessions]) => [
                 path,
                 Array.isArray(sessions)
-                    ? sessions.map(session => isRecord(session) ? { ...session, transcript: [], summary: null } : session)
+                    ? sessions.map((session: unknown) => isRecord(session) ? { ...session, transcript: [], summary: null } : session)
                     : sessions,
             ]));
         } else if (value !== undefined) portableState[key] = value;
@@ -225,8 +225,8 @@ export function projectProgress(
         updatedAt: meta.now ?? Date.now(),
         device: meta.device,
         version: meta.version,
-        settings: portableSettings as Partial<SpaceforgeSettings>,
-        state: portableState as Partial<PluginStateData>,
+        settings: portableSettings,
+        state: portableState,
     };
 }
 
@@ -277,7 +277,7 @@ export function mergeProgress(
         if (JSON.stringify(merged) !== JSON.stringify(current) && !report.replaced.includes(key)) report.replaced.push(key);
     }
 
-    const study = mergeStudyState(state, other.state as unknown as Record<string, unknown>);
+    const study = mergeStudyState(state, other.state);
     for (const key of ['studyPlans', 'studyProgress', 'studySessions']) {
         if (JSON.stringify(state[key]) !== JSON.stringify(study[key])) report.replaced.push(key);
         const collection = study[key];
@@ -332,9 +332,22 @@ function mergeDict(key: string, current: unknown, incoming: unknown, rule: State
     return base;
 }
 
+/**
+ * Durable observations from both sides, in the order they were first seen, at
+ * most the last twenty — the same window the tutor keeps for itself.
+ */
+function mergedTutorMemory(...lists: unknown[]): string[] {
+    const seen = new Set<string>();
+    for (const list of lists) {
+        if (!Array.isArray(list)) continue;
+        for (const entry of list) if (typeof entry === 'string') seen.add(entry);
+    }
+    return [...seen].slice(-20);
+}
+
 function mergeLog(key: string, current: unknown, incoming: unknown, rule: StateRule, report: MergeReport): unknown {
-    const mine = Array.isArray(current) ? current : [];
-    const theirs = Array.isArray(incoming) ? incoming : [];
+    const mine: unknown[] = Array.isArray(current) ? current : [];
+    const theirs: unknown[] = Array.isArray(incoming) ? incoming : [];
     const seen = new Set<string>();
     const merged: unknown[] = [];
     for (const record of [...mine, ...theirs]) {
@@ -461,7 +474,7 @@ export function mergeStudyState(local: Record<string, unknown>, incoming: Record
                 planFingerprint: plan.contentFingerprint ?? newer.planFingerprint,
                 archivedObjectives, pendingObjectives,
                 incompatibleObjectives, scheduleSuggestions: [...suggestions.values()],
-                tutorMemory: [...new Set([...(Array.isArray(mine.tutorMemory) ? mine.tutorMemory : []), ...(Array.isArray(theirs.tutorMemory) ? theirs.tutorMemory : [])])].slice(-20),
+                tutorMemory: mergedTutorMemory(mine.tutorMemory, theirs.tutorMemory),
             };
         }
         const localById = new Map<string, Record<string, unknown>>();
@@ -524,8 +537,8 @@ export function parseProgress(raw: string | null): ProgressEnvelope | null {
             updatedAt: parsed.updatedAt,
             device: typeof parsed.device === 'string' ? parsed.device : 'unknown',
             version: typeof parsed.version === 'string' ? parsed.version : '',
-            settings: (parsed.settings ?? {}) as Partial<SpaceforgeSettings>,
-            state: (parsed.state ?? {}) as Partial<PluginStateData>,
+            settings: parsed.settings ?? {},
+            state: parsed.state ?? {},
         };
     } catch {
         return null;

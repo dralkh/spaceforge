@@ -1,6 +1,6 @@
 import SpaceforgePlugin from '../main';
 import { isDeckPath } from '../models/anki';
-import { StudyPlan } from '../models/study';
+import { PreparationState, PreparationStatus, PreparationStepState, StudyPlan } from '../models/study';
 import { getDomainProfile } from '../models/study-domains';
 import { StudyPlanService } from './study-plan-service';
 import { StudySessionService } from './study-session-service';
@@ -26,21 +26,12 @@ import { StudySessionService } from './study-session-service';
  * Each step uses the same single-flight operation the panel and dock call.
  */
 
-export type PreparationState = 'queued' | 'running' | 'ready' | 'error' | 'interrupted';
-export type PreparationStepState = PreparationState | 'skipped';
-/** Stored on the plan as optional `preparation`; survives the normal studyPlans save. */
-export interface PreparationStatus {
-    notePath: string;
-    state: PreparationState;
-    message: string;
-    materials: PreparationStepState;
-    questions: PreparationStepState;
-    materialAttempts: number;
-    questionAttempts: number;
-    sourceHash: string;
-    updatedAt: number;
-}
-type PreparedPlan = StudyPlan & { preparation?: PreparationStatus };
+/**
+ * The preparation record lives on the plan (`StudyPlan.preparation`) so the
+ * normal `studyPlans` save carries it; its types stay exported from here for the
+ * callers that already import them from this service.
+ */
+export type { PreparationState, PreparationStatus, PreparationStepState };
 
 export interface StudyChartQueueStatus {
     /** Notes waiting, including the one in progress. */
@@ -110,7 +101,7 @@ export class StudyChartQueueService {
     }
 
     getPreparationStatus(notePath: string): PreparationStatus | null {
-        const saved = (this.planService.getPlan(notePath) as PreparedPlan | null)?.preparation;
+        const saved = this.planService.getPlan(notePath)?.preparation;
         if (!saved) return null;
         // A running record without a live job is recovery work, never a spinner forever.
         if (!this.autoPilotRuns.has(notePath) && (saved.state === 'running' || saved.state === 'queued')) {
@@ -150,7 +141,7 @@ export class StudyChartQueueService {
             this.interruptPreparation(notePath);
             return;
         }
-        const plan = this.planService.getPlan(notePath) as PreparedPlan | null;
+        const plan = this.planService.getPlan(notePath);
         if (!plan?.preparation) return;
         const running = this.autoPilotRuns.has(notePath);
         plan.preparation = {
@@ -183,7 +174,7 @@ export class StudyChartQueueService {
         let changed = false;
         for (const path of Object.keys(this.planService.plans)) {
             if (path !== newPath && !path.startsWith(`${newPath}/`)) continue;
-            const plan = this.planService.getPlan(path) as PreparedPlan | null;
+            const plan = this.planService.getPlan(path);
             if (!plan?.preparation) continue;
             const active = this.autoPilotRuns.has(oldPath + path.slice(newPath.length))
                 || plan.preparation.state === 'queued' || plan.preparation.state === 'running';
@@ -204,7 +195,7 @@ export class StudyChartQueueService {
 
     private interruptPreparation(notePath: string): void {
         this.preparationEpoch.set(notePath, (this.preparationEpoch.get(notePath) ?? 0) + 1);
-        const plan = this.planService.getPlan(notePath) as PreparedPlan | null;
+        const plan = this.planService.getPlan(notePath);
         if (!plan?.preparation || !this.autoPilotRuns.has(notePath)) return;
         plan.preparation = { ...plan.preparation, state: 'interrupted', message: 'Preparation interrupted. Retry to continue.', updatedAt: Date.now() };
         this.publishPreparation(plan.preparation);
@@ -286,12 +277,12 @@ export class StudyChartQueueService {
         if (running) return running;
         if (!manual && !this.autoMaterialsEnabled() && !this.autoMcqEnabled()) return Promise.resolve();
         const plan = this.planService.getPlan(notePath);
-        if (!StudyPlanService.planReady(plan)) return Promise.resolve();
+        if (!plan || !StudyPlanService.planReady(plan)) return Promise.resolve();
         const epoch = this.preparationEpoch.get(notePath) ?? 0;
         // Install the promise before any read/save/ready callback can re-enter.
         const materialStop = this.stepStop(notePath, 'materials');
         const questionStop = this.stepStop(notePath, 'questions');
-        const run = Promise.resolve().then(() => this.runAutoPilot(notePath, plan as PreparedPlan, epoch, manual, materialStop, questionStop));
+        const run = Promise.resolve().then(() => this.runAutoPilot(notePath, plan, epoch, manual, materialStop, questionStop));
         this.autoPilotRuns.set(notePath, run);
         const settle = (): void => {
             if (this.autoPilotRuns.get(notePath) === run) this.autoPilotRuns.delete(notePath);
@@ -317,7 +308,7 @@ export class StudyChartQueueService {
      */
     private async runAutoPilot(
         notePath: string,
-        plan: PreparedPlan,
+        plan: StudyPlan,
         epoch: number,
         manual: boolean,
         materialStop: number,

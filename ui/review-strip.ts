@@ -265,9 +265,12 @@ export class ReviewStrip {
             meta.setAttribute('title', state.meta);
         }
 
-        // (c) the due state, said only when there is one to say.
+        // (c) the due state, said only when there is one to say. It is the
+        // header's own fact, not the status block's: a narrow host puts it on
+        // the controls' line, and being a sibling is what lets it sit there
+        // without the wrapper resorting to `display: contents`.
         if (state.dueLabel) {
-            const due = status.createDiv({ cls: 'sf-strip-group sf-strip-group-due' });
+            const due = header.createDiv({ cls: 'sf-strip-group sf-strip-group-due' });
             due.createSpan({ cls: 'sf-strip-due', text: state.dueLabel });
         }
 
