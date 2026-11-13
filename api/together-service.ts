@@ -103,7 +103,6 @@ export class TogetherService implements IMCQGenerationService {
                 },
                 body: JSON.stringify({
                     model: model,
-                    max_tokens: 2048, // Adjust as needed
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: prompt }

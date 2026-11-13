@@ -48,14 +48,10 @@ export class ReviewController implements IReviewController {
         this.plugin = plugin;
         this.coreController = new ReviewControllerCore(plugin);
         this.navigationController = new ReviewNavigationController(plugin); // Initialize navigation controller
-        // Pass the generation service if available
-        if (plugin.mcqGenerationService) {
-            this.mcqController = new MCQController(plugin, mcqService, plugin.mcqGenerationService);
-        } else {
-            // Handle case where service might not be initialized (e.g., MCQ disabled)
-            // Depending on usage, might need null checks later or ensure it's always initialized when enabled.
-            // this.mcqController = undefined; // Or handle appropriately
-        }
+        // The controller resolves the generation service from the plugin on
+        // every call, so it follows a provider change and reports a missing one
+        // itself.
+        this.mcqController = new MCQController(plugin, mcqService);
         this.batchController = new ReviewBatchController(plugin); // Initialize batch controller
     }
 

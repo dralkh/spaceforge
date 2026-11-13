@@ -324,7 +324,7 @@ test('every provider in the dropdown has rows of its own, and they stay put', as
     assert.ok(dropdown, 'the provider choice is a dropdown');
     const options = dropdown.options.map(option => option.value);
     assert.ok(options.length >= 28, `expected every company and every CLI, found ${options.length}`);
-    for (const agentId of ['antigravity', 'claude', 'codex', 'copilot', 'cursor', 'hermes', 'openclaw', 'opencode']) {
+    for (const agentId of ['antigravity', 'claude', 'codex', 'copilot', 'cursor', 'hermes', 'openclaw', 'opencode', 'pi']) {
         assert.ok(options.includes(`cli:${agentId}`), `${agentId} is offered under its own id`);
     }
     assert.ok(!options.includes(ApiProvider.Cli), 'there is no converged "local CLI" row to narrow down');
@@ -332,8 +332,8 @@ test('every provider in the dropdown has rows of its own, and they stay put', as
     // The CLIs lead the list: they need no key and no account, so they are the
     // shortest path from a fresh install to a working provider.
     assert.deepEqual(
-        options.slice(0, 8),
-        ['cli:antigravity', 'cli:claude', 'cli:codex', 'cli:copilot', 'cli:cursor', 'cli:hermes', 'cli:openclaw', 'cli:opencode'],
+        options.slice(0, 9),
+        ['cli:antigravity', 'cli:claude', 'cli:codex', 'cli:copilot', 'cli:cursor', 'cli:hermes', 'cli:openclaw', 'cli:opencode', 'cli:pi'],
         'every CLI is listed first',
     );
 

@@ -1578,11 +1578,16 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
 
             new Setting(studySection)
                 .setName('Maximum output tokens per turn')
-                .setDesc('Caps the length of a single tutor reply. Thinking models (qwen3, deepseek-r1 and similar) spend part of this on reasoning before they answer, so give them 2000-4000. Charting scales its own budget above this for long sections.')
+                .setDesc('Leave empty for no limit, so long answers are never cut off. Set a number only to cap a single tutor reply. Charting and Study material are never capped.')
                 .addText(text => text
-                    .setPlaceholder('2000')
-                    .setValue(this.plugin.settings.studyMaxTokens.toString())
+                    .setPlaceholder('No limit')
+                    .setValue(this.plugin.settings.studyMaxTokens > 0 ? this.plugin.settings.studyMaxTokens.toString() : '')
                     .onChange(async (value: string) => {
+                        if (value.trim() === '') {
+                            this.plugin.settings.studyMaxTokens = 0;
+                            await this.plugin.savePluginData();
+                            return;
+                        }
                         const parsed = parseInt(value, 10);
                         if (!isNaN(parsed) && parsed >= 256) {
                             this.plugin.settings.studyMaxTokens = parsed;

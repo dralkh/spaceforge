@@ -172,10 +172,11 @@ export class StudyVisualService {
         const result = await client.send({
             messages,
             temperature: Math.min(0.6, Math.max(0.1, this.plugin.settings.studyTemperature)),
-            // A gallery of interactive assets, a map and a summary do not fit in
-            // the chart's budget — and a truncated answer is a lost generation,
-            // not a partial one, because the JSON never closes.
-            maxTokens: Math.max(6000, this.plugin.settings.studyMaxTokens * 4),
+            // No output cap. A gallery of interactive assets, a map and a
+            // summary of long material can run long, and a truncated answer is
+            // a lost generation, not a partial one, because the JSON never
+            // closes — so the model gets its full length, whatever the tutor's
+            // per-turn setting says.
             json: true,
             contextWindow: this.plugin.settings.studyContextWindow,
         });

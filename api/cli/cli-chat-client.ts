@@ -85,5 +85,6 @@ export function flattenMessages(request: ChatRequest): string {
  */
 function cliTimeoutMs(request: ChatRequest): number {
     const base = 180_000;
-    return request.maxTokens && request.maxTokens > 8000 ? base * 2 : base;
+    // No cap means the answer can be as long as the model makes it.
+    return !request.maxTokens || request.maxTokens > 8000 ? base * 2 : base;
 }

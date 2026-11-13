@@ -154,3 +154,43 @@ test('a failed preparation is cleared, so asking again retries it', async () => 
     assert.ok(retried, 'the retry is served');
     assert.equal(calls.generated.length, 2, 'a fresh attempt, not the finished failure');
 });
+
+test('generation goes to the provider selected now, not the one the controller was built with', async () => {
+    // The controller lives for the plugin's lifetime; a generator captured at
+    // construction kept answering for the provider the reader had left.
+    const used: string[] = [];
+    const generatorFor = (name: string) => ({
+        generateMCQs: async (notePath: string): Promise<MCQSet | null> => {
+            used.push(name);
+            return { notePath, generatedAt: Date.now(), questions: [{ question: 'Q?', choices: ['a', 'b'], correctAnswerIndex: 0 }] };
+        },
+    });
+    const generators: Record<string, ReturnType<typeof generatorFor>> = { first: generatorFor('first'), second: generatorFor('second') };
+    const plugin = {
+        settings: { enableMCQ: true, mcqApiProvider: 'first' },
+        get mcqGenerationService() { return generators[this.settings.mcqApiProvider]; },
+        app: {
+            vault: {
+                getAbstractFileByPath: (path: string) => {
+                    const file = new TFile();
+                    file.path = path;
+                    file.basename = path;
+                    return file;
+                },
+                read: async () => 'the note',
+            },
+        },
+        savePluginData: async () => undefined,
+    };
+    const stored = new Map<string, MCQSet>();
+    const mcqService = {
+        getMCQSetForNote: (path: string) => stored.get(path),
+        saveMCQSet: (set: MCQSet) => { stored.set(set.notePath, set); },
+    };
+    const controller = new MCQController(plugin as unknown as SpaceforgePlugin, mcqService as never);
+
+    await controller.generateMCQs('notes/a.md', true);
+    plugin.settings.mcqApiProvider = 'second';
+    await controller.generateMCQs('notes/a.md', true);
+    assert.deepEqual(used, ['first', 'second']);
+});

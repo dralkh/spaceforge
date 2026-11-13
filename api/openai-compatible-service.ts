@@ -82,7 +82,6 @@ export class OpenAICompatibleService implements IMCQGenerationService {
                 headers,
                 body: JSON.stringify({
                     model: model,
-                    max_tokens: 2048,
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: prompt }

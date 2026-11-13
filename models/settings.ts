@@ -465,6 +465,13 @@ export interface SpaceforgeSettings {
     studyChartDefaultMigrated?: boolean;
 
     /**
+     * Set once the per-turn output cap has been cleared on an existing vault.
+     * Every vault saved before carries the old 2000 default explicitly, and
+     * that cap is what cut long answers off; a cap set afterwards sticks.
+     */
+    studyOutputCapMigrated?: boolean;
+
+    /**
      * Show the resulting interval on each grade button.
      * Default: true
      */
@@ -661,9 +668,10 @@ export interface SpaceforgeSettings {
     studyTemperature: number;
 
     /**
-     * Max output tokens per Study turn. Thinking models need headroom: they
-     * spend part of the budget on reasoning before they answer.
-     * Default: 2000
+     * Optional cap on output tokens per tutor turn; 0 means no cap, and the
+     * model's own maximum applies. Charting and Study material (visuals, mind
+     * map, summary) are never capped: a truncated JSON answer is a lost one.
+     * Default: 0
      */
     studyMaxTokens: number;
 
@@ -831,6 +839,15 @@ export function migrateSettings(settings: SpaceforgeSettings): boolean {
         changed = true;
     }
 
+    // The tutor's per-turn cap used to default to 2000 tokens and was written
+    // into every saved vault, so long answers kept failing after the default
+    // became "no cap". Clear it once; a cap the reader sets later stays.
+    if (!settings.studyOutputCapMigrated) {
+        settings.studyMaxTokens = 0;
+        settings.studyOutputCapMigrated = true;
+        changed = true;
+    }
+
     if (!settings.fsrsShortTermMigrated) {
         const params = { ...(settings.fsrsParameters ?? {}) } as Record<string, unknown>;
         params.enable_short_term = DEFAULT_SETTINGS.fsrsParameters.enable_short_term;
@@ -993,7 +1010,7 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     studyMaxObjectives: 24,
     studyTurnLimit: 24,
     studyTemperature: 0.4,
-    studyMaxTokens: 2000,
+    studyMaxTokens: 0,
     studyContextWindow: 8192,
     studyAutoRateNote: false,
     mcqGradingMode: 'ask',

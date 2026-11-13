@@ -138,7 +138,7 @@ const openAiMessageExtract = (response: Record<string, unknown>): string => {
         if (salvage) return salvage;
         throw new ChatClientError(
             choice?.finish_reason === 'length'
-                ? 'The model spent its whole token budget on reasoning before answering. Raise "Maximum output tokens per turn" in the Study settings (2000-4000 is reasonable for a thinking model).'
+                ? 'The model spent its whole output allowance on reasoning before answering. If "Maximum output tokens per turn" is set in the Study settings, clear it so the model can use its full length.'
                 : 'The model returned reasoning but no answer.'
         );
     }
@@ -157,6 +157,51 @@ const trimSlash = (value: string): string => (value.endsWith('/') ? value.slice(
  * latency and failed requests; remember the fact for this session.
  */
 const tokenLimitUnsupported = new Set<string>();
+
+/**
+ * The output cap sent to Claude when the caller asked for none. The Messages
+ * API refuses a request without `max_tokens`, so "no limit" has to be a
+ * number; this one is at or above every current model's ceiling, and a model
+ * whose ceiling is lower names it in its 400, which is then retried at it.
+ */
+export const CLAUDE_UNCAPPED_MAX_TOKENS = 64000;
+
+/**
+ * Highest output cap each provider/model pair has said it accepts, learned
+ * from a 400 that named it, so later turns ask within it the first time.
+ */
+const tokenCeilings = new Map<string, number>();
+
+/**
+ * The model's own output ceiling, when a refusal names it.
+ *
+ * Anthropic: "max_tokens: 64000 > 32000, which is the maximum allowed number
+ * of output tokens for …"; OpenAI-shaped: "… supports at most 16384
+ * completion tokens".
+ */
+export function statedTokenCeiling(text: string): number | null {
+    const match = /max_(?:completion_)?tokens:?\s*\d+\s*>\s*(\d+)/i.exec(text)
+        ?? /at most (\d+) (?:completion |output )?tokens/i.exec(text);
+    if (!match) return null;
+    const value = parseInt(match[1], 10);
+    return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** The same body asking for the ceiling the provider just named. */
+function clampedTokenLimit(
+    body: Record<string, unknown>,
+    status: number,
+    text: string
+): { body: Record<string, unknown>; ceiling: number } | null {
+    if (status !== 400) return null;
+    const field = typeof body.max_tokens === 'number'
+        ? 'max_tokens'
+        : typeof body.max_completion_tokens === 'number' ? 'max_completion_tokens' : null;
+    if (!field) return null;
+    const ceiling = statedTokenCeiling(text);
+    if (ceiling === null || ceiling >= (body[field] as number)) return null;
+    return { body: { ...body, [field]: ceiling }, ceiling };
+}
 
 /** Identity of a provider/model pair, for the token-cap capability cache. */
 export const chatModelKey = (label: string, model: string): string => `${label}\u0000${model}`;
@@ -266,6 +311,13 @@ export async function postOpenAiChat(
         delete body.max_tokens;
         delete body.max_completion_tokens;
     }
+    const knownCeiling = cacheKey ? tokenCeilings.get(cacheKey) : undefined;
+    if (knownCeiling !== undefined) {
+        for (const field of ['max_tokens', 'max_completion_tokens']) {
+            const value = body[field];
+            if (typeof value === 'number' && value > knownCeiling) body[field] = knownCeiling;
+        }
+    }
     const post = (payload: Record<string, unknown>) => requestUrl({
         url,
         method: 'POST',
@@ -274,13 +326,25 @@ export async function postOpenAiChat(
         throw: false,
     });
 
-    let response = await post(body);
+    let sent = body;
+    let response = await post(sent);
+
+    // A cap above the model's own ceiling is refused with the ceiling named.
+    // Asking for the longest answer the model can give is the point of the
+    // cap, so ask again at that ceiling — this is how Claude, which requires
+    // a cap, gets "no limit".
+    const clamped = clampedTokenLimit(sent, response.status, response.text ?? '');
+    if (clamped) {
+        if (cacheKey) tokenCeilings.set(cacheKey, clamped.ceiling);
+        sent = clamped.body;
+        response = await post(sent);
+    }
     if (!tokenFallback) return response;
 
     // A model can reject the token-limit spelling its endpoint's
     // documentation promised (an upstream route with different rules). Ask
     // once more with the other spelling before failing.
-    const retry = alternateTokenLimit(body, response.status, response.text ?? '');
+    const retry = alternateTokenLimit(sent, response.status, response.text ?? '');
     if (retry) {
         response = await post(retry);
         // The route may reject both spellings outright. The cap is an
@@ -425,7 +489,7 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
             if (typeof message?.thinking === 'string' && message.thinking.trim().length > 0) {
                 const salvaged = findJsonObject(message.thinking);
                 if (salvaged) return salvaged;
-                throw new ChatClientError('Ollama used the whole token budget on reasoning. Raise "Maximum output tokens per turn" in the Study settings.');
+                throw new ChatClientError('Ollama used the whole token budget on reasoning. If "Maximum output tokens per turn" is set in the Study settings, clear it; otherwise raise the context window for local models.');
             }
             throw new ChatClientError('Ollama returned an empty response.');
         },
@@ -498,7 +562,10 @@ const PROVIDERS: Partial<Record<ApiProvider, ProviderDescriptor>> = {
                 },
                 body: {
                     model: s.claudeModel,
-                    max_tokens: r.maxTokens ?? 2048,
+                    // The Messages API requires a cap. With none asked for,
+                    // ask for a long one; a model whose ceiling is lower says
+                    // so and `postOpenAiChat` retries at that ceiling.
+                    max_tokens: r.maxTokens ?? CLAUDE_UNCAPPED_MAX_TOKENS,
                     ...(typeof r.temperature === 'number' ? { temperature: r.temperature } : {}),
                     ...(system ? { system } : {}),
                     messages,

@@ -69,7 +69,7 @@ export class OpenAIHttpService implements IMCQGenerationService {
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: prompt },
             ],
-            maxTokens: 2048,
+            // No output cap: a capped answer loses the questions past the cut.
         });
 
         try {

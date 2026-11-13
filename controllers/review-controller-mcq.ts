@@ -22,22 +22,29 @@ export class MCQController {
      */
     private mcqService: MCQService;
 
+    /** A generator injected by tests; production leaves it unset. */
+    private fixedGenerationService: IMCQGenerationService | undefined;
+
     /**
-     * Reference to the MCQ generation service (e.g., OpenRouter, OpenAI)
+     * The generator for the provider selected now. Never captured at
+     * construction: a controller outlives a provider change, and one that kept
+     * the generator it was built with went on generating with the old provider.
      */
-    private mcqGenerationService: IMCQGenerationService;
+    private get mcqGenerationService(): IMCQGenerationService | undefined {
+        return this.fixedGenerationService ?? this.plugin.mcqGenerationService;
+    }
 
     /**
      * Initialize MCQ controller
-     * 
+     *
      * @param plugin Reference to the main plugin
      * @param mcqService Reference to the MCQ data service
-     * @param mcqGenerationService Reference to the MCQ generation service
+     * @param mcqGenerationService A fixed generator, for tests only
      */
-    constructor(plugin: SpaceforgePlugin, mcqService: MCQService, mcqGenerationService: IMCQGenerationService) {
+    constructor(plugin: SpaceforgePlugin, mcqService: MCQService, mcqGenerationService?: IMCQGenerationService) {
         this.plugin = plugin;
         this.mcqService = mcqService;
-        this.mcqGenerationService = mcqGenerationService;
+        this.fixedGenerationService = mcqGenerationService;
     }
 
     /**

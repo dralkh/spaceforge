@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createChatClient } from '../api/chat-client';
+import { CLAUDE_UNCAPPED_MAX_TOKENS, createChatClient, statedTokenCeiling } from '../api/chat-client';
 import { ApiProvider, DEFAULT_SETTINGS, SpaceforgeSettings } from '../models/settings';
 import { getDomainProfile } from '../models/study-domains';
 import { StudyVisualService } from '../services/study-visuals-service';
@@ -220,8 +220,49 @@ test('Study material reads the provider again after the settings change', async 
         assert.match(seen[1].url, /api\.openai\.com/, 'the next generation uses the new provider');
         const body = JSON.parse(seen[1].body ?? '{}') as Record<string, unknown>;
         assert.equal(body.model, 'gpt-6.1-sol');
-        assert.equal(body.max_completion_tokens, Math.max(6000, settings.studyMaxTokens * 4));
+        // Material is never capped: a cut-off answer is invalid JSON, a lost pack.
+        assert.equal(body.max_completion_tokens, undefined);
+        assert.equal(body.max_tokens, undefined);
     } finally {
         setRequestUrlStub(null);
     }
+});
+
+test('Claude with no cap asks for the longest answer, then retries at the ceiling the model names', async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    setRequestUrlStub(request => {
+        const body = JSON.parse(request.body ?? '{}') as Record<string, unknown>;
+        seen.push(body);
+        if ((body.max_tokens as number) > 32000) {
+            return {
+                status: 400,
+                text: JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: `max_tokens: ${String(body.max_tokens)} > 32000, which is the maximum allowed number of output tokens for claude-ceiling-test` } }),
+            };
+        }
+        return { status: 200, json: { content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' } };
+    });
+    try {
+        const client = createChatClient(settingsWith({
+            mcqApiProvider: ApiProvider.Claude,
+            claudeApiKey: 'k',
+            claudeModel: 'claude-ceiling-test',
+        }));
+        assert.ok(client);
+        assert.equal((await client.send({ messages: [{ role: 'user', content: 'hi' }] })).text, 'ok');
+        assert.equal(seen[0].max_tokens, CLAUDE_UNCAPPED_MAX_TOKENS, 'the first ask is uncapped in effect');
+        assert.equal(seen[1].max_tokens, 32000, 'the retry uses the model\'s own ceiling');
+
+        // The ceiling is remembered: the next turn does not fail first.
+        await client.send({ messages: [{ role: 'user', content: 'again' }] });
+        assert.equal(seen.length, 3);
+        assert.equal(seen[2].max_tokens, 32000);
+    } finally {
+        setRequestUrlStub(null);
+    }
+});
+
+test('a refusal is read for the ceiling it names, in both vendors\' wording', () => {
+    assert.equal(statedTokenCeiling('max_tokens: 64000 > 8192, which is the maximum allowed number of output tokens for claude-3-5-haiku'), 8192);
+    assert.equal(statedTokenCeiling('max_tokens is too large: 100000. This model supports at most 16384 completion tokens, whereas you provided 100000.'), 16384);
+    assert.equal(statedTokenCeiling('This model\'s maximum context length is 128000 tokens.'), null, 'a context limit is not an output ceiling');
 });

@@ -167,7 +167,25 @@ export default class SpaceforgePlugin extends Plugin {
     batchController: ReviewBatchController;
     reviewFlowController: ReviewFlowController;
     mcqController: MCQController | undefined;
-    mcqGenerationService: IMCQGenerationService | undefined; // Changed from openRouterService
+    /** The service last built, and the provider it was built for. */
+    private mcqGenerationCache: { provider: string; service: IMCQGenerationService } | null = null;
+
+    /**
+     * The question generator for the provider selected *now*.
+     *
+     * It used to be a field set once at load and on a few settings events, and
+     * every holder kept its own copy, so after a provider change generation kept
+     * going to the provider the reader had left. Resolved on every read, rebuilt
+     * whenever the selection differs from the one it was built for.
+     */
+    get mcqGenerationService(): IMCQGenerationService | undefined {
+        if (!this.settings?.enableMCQ) return undefined;
+        const provider = String(this.settings.mcqApiProvider);
+        if (this.mcqGenerationCache?.provider === provider) return this.mcqGenerationCache.service;
+        const service = this.createMcqGenerationService(false);
+        this.mcqGenerationCache = service ? { provider, service } : null;
+        return service;
+    }
     contextMenuHandler: ContextMenuHandler;
     // sidebarView: ReviewSidebarView; // Avoid storing direct references to views
     public clickedDateFromCalendar: Date | null = null;
@@ -1748,67 +1766,73 @@ export default class SpaceforgePlugin extends Plugin {
     addIcons(): void { /* ... */ }
 
     initializeMCQComponents(): void {
-        this.mcqGenerationService = undefined; // Clear previous instance
+        this.mcqGenerationCache = null;
         this.mcqController = undefined;
 
         if (this.settings.enableMCQ) {
-            this.mcqGenerationService = this.createMcqGenerationService();
-            if (this.mcqGenerationService) {
-                // Pass the mcqService for data management, and the new mcqGenerationService for API calls
-                this.mcqController = new MCQController(this, this.mcqService, this.mcqGenerationService);
+            // The controller asks for the generation service on every call, so
+            // it exists even while the provider is incomplete: a key pasted
+            // afterwards works without a reload.
+            this.mcqController = new MCQController(this, this.mcqService);
+            const service = this.createMcqGenerationService(true);
+            if (service) {
+                this.mcqGenerationCache = { provider: String(this.settings.mcqApiProvider), service };
             } else {
                 new Notice('Generation service could not be initialized. Check API provider settings in settings');
             }
         }
     }
 
-    private createMcqGenerationService(): IMCQGenerationService | undefined {
+    private createMcqGenerationService(notify = true): IMCQGenerationService | undefined {
+        // Reads resolve the service on every access, so only an explicit
+        // (re)initialisation may speak; a silent read must not raise notices.
+        const say = (message: string): void => { if (notify) new Notice(message); };
         switch (this.settings.mcqApiProvider) {
             case ApiProvider.OpenRouter:
                 if (!this.settings.openRouterApiKey) {
-                    new Notice('OpenRouter API key is not set in settings');
+                    say('OpenRouter API key is not set in settings');
                     return undefined;
                 }
                 return new OpenRouterService(this);
             case ApiProvider.OpenAI:
                 if (!this.settings.openaiApiKey) {
-                    new Notice('OpenAI API key is not set in settings');
+                    say('OpenAI API key is not set in settings');
                     return undefined;
                 }
                 return new OpenAIService(this);
             case ApiProvider.Ollama:
                 if (!this.settings.ollamaApiUrl || !this.settings.ollamaModel) {
-                    new Notice('Ollama API URL or model is not set in settings');
+                    say('Ollama API URL or model is not set in settings');
                     return undefined;
                 }
                 return new OllamaService(this);
             case ApiProvider.Gemini:
                 if (!this.settings.geminiApiKey) {
-                    new Notice('Gemini API key is not set in settings');
+                    say('Gemini API key is not set in settings');
                     return undefined;
                 }
                 return new GeminiService(this);
             case ApiProvider.Claude:
                 if (!this.settings.claudeApiKey || !this.settings.claudeModel) {
-                    new Notice('Claude API key or model is not set in settings');
+                    say('Claude API key or model is not set in settings');
                     return undefined;
                 }
                 return new ClaudeService(this);
             case ApiProvider.Together:
                 if (!this.settings.togetherApiKey || !this.settings.togetherModel) {
-                    new Notice('Together AI API key or model is not set in settings');
+                    say('Together AI API key or model is not set in settings');
                     return undefined;
                 }
                 return new TogetherService(this);
             case ApiProvider.OpenAICompatible:
                 if (!this.settings.openaiCompatibleApiUrl || !this.settings.openaiCompatibleModel) {
-                    new Notice('The provider needs a server address and a model.');
+                    say('The provider needs a server address and a model.');
                     return undefined;
                 }
                 return new OpenAICompatibleService(this);
             case ApiProvider.Cli:
                 if (!this.settings.cliAgent) {
-                    new Notice('No local CLI chosen yet.');
+                    say('No local CLI chosen yet.');
                     return undefined;
                 }
                 // The CLI brings its own login, so there is no key to check here;
@@ -1821,7 +1845,7 @@ export default class SpaceforgePlugin extends Plugin {
                 const agentId = agentIdOfProvider(this.settings.mcqApiProvider);
                 if (agentId) {
                     if (!getCliAgent(agentId)) {
-                        new Notice(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
+                        say(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
                         return undefined;
                     }
                     return new CliService(this);
@@ -1830,12 +1854,12 @@ export default class SpaceforgePlugin extends Plugin {
                 // OpenAI-shaped service, so a new company needs no case here.
                 const descriptor = getHttpProvider(this.settings.mcqApiProvider);
                 if (!descriptor || !providerIsOpenAiShaped(descriptor)) {
-                    new Notice(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
+                    say(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
                     return undefined;
                 }
                 const gap = describeProviderGap(descriptor, this.settings);
                 if (gap) {
-                    new Notice(gap);
+                    say(gap);
                     return undefined;
                 }
                 return new OpenAIHttpService(this, descriptor);

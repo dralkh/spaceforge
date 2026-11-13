@@ -218,6 +218,18 @@ test('background charting lands off, once, and a later choice sticks', () => {
     assert.equal(settings.studyAutoChart, false);
 });
 
+test('the old per-turn output cap is cleared once, and a later cap sticks', () => {
+    // Every saved vault carries the old 2000-token default explicitly; that
+    // cap is what cut long Study answers off.
+    const first = loadLegacy({ studyMaxTokens: 2000 });
+    assert.equal(first.settings.studyMaxTokens, 0, 'no cap after the upgrade');
+    assert.equal(first.settings.studyOutputCapMigrated, true);
+
+    first.settings.studyMaxTokens = 3000;
+    assert.equal(migrateSettings(first.settings), false);
+    assert.equal(first.settings.studyMaxTokens, 3000, 'a cap set afterwards is the reader\'s choice');
+});
+
 test('the FSRS parameters are corrected in the same pass, not the next launch', () => {
     const { settings, changed } = loadLegacy();
     assert.equal(changed, true);

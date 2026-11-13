@@ -7,6 +7,8 @@ import { StudyMode, StudySessionEvent } from '../models/study';
 import { DEFAULT_SETTINGS } from '../models/settings';
 import { repairStudyWorkspace } from '../models/study-workspace';
 import { StudyController } from '../controllers/study-controller';
+import { ApiProvider } from '../models/settings';
+import { setRequestUrlStub, StubRequestUrlRequest } from './support/obsidian-shim';
 
 const options = { mode: StudyMode.Guided, webSearch: false, turnLimit: 20, freshStart: false };
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
@@ -385,4 +387,34 @@ test('workspace retention keeps one live chat per objective and bounds the data'
     assert.ok(after < before, `${after} < ${before}`);
     const second = repairStudyWorkspace(repaired.workspace, new Set([a, b]));
     assert.equal(second.changed, false, 'pruning is idempotent');
+});
+
+test('a sitting follows a provider change on its next turn, and sends no output cap', async () => {
+    // The sitting outlives the settings screen. A client built when it opened
+    // kept sending every later turn to the provider the reader had left.
+    const seen: StubRequestUrlRequest[] = [];
+    const h = harness(); const s = h.make();
+    setRequestUrlStub(request => {
+        seen.push(request);
+        return { status: 200, json: { choices: [{ message: { content: response(s.getActiveObjectiveId()!).text }, finish_reason: 'stop' }] } };
+    });
+    const settings = (s as any).plugin.settings;
+    Object.assign(settings, { mcqApiProvider: ApiProvider.OpenAICompatible, openaiCompatibleApiUrl: 'http://first.test/v1', openaiCompatibleModel: 'first-model' });
+    try {
+        await s.start(); await s.flush();
+        assert.ok(seen.length >= 1);
+        assert.match(seen[seen.length - 1].url, /first\.test/);
+        const opening = JSON.parse(seen[seen.length - 1].body ?? '{}');
+        assert.equal(opening.max_tokens, undefined, 'no cap by default');
+
+        settings.openaiCompatibleApiUrl = 'http://second.test/v1';
+        settings.openaiCompatibleModel = 'second-model';
+        const before = seen.length;
+        await s.answer('yes'); await s.flush();
+        assert.ok(seen.length > before, 'the answer reached a model');
+        assert.match(seen[seen.length - 1].url, /second\.test/, 'the next turn goes to the provider selected now');
+        assert.equal(JSON.parse(seen[seen.length - 1].body ?? '{}').model, 'second-model');
+    } finally {
+        setRequestUrlStub(null);
+    }
 });

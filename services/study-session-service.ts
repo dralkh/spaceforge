@@ -96,7 +96,11 @@ export class StudySessionService {
     private plugin: SpaceforgePlugin;
     private planService: StudyPlanService;
     private searchService: StudyWebSearchService;
-    private chatClient: ChatClient | null;
+    /**
+     * A transport injected by tests and the live harness. Production leaves it
+     * null and builds a client from the current settings on every turn.
+     */
+    private chatClient: ChatClient | null = null;
 
     private notePath: string;
     private noteTitle: string;
@@ -154,7 +158,6 @@ export class StudySessionService {
         this.progress = planService.ensureProgress(plan);
         this.repairWorkspace();
         this.options = { ...options };
-        this.chatClient = createChatClient(plugin.settings);
         this.noteTitle = (notePath.split('/').pop() ?? notePath).replace(/\.md$/, '');
 
         for (const objective of plan.objectives) {
@@ -855,13 +858,10 @@ export class StudySessionService {
             const result = await chat.send({
                 messages,
                 temperature: Math.min(0.5, plugin.settings.studyTemperature),
-                // The output budget scales with the section: a thinking model
-                // asked to chart three thousand characters of clinical text can
-                // spend the whole of a flat budget on reasoning and then answer
+                // No output cap: a thinking model asked to chart a long section
+                // can spend any fixed budget on reasoning and then answer
                 // nothing, which is what made long notes seem impossible to
-                // chart. The setting is the floor, the cap keeps it valid for
-                // every provider.
-                maxTokens: Math.min(8192, Math.max(1200, plugin.settings.studyMaxTokens) + Math.ceil(section.text.length / 2)),
+                // chart. The model's own length is the only limit.
                 json: true,
                 contextWindow: plugin.settings.studyContextWindow,
             });
@@ -1112,7 +1112,10 @@ export class StudySessionService {
         try {
             try { await this.persist(); } catch (error) { storageFailed = true; request.status = 'failed'; this.checkpoint(); this.storageError(error); return; }
             if (generation !== this.generation) return;
-            const chat = this.chatClient;
+            // Built from the settings as they are now, every turn: a sitting
+            // outlives a provider change, and a client made when it opened kept
+            // talking to the provider the reader had already left.
+            const chat = this.chatClient ?? createChatClient(this.plugin.settings);
             if (!chat) {
                 const provider = inspectChatProvider(this.plugin.settings);
                 this.emit({ type: 'error', message: 'Study cannot reach a model.', detail: provider.reason ?? 'Check the API provider configuration in settings.' });
@@ -1144,7 +1147,8 @@ export class StudySessionService {
                     const result = await chat.send({
                         messages,
                         temperature: this.plugin.settings.studyTemperature,
-                        maxTokens: this.plugin.settings.studyMaxTokens,
+                        // 0 (the default) is no cap; a reader who set one keeps it.
+                        maxTokens: this.plugin.settings.studyMaxTokens > 0 ? this.plugin.settings.studyMaxTokens : undefined,
                         json: true,
                         contextWindow: this.plugin.settings.studyContextWindow,
                     });

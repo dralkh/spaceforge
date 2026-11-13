@@ -1,4 +1,5 @@
-import { Notice, requestUrl } from 'obsidian';
+import { Notice } from 'obsidian';
+import { CLAUDE_UNCAPPED_MAX_TOKENS, chatModelKey, postOpenAiChat } from './chat-client';
 import { CLAUDE, MCQS, MCQ, API } from '../ui/constants';
 import SpaceforgePlugin from '../main';
 import { MCQQuestion, MCQSet } from '../models/mcq';
@@ -95,23 +96,26 @@ export class ClaudeService implements IMCQGenerationService {
             : settings.mcqAdvancedSystemPrompt;
 
         try {
-            const response = await requestUrl({
-                url: 'https://api.anthropic.com/v1/messages',
-                method: 'POST',
-                headers: {
+            // The Messages API requires a cap; ask for the longest answer and
+            // let the shared POST retry at the model's own ceiling if lower.
+            const response = await postOpenAiChat(
+                'https://api.anthropic.com/v1/messages',
+                {
                     'Content-Type': 'application/json',
                     'x-api-key': apiKey,
                     'anthropic-version': '2023-06-01'
                 },
-                body: JSON.stringify({
+                {
                     model: model,
-                    max_tokens: 2048, // Adjust as needed
+                    max_tokens: CLAUDE_UNCAPPED_MAX_TOKENS,
                     system: systemPrompt,
                     messages: [
                         { role: 'user', content: prompt }
                     ]
-                })
-            });
+                },
+                chatModelKey(CLAUDE, model),
+                false
+            );
 
             if (response.status !== 200) {
                 const errorData = (response.json ?? { message: response.text }) as ClaudeErrorResponse;

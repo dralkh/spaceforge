@@ -283,7 +283,7 @@ provider you selected for a feature):
 
 **Access outside your vault.** The optional **Local agent CLI** provider runs a program that is
 already installed and signed in on your computer (for example `claude`, `codex`, `copilot`,
-`cursor-agent`, `agy`, `hermes`, `openclaw` or `opencode`). To do that it looks the program up on
+`cursor-agent`, `agy`, `hermes`, `openclaw`, `opencode` or `pi`). To do that it looks the program up on
 your `PATH` — which means
 reading directories such as `~/.local/bin` — runs it with the task's prompt, and reads what it
 prints. The program it starts inherits this application's environment, so anything already exported

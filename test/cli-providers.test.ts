@@ -36,6 +36,7 @@ import {
     listCliAgents,
     openclawAgent,
     opencodeAgent,
+    piAgent,
 } from '../api/cli/cli-agents';
 import { CliTurnError, isCliExecAvailable, parseCliOutput, runCliTurn } from '../api/cli/cli-runner';
 import { CliChatClient, flattenMessages } from '../api/cli/cli-chat-client';
@@ -231,6 +232,43 @@ test('openclawAgent.buildArgs: prompt in argv after --message, --json on', () =>
     assert.ok(args.includes('--message'), 'the prompt is delivered as a flag');
     assert.equal(args[args.indexOf('--message') + 1], 'the prompt');
     assert.ok(args.includes('--json'), 'stdout stays machine-readable');
+});
+
+test('piAgent.buildArgs: print mode with the prompt on stdin, and nothing that could act on the vault', () => {
+    const args = piAgent.buildArgs({ prompt: 'the prompt' });
+    assert.equal(args[0], '-p', 'print mode is the one-shot interface');
+    assert.ok(args.includes('--no-session'), 'a task needs no session file');
+    assert.ok(args.includes('--no-tools'), 'a text task gets no tools, built-in or MCP');
+    for (const flag of ['-ne', '-nc', '-ns', '-np', '--no-approve']) {
+        assert.ok(args.includes(flag), `${flag} keeps the machine\u2019s own prompt material out of the turn`);
+    }
+    assert.equal(args.includes('the prompt'), false, 'the prompt streams on stdin, never in argv');
+    assert.equal(piAgent.stdinPrompt !== false, true, 'the note travels on stdin');
+    assert.equal(args.includes('--model'), false, 'no model means the CLI\u2019s own default');
+
+    assert.deepEqual(
+        piAgent.buildArgs({ prompt: 'x', model: 'opencode-go/deepseek-v4.1-flash' }).slice(-2),
+        ['--model', 'opencode-go/deepseek-v4.1-flash'],
+    );
+});
+
+test('piAgent.listModels reads the provider/model column table', () => {
+    const table = [
+        'provider      model                       context  max-out  thinking  images',
+        'opencode-go   gemini-4-argon              1.0M     65.5K    yes       yes   ',
+        'openai-codex  gpt-6.1-sol                 500K     128K     yes       yes   ',
+        'llamacpp      Qwen3.5-9B                  65.5K    16.4K    yes       yes   ',
+        'openai-codex  gpt-6.1-sol                 500K     128K     yes       yes   ',
+        '',
+    ].join('\n');
+
+    assert.deepEqual(piAgent.listModels?.parse(table), [
+        { id: 'opencode-go/gemini-4-argon', label: 'gemini-4-argon (opencode-go)' },
+        { id: 'openai-codex/gpt-6.1-sol', label: 'gpt-6.1-sol (openai-codex)' },
+        { id: 'llamacpp/Qwen3.5-9B', label: 'Qwen3.5-9B (llamacpp)' },
+    ], 'the header is dropped, ids are provider-qualified, and a repeated row is not offered twice');
+
+    assert.deepEqual(piAgent.listModels?.parse('No models available. Try /login.\n'), [], 'prose is not a model');
 });
 
 // ------------------------------------------------------- 2. agent registry

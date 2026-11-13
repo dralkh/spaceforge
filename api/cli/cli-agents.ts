@@ -568,6 +568,74 @@ export const antigravityAgent: CliAgentDef = {
     ],
 };
 
+// -------------------------------------------------------------------------- Pi
+
+/**
+ * Pi (`pi`) — a terminal coding agent run in its print mode.
+ *
+ * `-p` is the one-shot interface: the prompt arrives on stdin, the final
+ * assistant text is the only thing on stdout, and errors go to stderr with a
+ * non-zero exit, which is exactly what `runCliTurn` already reads. Auth is
+ * whatever the reader set up with `pi` and `/login` (an OAuth account or an
+ * `*_API_KEY` variable), so nothing is nested here either.
+ *
+ * The rest of the flags keep a text task text-shaped: no tools (`--no-tools`),
+ * no session file (`--no-session`), and none of the machine's extensions,
+ * skills, prompt templates or `AGENTS.md` files (`-ne -ns -np -nc`) steering a
+ * prompt that only wants an answer back. `--no-approve` ignores trust-gated
+ * project configuration for the same reason, since headless mode has no one to
+ * approve it.
+ */
+export const piAgent: CliAgentDef = {
+    id: 'pi',
+    name: 'Pi',
+    bin: 'pi',
+    buildArgs: (options: CliInvokeOptions) => {
+        const args = ['-p', '--no-session', '--no-tools', '--no-approve', '-ne', '-nc', '-ns', '-np'];
+        if (wantsModel(options.model)) args.push('--model', options.model);
+        return args;
+    },
+    versionArgs: ['--version'],
+    streamFormat: 'raw-text',
+    stdinPrompt: true,
+    listModels: {
+        args: ['--list-models'],
+        parse: (output: string): CliModelEntry[] => {
+            // A column table: `provider  model  context  max-out  thinking  images`,
+            // two or more spaces between columns, one row per model. Pi selects a
+            // model by `provider/id`, which is what each row is turned into.
+            const models: CliModelEntry[] = [];
+            const seen = new Set<string>();
+            for (const line of String(output || '').split(/\r?\n/)) {
+                const match = /^([A-Za-z0-9][\w.-]*)\s{2,}(\S+)(?:\s{2,}|$)/.exec(line.trim());
+                if (!match) continue;
+                const [, provider, model] = match;
+                if (/^provider$/i.test(provider)) continue;
+                const id = `${provider}/${model}`;
+                if (seen.has(id)) continue;
+                seen.add(id);
+                models.push({ id, label: `${model} (${provider})` });
+            }
+            return models;
+        },
+    },
+    authFailurePatterns: [
+        ...COMMON_AUTH_FAILURE_PATTERNS,
+        /no (models?|providers?) (available|configured)/i,
+        /run `?\/login`?/i,
+    ],
+    // `pi auth check` needs a provider or model named, so there is no generic
+    // signed-in probe; `--list-models` above is the cheap readiness check.
+    loginCommand: 'pi',
+    loginGuidance:
+        'Pi is not signed in to a model provider. Run `pi` in a terminal, use `/login` (or export a provider key such as OPENROUTER_API_KEY), then Detect again. Spaceforge never sees those credentials.',
+    notFoundGuidance:
+        'The `pi` CLI was not found on your PATH. Install it (`npm install -g @earendil-works/pi-coding-agent`), run `pi` once and `/login`, then Detect again. Installing it after Obsidian started can hide it — restarting Obsidian picks up a new PATH.',
+    // Which models exist depends on the reader's own providers, so the live list
+    // above is the real answer; this is what to offer when that call fails.
+    catalogModels: [{ id: 'default', label: 'Default (as configured in Pi)' }],
+};
+
 export const CLI_AGENTS: CliAgentDef[] = [
     antigravityAgent,
     claudeAgent,
@@ -577,6 +645,7 @@ export const CLI_AGENTS: CliAgentDef[] = [
     hermesAgent,
     openclawAgent,
     opencodeAgent,
+    piAgent,
 ];
 
 const BY_ID = new Map(CLI_AGENTS.map(agent => [agent.id, agent]));
