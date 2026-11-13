@@ -49,6 +49,9 @@
  */
 
 import { StudyFlow, StudyFlowStep, StudyMatrix, StudySummary, StudyTimeline, StudyTimelineEntry, StudyVisual } from '../models/study-visuals';
+import type { AloudSegmentSummaryTarget } from '../services/tts/study-aloud-converter';
+
+const ACTIVE_TTS_CLS = 'sf-tts-active-segment';
 
 /** The tag that marks the line the reader should leave with. */
 const PEARL_TAG = 'Pearl';
@@ -1245,10 +1248,14 @@ export class StudyVisualBoardView {
  */
 export class StudySummaryView {
     private root: HTMLElement | null = null;
+    private headEl: HTMLElement | null = null;
+    private keptEl: HTMLElement | null = null;
     private toggle: HTMLButtonElement | null = null;
     private bullets: HTMLElement[] = [];
+    private childItems: HTMLElement[][] = [];
     private pearlCount = 0;
     private pearlsOnly = false;
+    private highlightedEl: HTMLElement | null = null;
 
     mount(container: HTMLElement, summary: StudySummary): () => void {
         this.unmount();
@@ -1256,6 +1263,7 @@ export class StudySummaryView {
         this.root = root;
 
         const head = root.createDiv('sf-sum-head');
+        this.headEl = head;
         head.createDiv({ cls: 'sf-sum-title', text: summary.title });
         head.createDiv({ cls: 'sf-sum-count', text: summaryCountLine(summary) });
 
@@ -1279,22 +1287,65 @@ export class StudySummaryView {
             mark.setAttribute('aria-hidden', 'true');
             const main = item.createDiv('sf-sum-main');
             main.createSpan({ cls: 'sf-sum-text', text: bullet.text });
+            const bulletChildren: HTMLElement[] = [];
             if (bullet.children && bullet.children.length > 0) {
                 const children = main.createEl('ul', { cls: 'sf-sum-children' });
-                for (const child of bullet.children) children.createEl('li', { cls: 'sf-sum-child', text: child });
+                for (const child of bullet.children) {
+                    bulletChildren.push(children.createEl('li', { cls: 'sf-sum-child', text: child }));
+                }
             }
+            this.childItems.push(bulletChildren);
             this.bullets.push(item);
         }
 
-        if (summary.kept) root.createDiv({ cls: 'sf-sum-kept', text: summary.kept });
+        if (summary.kept) {
+            this.keptEl = root.createDiv({ cls: 'sf-sum-kept', text: summary.kept });
+        }
 
         return () => this.unmount();
     }
 
+    isPearlsOnly(): boolean {
+        return this.pearlsOnly;
+    }
+
+    highlightTtsTarget(target: AloudSegmentSummaryTarget | null, autoScroll = true): void {
+        if (this.highlightedEl) {
+            this.highlightedEl.removeClass(ACTIVE_TTS_CLS);
+            this.highlightedEl = null;
+        }
+        if (!target) return;
+
+        let candidate: HTMLElement | null = null;
+        if (target.kind === 'title') {
+            candidate = this.headEl;
+        } else if (target.kind === 'kept') {
+            candidate = this.keptEl;
+        } else if (target.kind === 'bullet' && typeof target.bulletIndex === 'number') {
+            candidate = this.bullets[target.bulletIndex] ?? null;
+        } else if (
+            target.kind === 'child' &&
+            typeof target.bulletIndex === 'number' &&
+            typeof target.childIndex === 'number'
+        ) {
+            candidate = this.childItems[target.bulletIndex]?.[target.childIndex] ?? null;
+        }
+        if (!candidate) return;
+        candidate.addClass(ACTIVE_TTS_CLS);
+        this.highlightedEl = candidate;
+        if (autoScroll) {
+            candidate.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
     unmount(): void {
+        this.highlightTtsTarget(null, false);
         this.toggle?.removeEventListener('click', this.onToggleClick);
         this.toggle = null;
+        this.headEl = null;
+        this.keptEl = null;
         this.bullets = [];
+        this.childItems = [];
         this.pearlCount = 0;
         this.pearlsOnly = false;
         this.root?.remove();

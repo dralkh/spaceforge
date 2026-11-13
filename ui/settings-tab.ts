@@ -28,6 +28,7 @@ import {
 } from '../api/provider-registry';
 import { ModelSuggest } from './model-suggest';
 import { ConfirmationModal } from './confirmation-modal';
+import { renderTtsSettingsSection } from './settings/tts-settings';
 import SpaceforgePlugin from '../main';
 import { ApiProvider, DEFAULT_SETTINGS, MCQQuestionAmountMode, MCQDifficulty, ProviderId, SpaceforgeSettings, StudySearchProvider, StudyExpertise } from '../models/settings';
 import { SpaceforgePluginData, DEFAULT_PLUGIN_STATE_DATA, PluginStateData } from '../models/plugin-data';
@@ -1874,6 +1875,10 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                         ? `Spaceforge: took ${after - before} note(s) from the vault’s copy.`
                         : 'Spaceforge: nothing new in the vault’s copy.', 6000);
                 }));
+
+        // ========= TEXT-TO-SPEECH (TTS) SECTION =========
+        const ttsSection = createCollapsible('Text-to-speech (aloud)', 'volume-2', false);
+        renderTtsSettingsSection(ttsSection, this.plugin);
 
         // ========= DATA MANAGEMENT SECTION =========
         const dataSection = createCollapsible('Data management', 'database', false);

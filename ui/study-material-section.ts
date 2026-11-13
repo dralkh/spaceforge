@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 import { StudyVisualPack } from '../models/study-visuals';
+import type { AloudSegment } from '../services/tts/study-aloud-converter';
 import { StudyMindMapView } from './study-mindmap';
 import { StudySummaryView } from './study-visual-board';
 import { StudyGalleryAssetState, StudyVisualGalleryView } from './study-visual-gallery';
@@ -39,19 +40,29 @@ export interface StudyMaterialHost {
     generate: () => Promise<StudyVisualPack | null>;
     state?: StudyMaterialState;
     saveState?: () => void;
+    onReadAloud?: (view: StudyMaterialView) => void;
+}
+
+interface MountedMaterialSurface {
+    el: HTMLElement;
+    teardown: () => void;
+    mindMapView?: StudyMindMapView;
+    galleryView?: StudyVisualGalleryView;
+    summaryView?: StudySummaryView;
 }
 
 export class StudyMaterialSection {
     private rootEl: HTMLElement | null = null;
     private stateEl: HTMLElement | null = null;
     private generateEl: HTMLButtonElement | null = null;
+    private listenEl: HTMLButtonElement | null = null;
     private tabs = new Map<StudyMaterialView, HTMLButtonElement>();
     private hostEl: HTMLElement | null = null;
     private teardown: (() => void) | null = null;
     private view: StudyMaterialView = 'mindmap';
     private busy = false;
     private host: StudyMaterialHost | null = null;
-    private surfaces = new Map<StudyMaterialView, { el: HTMLElement; teardown: () => void }>();
+    private surfaces = new Map<StudyMaterialView, MountedMaterialSurface>();
     private renderedPack: StudyVisualPack | null = null;
     private externalNavigation = false;
 
@@ -64,6 +75,16 @@ export class StudyMaterialSection {
         const head = this.rootEl.createDiv('sf-study-material-head');
         head.createDiv({ cls: 'sf-study-section-title', text: 'Study material' });
         this.stateEl = head.createDiv('sf-study-material-state');
+        if (host.onReadAloud) {
+            this.listenEl = head.createEl('button', {
+                cls: 'sf-btn sf-study-material-listen',
+                attr: { type: 'button', title: 'Read current study material aloud' },
+            });
+            const icon = this.listenEl.createSpan('sf-study-material-listen-icon');
+            setIcon(icon, 'volume-2');
+            this.listenEl.createSpan({ text: 'Listen' });
+            this.listenEl.addEventListener('click', () => this.host?.onReadAloud?.(this.view));
+        }
         this.generateEl = head.createEl('button', { cls: 'sf-btn sf-study-material-generate' });
         this.generateEl.addEventListener('click', () => void this.make());
 
@@ -118,7 +139,57 @@ export class StudyMaterialSection {
             if (pending) this.generateEl.setAttribute('disabled', 'true');
         }
         if (this.busy) this.generateEl.setAttribute('disabled', 'true');
+        if (this.listenEl) {
+            this.listenEl.disabled = !pack;
+        }
         this.show();
+    }
+
+    getView(): StudyMaterialView {
+        return this.view;
+    }
+
+    isSummaryPearlsOnly(): boolean {
+        return this.surfaces.get('summary')?.summaryView?.isPearlsOnly() ?? false;
+    }
+
+    highlightTtsSegment(segment: AloudSegment | null, autoScroll = true): void {
+        if (!segment) {
+            this.clearTtsHighlight();
+            return;
+        }
+        const targetView: StudyMaterialView | null =
+            segment.targetSurface === 'mindmap'
+                ? 'mindmap'
+                : segment.targetSurface === 'visualize'
+                  ? 'board'
+                  : segment.targetSurface === 'summary'
+                    ? 'summary'
+                    : null;
+
+        if (!targetView) {
+            this.clearTtsHighlight();
+            return;
+        }
+        if (this.view !== targetView) {
+            this.setView(targetView);
+        }
+        const activeSurface = this.surfaces.get(targetView);
+        if (!activeSurface) return;
+
+        if (targetView === 'mindmap' && activeSurface.mindMapView && segment.mindMapTarget) {
+            activeSurface.mindMapView.highlightTtsNode(segment.mindMapTarget, autoScroll);
+        } else if (targetView === 'board' && activeSurface.galleryView && segment.visualTarget) {
+            activeSurface.galleryView.highlightTtsTarget(segment.visualTarget, autoScroll);
+        } else if (targetView === 'summary' && activeSurface.summaryView && segment.summaryTarget) {
+            activeSurface.summaryView.highlightTtsTarget(segment.summaryTarget, autoScroll);
+        }
+    }
+
+    clearTtsHighlight(): void {
+        this.surfaces.get('mindmap')?.mindMapView?.highlightTtsNode(null, false);
+        this.surfaces.get('board')?.galleryView?.highlightTtsTarget(null, false);
+        this.surfaces.get('summary')?.summaryView?.highlightTtsTarget(null, false);
     }
 
     /** The one surface that is on screen, and the old one always torn down. */
@@ -173,11 +244,27 @@ export class StudyMaterialSection {
             for (const existing of Object.keys(states.packs)) if (existing !== key) delete states.packs[existing];
         }
         const save = () => this.host?.saveState?.();
-        let teardown: () => void;
-        if (this.view === 'mindmap') teardown = new StudyMindMapView({ state: state.map, onStateChange: value => { state.map = value; save(); } }).mount(surface, pack.mindMap);
-        else if (this.view === 'board') teardown = new StudyVisualGalleryView().mount(surface, pack.visuals, { open: state.gallery, assets: state.assets ??= {}, onChange: value => { state.gallery = value; save(); }, onAssetChange: save });
-        else teardown = new StudySummaryView().mount(surface, pack.summary);
-        this.surfaces.set(this.view, { el: surface, teardown });
+        let entry: MountedMaterialSurface;
+        if (this.view === 'mindmap') {
+            const mindMapView = new StudyMindMapView({
+                state: state.map,
+                onStateChange: value => { state.map = value; save(); },
+            });
+            entry = { el: surface, teardown: mindMapView.mount(surface, pack.mindMap), mindMapView };
+        } else if (this.view === 'board') {
+            const galleryView = new StudyVisualGalleryView();
+            const teardown = galleryView.mount(surface, pack.visuals, {
+                open: state.gallery,
+                assets: state.assets ??= {},
+                onChange: value => { state.gallery = value; save(); },
+                onAssetChange: save,
+            });
+            entry = { el: surface, teardown, galleryView };
+        } else {
+            const summaryView = new StudySummaryView();
+            entry = { el: surface, teardown: summaryView.mount(surface, pack.summary), summaryView };
+        }
+        this.surfaces.set(this.view, entry);
     }
 
     /**
@@ -225,6 +312,7 @@ export class StudyMaterialSection {
         this.rootEl = null;
         this.stateEl = null;
         this.generateEl = null;
+        this.listenEl = null;
         this.hostEl = null;
         this.host = null;
     }

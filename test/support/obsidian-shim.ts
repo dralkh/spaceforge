@@ -336,6 +336,7 @@ export interface StubRequestUrlResponse {
     status: number;
     json?: unknown;
     text?: string;
+    arrayBuffer?: ArrayBuffer;
     headers?: Record<string, string>;
 }
 

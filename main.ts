@@ -75,6 +75,7 @@ import { StudyVisualService } from './services/study-visuals-service';
 import { StudyWebSearchService } from './services/study-web-search-service';
 import { StudyController } from './controllers/study-controller';
 import { StudyChartQueueService } from './services/study-chart-queue-service';
+import { TtsPlayerService } from './services/tts/tts-player-service';
 
 /**
  * Spaceforge: Spaced Repetition Plugin for Obsidian
@@ -145,6 +146,7 @@ export default class SpaceforgePlugin extends Plugin {
     studyWebSearchService: StudyWebSearchService;
     studyController: StudyController;
     studyChartQueue: StudyChartQueueService;
+    ttsService: TtsPlayerService;
 
 
     /**
@@ -275,6 +277,7 @@ export default class SpaceforgePlugin extends Plugin {
         // Study needs loaded settings (provider, search backend, limits)
         this.studyWebSearchService = new StudyWebSearchService(this);
         this.studyController = new StudyController(this, this.studyPlanService, this.studyWebSearchService);
+        this.ttsService = TtsPlayerService.fromPlugin(this);
 
         // Background charting: the queue is re-derived from the review schedule,
         // so it needs no persistence and cannot drift from the vault.
@@ -543,6 +546,7 @@ export default class SpaceforgePlugin extends Plugin {
         // The review bar and the dock are ours; without this they outlive the
         // plugin and the next enable puts a second copy beside the first.
         this.reviewFlowController?.dispose();
+        this.ttsService?.destroy();
 
         // Explicitly remove the global event listener
         if (this.beforeUnloadHandler) {
@@ -1759,6 +1763,67 @@ export default class SpaceforgePlugin extends Plugin {
                 if (!this.reviewFlowController.isActive()) return false;
                 if (!checking) this.reviewFlowController.end();
                 return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'tts-read-aloud-review',
+            name: 'Read aloud current review note or study material',
+            checkCallback: (checking: boolean) => {
+                const dock = this.reviewFlowController?.getDock();
+                const file = this.activeMarkdownFile();
+                if (!dock && !file) return false;
+                if (!checking) {
+                    if (dock) {
+                        void dock.readAloud('auto');
+                    } else if (file) {
+                        void this.app.vault.cachedRead(file).then(markdown =>
+                            this.ttsService.playNoteContent({
+                                title: file.basename,
+                                notePath: file.path,
+                                markdown,
+                            }),
+                        );
+                    }
+                }
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: 'tts-toggle-play-pause',
+            name: 'Pause or resume reading aloud',
+            callback: () => void this.ttsService.togglePlayPause(),
+        });
+
+        this.addCommand({
+            id: 'tts-next-chunk',
+            name: 'Skip to next aloud chunk',
+            callback: () => void this.ttsService.next(),
+        });
+
+        this.addCommand({
+            id: 'tts-prev-chunk',
+            name: 'Skip to previous aloud chunk',
+            callback: () => void this.ttsService.previous(),
+        });
+
+        this.addCommand({
+            id: 'tts-stop',
+            name: 'Stop reading aloud',
+            callback: () => this.ttsService.stop(),
+        });
+
+        this.addCommand({
+            id: 'tts-toggle-autoscroll',
+            name: 'Toggle aloud auto-scroll',
+            callback: () => {
+                const cur = this.ttsService.getSnapshot();
+                if (cur.autoScrollPausedByUser || !this.settings.tts.autoScroll) {
+                    this.ttsService.resumeAutoScroll();
+                } else {
+                    this.ttsService.setAutoScroll(false);
+                }
             },
         });
     }

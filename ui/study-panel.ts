@@ -23,6 +23,7 @@ import { StudyBriefing, StudyCommand, StudySessionService } from '../services/st
 import { StudyPlanService } from '../services/study-plan-service';
 import { StudyVisualPack } from '../models/study-visuals';
 import { StudyMaterialHost, StudyMaterialSection, StudyMaterialState, StudyMaterialView, studyPackStateKey } from './study-material-section';
+import type { AloudSegment } from '../services/tts/study-aloud-converter';
 import {
     MODE_CHOICES,
     STATUS_LABELS,
@@ -49,6 +50,8 @@ export interface StudyPanelOptions {
     onSessionEnd?: (payload: StudySummaryPayload) => void;
     /** Called when the panel wants more room (host expands itself). */
     onRequestSpace?: () => void;
+    /** Called when reader triggers aloud reading directly from a material section. */
+    onReadAloud?: (view: StudyMaterialView) => void;
 }
 
 /**
@@ -113,6 +116,8 @@ export class StudyPanel {
     private materialEl: HTMLElement | null = null;
     private viewButtons = new Map<string, HTMLButtonElement>();
     private activeView: 'learn' | StudyMaterialView = 'learn';
+    private pendingWorkspaceView: 'learn' | StudyMaterialView | null = null;
+    private pendingTtsHighlight: { segment: AloudSegment | null; autoScroll: boolean } | null = null;
     private viewState: WorkspaceViewState = {};
     private workspaceProgress: HTMLElement | null = null;
     private objectiveChooser: HTMLSelectElement | null = null;
@@ -340,7 +345,8 @@ export class StudyPanel {
         if (savedWorkspace?.changed) this.saveWorkspace();
         this.viewState = store?.workspace?.viewState ?? {};
         this.pruneViewState();
-        this.activeView = this.viewState.activeView ?? 'learn';
+        this.activeView = this.pendingWorkspaceView ?? this.viewState.activeView ?? 'learn';
+        this.pendingWorkspaceView = null;
         this.buildWorkspace();
         this.renderBriefing();
         const workspace = store?.workspace;
@@ -392,6 +398,11 @@ export class StudyPanel {
         this.learningEl = host.createDiv('sf-study-workspace-learn');
         this.materialEl = host.createDiv('sf-study-workspace-material');
         this.switchWorkspaceView(this.activeView, false);
+        if (this.pendingTtsHighlight) {
+            const pending = this.pendingTtsHighlight;
+            this.pendingTtsHighlight = null;
+            this.highlightTtsSegment(pending.segment, pending.autoScroll);
+        }
     }
 
     private switchWorkspaceView(view: 'learn' | StudyMaterialView, capture = true): void {
@@ -514,6 +525,7 @@ export class StudyPanel {
             generate: () => this.generateVisuals(),
             state: this.viewState.material ??= {},
             saveState: () => this.saveWorkspace(),
+            onReadAloud: view => this.options.onReadAloud?.(view),
         };
         section.mount(card, host, { externalNavigation: true });
     }
@@ -1751,5 +1763,83 @@ export class StudyPanel {
             void this.plugin.getSidebarView()?.refresh();
         }
         if (!restored) this.options.onSessionEnd?.(payload);
+    }
+
+    getActiveWorkspaceView(): 'learn' | StudyMaterialView {
+        return this.activeView;
+    }
+
+    setWorkspaceView(view: 'learn' | StudyMaterialView): void {
+        if (this.learningEl && this.materialEl) {
+            this.pendingWorkspaceView = null;
+            this.switchWorkspaceView(view);
+        } else {
+            this.activeView = view;
+            this.pendingWorkspaceView = view;
+        }
+    }
+
+    getVisualPack(): StudyVisualPack | null {
+        return this.materialSnapshot().pack;
+    }
+
+    isSummaryPearlsOnly(): boolean {
+        return this.materialSection?.isSummaryPearlsOnly() ?? false;
+    }
+
+    getTutorTurns(): Array<{ role: string; text: string }> {
+        return this.session?.getVisibleTranscript?.() ?? [];
+    }
+
+    getNoteContent(): string {
+        return this.content;
+    }
+
+    highlightTtsSegment(segment: AloudSegment | null, autoScroll = true): void {
+        if (!this.learningEl || !this.materialEl) {
+            this.pendingTtsHighlight = segment ? { segment, autoScroll } : null;
+            return;
+        }
+        this.pendingTtsHighlight = null;
+        if (this.streamEl) {
+            for (const kid of Array.from(this.streamEl.children ?? [])) {
+                (kid as HTMLElement).removeClass?.('sf-tts-active-segment');
+            }
+        }
+        if (!segment) {
+            this.materialSection?.clearTtsHighlight();
+            return;
+        }
+        if (
+            segment.targetSurface === 'mindmap' ||
+            segment.targetSurface === 'visualize' ||
+            segment.targetSurface === 'summary'
+        ) {
+            const targetView: StudyMaterialView =
+                segment.targetSurface === 'visualize' ? 'board' : segment.targetSurface;
+            if (this.activeView !== targetView) {
+                this.setWorkspaceView(targetView);
+            }
+            this.materialSection?.highlightTtsSegment(segment, autoScroll);
+            return;
+        }
+        if (segment.targetSurface === 'tutor') {
+            this.materialSection?.clearTtsHighlight();
+            if (this.activeView !== 'learn') {
+                this.setWorkspaceView('learn');
+            }
+            if (this.streamEl && typeof segment.tutorTurnIndex === 'number') {
+                const bubbles = Array.from(this.streamEl.children ?? []).filter(el =>
+                    (el as HTMLElement).hasClass?.('sf-study-turn'),
+                ) as HTMLElement[];
+                const target = bubbles[segment.tutorTurnIndex];
+                if (target) {
+                    target.addClass('sf-tts-active-segment');
+                    if (autoScroll) {
+                        target.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            }
+        }
     }
 }

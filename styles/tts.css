@@ -1,0 +1,174 @@
+/* Spaceforge - Text-to-Speech (TTS) player bar, settings, and live reading highlights */
+
+.sf-dock-tts {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.sf-tts-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 8px;
+  font-size: var(--sf-font-ui);
+}
+
+.sf-tts-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sf-space-xs);
+}
+
+.sf-tts-play-btn,
+.sf-tts-icon-btn,
+.sf-tts-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 6px;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--sf-font-small);
+  cursor: pointer;
+}
+
+.sf-tts-play-btn:hover:not(:disabled),
+.sf-tts-icon-btn:hover:not(:disabled),
+.sf-tts-chip-btn:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+}
+
+.sf-tts-play-btn:disabled,
+.sf-tts-icon-btn:disabled,
+.sf-tts-chip-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sf-tts-bar.is-playing .sf-tts-play-btn {
+  border-color: var(--sf-primary);
+  color: var(--sf-primary);
+}
+
+.sf-tts-bar.is-loading .sf-tts-play-btn {
+  border-color: var(--sf-warning);
+}
+
+.sf-tts-bar.is-error .sf-tts-caption {
+  color: var(--sf-danger);
+}
+
+.sf-tts-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sf-tts-btn-icon svg,
+.sf-tts-icon-btn svg,
+.sf-study-material-listen-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sf-tts-source {
+  height: 24px;
+  padding: 0 6px;
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--sf-font-small);
+}
+
+.sf-tts-follow-btn.is-on {
+  border-color: var(--sf-primary);
+  color: var(--sf-primary);
+}
+
+.sf-tts-follow-btn.is-paused {
+  border-color: var(--sf-warning);
+  color: var(--sf-warning);
+}
+
+.sf-tts-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sf-space-sm);
+  min-width: 0;
+  font-size: var(--sf-font-small);
+  color: var(--sf-text-muted);
+}
+
+.sf-tts-caption {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sf-tts-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-tts-progress {
+  height: 2px;
+  width: 100%;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sf-tts-progress-fill {
+  height: 100%;
+  width: var(--sf-tts-progress, 0%);
+  background: var(--sf-primary);
+  transition: width var(--sf-transition-fast);
+}
+
+/* Listen button inside Study Material header */
+.sf-study-material-listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sf-study-material-listen-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Active speech highlight across note, summary, mind map, visualize cards, and study tutor */
+.sf-tts-active-segment {
+  outline: 2px solid var(--sf-primary);
+  outline-offset: 1px;
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 84%);
+  border-radius: var(--sf-radius-sm);
+  transition: background-color var(--sf-transition-fast), outline-color var(--sf-transition-fast);
+}
+
+.sf-mm-node.sf-tts-active-segment {
+  box-shadow: 0 0 0 2px var(--sf-primary);
+}
+
+.sf-vg-card.sf-tts-active-card {
+  border-color: var(--sf-primary);
+}
+
+.sf-tts-settings-status {
+  margin-bottom: var(--sf-space-sm);
+}
+
+.sf-tts-provider-slot {
+  margin-top: var(--sf-space-xs);
+}

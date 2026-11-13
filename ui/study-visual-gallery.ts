@@ -1,10 +1,27 @@
 import { setIcon } from 'obsidian';
 import { StudyVisual } from '../models/study-visuals';
+import type { AloudSegmentVisualTarget } from '../services/tts/study-aloud-converter';
 import { StudyVisualBoardView } from './study-visual-board';
 import { StudyVisualDiagramView } from './study-visual-diagram';
 import { StudyVisualGraphView } from './study-visual-graph';
 import { StudyVisualLabView } from './study-visual-lab';
 import { StudySequenceState, StudyVisualSequenceView } from './study-visual-sequence';
+
+const ACTIVE_TTS_CLS = 'sf-tts-active-segment';
+
+function collectByClass(root: HTMLElement, cls: string): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    const visit = (node: HTMLElement) => {
+        if (node.classList?.contains(cls)) out.push(node);
+        const kids = node.children;
+        if (!kids) return;
+        for (let i = 0; i < kids.length; i++) {
+            visit(kids[i] as HTMLElement);
+        }
+    };
+    visit(root);
+    return out;
+}
 
 export interface StudyGalleryAssetState { lab?: Record<string, number>; sequence?: StudySequenceState }
 export interface StudyGalleryState {
@@ -50,6 +67,9 @@ export class StudyVisualGalleryView {
     private state: StudyGalleryState = {};
     private closers = new Map<HTMLElement, () => void>();
     private collapseAllEl: HTMLButtonElement | null = null;
+    private cardsByIndex: Array<{ card: HTMLElement; body: HTMLElement; openCard: () => void }> = [];
+    private highlightedEl: HTMLElement | null = null;
+    private highlightedCard: HTMLElement | null = null;
 
     /** Mount the gallery; returns its teardown. */
     mount(container: HTMLElement, visuals: StudyVisual[], state: StudyGalleryState = {}): () => void {
@@ -128,6 +148,18 @@ export class StudyVisualGalleryView {
             teardown = null;
         });
         this.closers.set(card, () => setOpen(false));
+        this.cardsByIndex[index] = {
+            card,
+            body,
+            openCard: () => {
+                if (!this.open.has(key)) {
+                    this.open.add(key);
+                    this.onChange?.([...this.open]);
+                    setOpen(true);
+                    this.updateToolbar();
+                }
+            },
+        };
         head.addEventListener('click', () => {
             const nowOpen = !this.open.has(key);
             if (nowOpen) this.open.add(key);
@@ -150,6 +182,69 @@ export class StudyVisualGalleryView {
         if (this.collapseAllEl) this.collapseAllEl.disabled = this.open.size === 0;
     }
 
+    /** Open the card (if collapsed), highlight the active educational piece, and scroll into view. */
+    highlightTtsTarget(target: AloudSegmentVisualTarget | null, autoScroll = true): void {
+        if (this.highlightedEl) {
+            this.highlightedEl.removeClass(ACTIVE_TTS_CLS);
+            this.highlightedEl = null;
+        }
+        if (this.highlightedCard) {
+            this.highlightedCard.removeClass('sf-tts-active-card');
+            this.highlightedCard = null;
+        }
+        if (!target) return;
+
+        const entry = this.cardsByIndex[target.visualIndex];
+        if (!entry) return;
+        entry.openCard();
+
+        entry.card.addClass('sf-tts-active-card');
+        this.highlightedCard = entry.card;
+
+        let candidate: HTMLElement | null = null;
+        const { subRole, visualKind, itemIndex } = target;
+        if (subRole === 'intro') {
+            candidate =
+                collectByClass(entry.body, 'sf-vb-teach')[0] ??
+                collectByClass(entry.body, 'sf-lab-teach')[0] ??
+                collectByClass(entry.body, 'sf-vd-teach')[0] ??
+                collectByClass(entry.body, 'sf-vsq-teach')[0] ??
+                collectByClass(entry.body, 'sf-graph-teach')[0] ??
+                collectByClass(entry.card, 'sf-vg-head')[0] ??
+                entry.card;
+        } else if (subRole === 'pearl') {
+            candidate =
+                collectByClass(entry.body, 'sf-vb-pearl')[0] ??
+                collectByClass(entry.body, 'sf-lab-pearl')[0] ??
+                collectByClass(entry.body, 'sf-vd-pearl')[0] ??
+                collectByClass(entry.body, 'sf-graph-pearl')[0] ??
+                entry.card;
+        } else if (subRole === 'verdict') {
+            candidate = collectByClass(entry.body, 'sf-lab-presets')[0] ?? entry.body;
+        } else if (subRole === 'item' && typeof itemIndex === 'number') {
+            const clsByKind: Record<string, string> = {
+                matrix: 'sf-vb-row',
+                compare: 'sf-vb-row',
+                flow: 'sf-vb-step',
+                cycle: 'sf-vb-ring-step',
+                timeline: 'sf-vb-tl-entry',
+                lab: 'sf-lab-output',
+                diagram: 'sf-vd-chip',
+                sequence: 'sf-vsq-card',
+                graph: 'sf-graph-legend-item',
+            };
+            const list = collectByClass(entry.body, clsByKind[visualKind] ?? '');
+            candidate = list[itemIndex] ?? entry.card;
+        }
+
+        const focusEl = candidate ?? entry.card;
+        focusEl.addClass(ACTIVE_TTS_CLS);
+        this.highlightedEl = focusEl;
+        if (autoScroll) {
+            focusEl.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
     /** One asset, in the renderer that owns its kind. */
     private mountAsset(body: HTMLElement, visual: StudyVisual): () => void {
         const assets = this.state.assets ??= {};
@@ -169,6 +264,8 @@ export class StudyVisualGalleryView {
     }
 
     private destroy(): void {
+        this.highlightTtsTarget(null, false);
+        this.cardsByIndex = [];
         for (const teardown of this.cardTeardowns.values()) {
             try {
                 teardown();

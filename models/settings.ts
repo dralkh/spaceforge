@@ -1,4 +1,5 @@
 import { DeckSessionPlacement, ReviewInterfaceMode, ReviewSessionHost, ReviewSessionPlacement } from './review-flow';
+import { DEFAULT_TTS_SETTINGS, normalizeTtsSettings, TtsSettings } from './tts';
 
 /**
  * MCQ difficulty levels
@@ -705,6 +706,11 @@ export interface SpaceforgeSettings {
      * Default: 0
      */
     reviewDockHeight: number;
+
+    /**
+     * Text-to-Speech configuration (supporting all Aloud TTS endpoints and cache/autoscroll).
+     */
+    tts: TtsSettings;
 }
 
 /**
@@ -871,6 +877,17 @@ export function migrateSettings(settings: SpaceforgeSettings): boolean {
         changed = true;
     }
 
+    if (!settings.tts || typeof settings.tts !== 'object') {
+        settings.tts = { ...DEFAULT_TTS_SETTINGS };
+        changed = true;
+    } else {
+        const normalized = normalizeTtsSettings(settings.tts);
+        if (JSON.stringify(normalized) !== JSON.stringify(settings.tts)) {
+            settings.tts = normalized;
+            changed = true;
+        }
+    }
+
     return changed;
 }
 
@@ -1015,4 +1032,5 @@ export const DEFAULT_SETTINGS: SpaceforgeSettings = {
     studyAutoRateNote: false,
     mcqGradingMode: 'ask',
     reviewDockHeight: 0,
+    tts: { ...DEFAULT_TTS_SETTINGS },
 };

@@ -1,4 +1,4 @@
-import { Notice, setIcon } from 'obsidian';
+import { MarkdownView, Notice, TFile, setIcon } from 'obsidian';
 import SpaceforgePlugin from '../main';
 import { StudyController } from '../controllers/study-controller';
 import { StudyPanel } from './study-panel';
@@ -7,6 +7,17 @@ import { scoreSession, suggestedRating } from '../models/mcq-scoring';
 import { ReviewAlgorithm } from '../models/review-flow';
 import { MCQSession, MCQSet } from '../models/mcq';
 import type { StudySummaryPayload } from '../models/study';
+import type { TtsTargetSource } from '../models/tts';
+import {
+    AloudSegment,
+    convertMindMapToAloudSegments,
+    convertSummaryToAloudSegments,
+    convertTutorTurnsToAloudSegments,
+    convertVisualGalleryToAloudSegments,
+} from '../services/tts/study-aloud-converter';
+import type { TtsPlayerService, TtsPlayerSnapshot } from '../services/tts/tts-player-service';
+import { TtsEditorHighlighter } from './tts-editor-highlighter';
+import { TtsPlayerBar } from './tts-player-bar';
 
 export type DockTab = 'study' | 'mcq' | 'cards';
 
@@ -137,6 +148,10 @@ export class ReviewDock {
     private cardsPanel: HTMLElement | null = null;
     /** The teardown the sitting's own mount returned; the dock's to call. */
     private cardsTeardown: (() => void) | null = null;
+    private ttsBarHost: HTMLElement | null = null;
+    private ttsBar: TtsPlayerBar | null = null;
+    private ttsUnsubscribe: (() => void) | null = null;
+    private editorHighlighter: TtsEditorHighlighter | null = null;
 
     private handlers: ReviewDockHandlers;
 
@@ -305,6 +320,14 @@ export class ReviewDock {
     }
 
     destroy(): void {
+        this.ttsUnsubscribe?.();
+        this.ttsUnsubscribe = null;
+        this.ttsBar?.unmount();
+        this.ttsBar = null;
+        this.ttsBarHost?.remove();
+        this.ttsBarHost = null;
+        this.editorHighlighter?.clear();
+        this.editorHighlighter = null;
         this.unsubscribe?.();
         this.unsubscribe = null;
         this.detachResize?.();
@@ -331,6 +354,20 @@ export class ReviewDock {
 
     private build(container: HTMLElement): void {
         const root = container.createDiv({ cls: 'sf-dock' });
+        const ttsService = this.getTtsService();
+        if (ttsService) {
+            this.ttsBarHost = root.createDiv('sf-dock-tts');
+            this.ttsBar = new TtsPlayerBar(ttsService, {
+                onReadTarget: source => this.readAloud(source),
+                onResumeFollow: () => this.syncTtsHighlight(ttsService.getSnapshot()),
+            });
+            this.ttsBar.mount(this.ttsBarHost);
+            this.editorHighlighter = new TtsEditorHighlighter(this.plugin.app, () =>
+                ttsService.pauseAutoScrollByUser(),
+            );
+            this.ttsUnsubscribe = ttsService.subscribe(snapshot => this.syncTtsHighlight(snapshot));
+        }
+
         // The Study / MCQs buttons live on the bar's own identity line now, so
         // the dock itself is only the content: a line of status when there is
         // something to say, and the panel under it.
@@ -338,6 +375,13 @@ export class ReviewDock {
 
         this.host = root.createDiv('sf-dock-host');
         this.inner = this.host.createDiv('sf-dock-inner');
+        this.inner.addEventListener(
+            'wheel',
+            () => {
+                this.getTtsService()?.pauseAutoScrollByUser();
+            },
+            { passive: true },
+        );
 
         this.grip = this.inner.createDiv('sf-dock-grip');
         // The handle is the dock's top edge: say what it does, since a bare
@@ -590,8 +634,205 @@ export class ReviewDock {
             compact: true,
             onRequestSpace: () => this.setExpanded(true),
             onSessionEnd: payload => this.afterStudySession(payload),
+            onReadAloud: view => void this.readAloud(view === 'board' ? 'visualize' : view),
         });
         this.panel.mount(host);
+    }
+
+    private getTtsService(): TtsPlayerService | null {
+        const plugin = this.plugin as unknown as { ttsService?: TtsPlayerService | null };
+        return plugin.ttsService ?? null;
+    }
+
+    /**
+     * Trigger aloud playback with Aloud-inspired automatic selection or explicit surface target.
+     */
+    async readAloud(requestedSource: TtsTargetSource = 'auto'): Promise<void> {
+        const ttsService = this.getTtsService();
+        if (!ttsService) {
+            new Notice('Text-to-Speech service is not ready.');
+            return;
+        }
+        const path = this.path;
+        if (!path) {
+            new Notice('Open or start reviewing a note to read aloud.');
+            return;
+        }
+
+        const resolvedSource = this.resolveReadAloudSource(requestedSource, path);
+        const title = path.split('/').pop()?.replace(/\.md$/i, '') || path;
+
+        if (resolvedSource === 'mindmap' || resolvedSource === 'visualize' || resolvedSource === 'summary') {
+            if (!this.expanded || this.tab !== 'study') {
+                this.tab = 'study';
+                this.setExpanded(true);
+            }
+            const workspaceView = resolvedSource === 'visualize' ? 'board' : resolvedSource;
+            this.panel?.setWorkspaceView(workspaceView);
+
+            const pack =
+                this.panel?.getVisualPack() ??
+                this.controller.planService.getPlan(path)?.visuals ??
+                null;
+            if (!pack) {
+                new Notice('Study material has not been generated for this note yet. Click "Make it" first.');
+                return;
+            }
+
+            let segments: AloudSegment[];
+            if (resolvedSource === 'mindmap') {
+                segments = convertMindMapToAloudSegments(pack.mindMap);
+            } else if (resolvedSource === 'visualize') {
+                segments = convertVisualGalleryToAloudSegments(pack.visuals);
+            } else {
+                const pearlsOnly = this.panel?.isSummaryPearlsOnly() ?? false;
+                segments = convertSummaryToAloudSegments(pack.summary, { pearlsOnly });
+            }
+
+            await ttsService.playSegments({
+                title,
+                notePath: path,
+                sourceSurface: resolvedSource,
+                segments,
+                sourceMode: resolvedSource,
+            });
+            return;
+        }
+
+        if (resolvedSource === 'tutor') {
+            if (!this.expanded || this.tab !== 'study') {
+                this.tab = 'study';
+                this.setExpanded(true);
+            }
+            this.panel?.setWorkspaceView('learn');
+            const turns = this.panel?.getTutorTurns() ?? [];
+            const segments = convertTutorTurnsToAloudSegments(turns);
+            if (segments.length === 0) {
+                new Notice('No study tutor conversation yet for this note.');
+                return;
+            }
+            await ttsService.playSegments({
+                title,
+                notePath: path,
+                sourceSurface: 'tutor',
+                segments,
+                sourceMode: 'tutor',
+            });
+            return;
+        }
+
+        // Default / explicit 'note' target: inspect active MarkdownView for selection / cursor-to-end
+        const view = this.findMarkdownView(path);
+        const editor = view?.editor;
+        let markdown = editor?.getValue() ?? '';
+        let selectionFrom: number | undefined;
+        let selectionTo: number | undefined;
+
+        if (editor && typeof editor.posToOffset === 'function') {
+            selectionFrom = editor.posToOffset(editor.getCursor('from'));
+            selectionTo = editor.posToOffset(editor.getCursor('to'));
+        }
+        if (!markdown) {
+            const read = await this.controller.readNote(path);
+            if (read !== null) markdown = read;
+            else {
+                const file = this.plugin.app?.vault?.getAbstractFileByPath?.(path);
+                if (file instanceof TFile && this.plugin.app?.vault?.cachedRead) {
+                    markdown = await this.plugin.app.vault.cachedRead(file);
+                }
+            }
+        }
+        if (!markdown.trim()) {
+            new Notice('Note has no text to read aloud.');
+            return;
+        }
+
+        await ttsService.playNoteContent({
+            title,
+            notePath: path,
+            markdown,
+            selectionFrom,
+            selectionTo,
+        });
+    }
+
+    private resolveReadAloudSource(
+        requested: TtsTargetSource,
+        path: string,
+    ): Exclude<TtsTargetSource, 'auto'> {
+        if (requested !== 'auto') return requested;
+
+        const view = this.findMarkdownView(path);
+        const selection = view?.editor?.getSelection?.()?.trim() ?? '';
+        if (selection.length >= 4 && (selection.split(/\s+/).length > 1 || selection.length >= 12)) {
+            return 'note';
+        }
+
+        if (this.expanded && this.tab === 'study' && this.panel) {
+            const wsView = this.panel.getActiveWorkspaceView();
+            const pack =
+                this.panel.getVisualPack() ??
+                this.controller.planService.getPlan(path)?.visuals ??
+                null;
+            if (wsView === 'mindmap' && pack) return 'mindmap';
+            if (wsView === 'board' && pack) return 'visualize';
+            if (wsView === 'summary' && pack) return 'summary';
+            if (wsView === 'learn' && this.panel.getTutorTurns().length > 0) return 'tutor';
+        }
+
+        return 'note';
+    }
+
+    private findMarkdownView(path: string): MarkdownView | null {
+        const workspace = this.plugin.app?.workspace;
+        if (!workspace) return null;
+        const active = workspace.getActiveViewOfType?.(MarkdownView) ?? null;
+        if (active?.file instanceof TFile && active.file.path === path) return active;
+        const leaves = workspace.getLeavesOfType?.('markdown') ?? [];
+        for (const leaf of leaves) {
+            const candidate = leaf.view;
+            if (candidate instanceof MarkdownView && candidate.file instanceof TFile && candidate.file.path === path) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private syncTtsHighlight(snapshot: TtsPlayerSnapshot): void {
+        const seg = snapshot.currentSegment;
+        const isActive =
+            snapshot.status === 'playing' ||
+            snapshot.status === 'loading' ||
+            snapshot.status === 'paused';
+
+        if (!isActive || !seg) {
+            this.editorHighlighter?.clear();
+            this.panel?.highlightTtsSegment(null, false);
+            return;
+        }
+
+        if (seg.targetSurface === 'note') {
+            this.panel?.highlightTtsSegment(null, false);
+            this.editorHighlighter?.sync(snapshot);
+            return;
+        }
+
+        this.editorHighlighter?.clear();
+        if (snapshot.notePath && this.path && snapshot.notePath !== this.path) {
+            return;
+        }
+        if (
+            seg.targetSurface === 'mindmap' ||
+            seg.targetSurface === 'visualize' ||
+            seg.targetSurface === 'summary' ||
+            seg.targetSurface === 'tutor'
+        ) {
+            if (!this.expanded || this.tab !== 'study') {
+                this.tab = 'study';
+                this.setExpanded(true);
+            }
+            this.panel?.highlightTtsSegment(seg, snapshot.autoScroll);
+        }
     }
 
     /**
@@ -771,10 +1012,11 @@ export class ReviewDock {
         if (!this.root) return;
         const studyOn = this.plugin.settings.studyEnabled && !!this.plugin.studyController;
         const mcqOn = this.plugin.settings.enableMCQ && !!this.plugin.mcqController;
+        const ttsOn = !!this.getTtsService() && !!path;
         // A card sitting is content on its own: the dock is shown for it too,
         // with or without a note under the bar.
         const hasContent = !!path || this.hasCardSitting();
-        this.root.toggleClass('sf-hidden', !hasContent || (!studyOn && !mcqOn));
+        this.root.toggleClass('sf-hidden', !hasContent || (!studyOn && !mcqOn && !ttsOn));
         this.handlers.onTabs?.(this.tabState());
         if (!path) return;
 

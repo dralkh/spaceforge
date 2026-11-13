@@ -141,3 +141,14 @@
     opacity: 0.5;
     cursor: default;
 }
+
+.sf-vg-card.sf-tts-active-card {
+    border-color: var(--sf-primary);
+}
+
+.sf-vg-card .sf-tts-active-segment {
+    outline: 2px solid var(--sf-primary);
+    outline-offset: 1px;
+    background-color: color-mix(in srgb, var(--sf-primary), transparent 84%);
+    border-radius: var(--sf-radius-sm);
+}

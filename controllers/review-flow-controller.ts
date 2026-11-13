@@ -902,6 +902,10 @@ export class ReviewFlowController {
         return this.dock.isExpanded();
     }
 
+    getDock(): ReviewDock | null {
+        return this.dock;
+    }
+
     /**
      * Show a card sitting — a whole deck's queue — in the dock, under the
      * grades, where the MCQs render: the sitting on top of the note review

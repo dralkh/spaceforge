@@ -632,3 +632,8 @@
     overflow-wrap: break-word;
   }
 }
+
+.sf-mm-node.sf-tts-active-segment {
+  box-shadow: 0 0 0 2px var(--sf-primary);
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 84%);
+}

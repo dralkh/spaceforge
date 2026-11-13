@@ -45,6 +45,7 @@
 
 import { setIcon } from 'obsidian';
 import { StudyMindMap, StudyMindMapNode, mapDepth, mapNodeCount } from '../models/study-visuals';
+import type { AloudSegmentMindMapTarget } from '../services/tts/study-aloud-converter';
 
 /** The width band a host affords; the stylesheet reads it to cap label width. */
 export type MindMapWidthBand = 'narrow' | 'mid' | 'wide';
@@ -433,6 +434,48 @@ export class StudyMindMapView {
     /** The id of the node the keyboard cursor is on, or null before mount. */
     getActiveId(): string | null {
         return this.activeKey ? this.views.get(this.activeKey)?.id ?? null : null;
+    }
+
+    /** Highlight, expand, focus, and optionally scroll to a mind-map node for live TTS playback. */
+    highlightTtsNode(target: AloudSegmentMindMapTarget | null, autoScroll = true): void {
+        for (const candidate of this.views.values()) {
+            candidate.nodeEl.removeClass('sf-tts-active-segment');
+        }
+        if (!target) return;
+
+        const key = this.views.has(target.nodeKey)
+            ? target.nodeKey
+            : (this.idIndex.get(target.nodeId) ?? null);
+        const view = key ? this.views.get(key) : undefined;
+        if (!key || !view) return;
+
+        let opened = false;
+        let parent = view.parentKey;
+        while (parent) {
+            if (this.collapsed.delete(parent)) opened = true;
+            parent = this.views.get(parent)?.parentKey ?? null;
+        }
+        if (opened) {
+            this.applyCollapsedClasses();
+            this.rebuildOrder();
+            this.updateCount();
+            this.clampCursor();
+        }
+
+        this.focusedKey = key;
+        for (const candidate of this.views.values()) {
+            const focused = candidate.key === key;
+            candidate.nodeEl.toggleClass('is-focused', focused);
+            candidate.nodeEl.toggleClass('is-ancestor', !focused && this.isDescendantOf(key, candidate.key));
+            candidate.nodeEl.setAttribute('aria-selected', focused ? 'true' : 'false');
+        }
+        this.rootEl?.addClass('is-focus-mode');
+        this.renderDetail(view);
+        this.setActive(key);
+        view.nodeEl.addClass('sf-tts-active-segment');
+        if (autoScroll) {
+            view.nodeEl.scrollIntoView?.({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
     }
 
     // ------------------------------------------------------------- keyboard
