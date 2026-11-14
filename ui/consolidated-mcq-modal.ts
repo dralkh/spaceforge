@@ -132,8 +132,7 @@ export class ConsolidatedMCQModal extends Modal {
 
         // Calculate progress percentage for dynamic styling
         const progressPercent = Math.round(((this.currentQuestionIndex + 1) / this.allQuestions.length) * 100);
-        // Set data-progress for proper progress bar display
-        contentEl.setAttribute('data-progress', progressPercent.toString());
+        contentEl.setCssProps({ '--sf-mcq-progress': `${progressPercent}%` });
 
         progressEl.setText(`Question ${this.currentQuestionIndex + 1} of ${this.allQuestions.length}`);
 
@@ -342,7 +341,7 @@ export class ConsolidatedMCQModal extends Modal {
 
                 // Update progress percentage for the progress bar
                 const newProgressPercent = Math.round(((this.currentQuestionIndex + 1) / this.allQuestions.length) * 100);
-                contentEl.setAttribute('data-progress', newProgressPercent.toString());
+                contentEl.setCssProps({ '--sf-mcq-progress': `${newProgressPercent}%` });
 
                 // Show next question or complete review
                 if (this.currentQuestionIndex < this.allQuestions.length) {

@@ -50,6 +50,68 @@ export class TtsProviderError extends Error {
     }
 }
 
+export interface RawRequestUrlResponseLike {
+    status: number;
+    headers?: Record<string, string>;
+    arrayBuffer?: ArrayBuffer;
+    text?: string;
+    json?: unknown;
+}
+
+/**
+ * Safely convert Obsidian's lazy `RequestUrlResponse` (whose `.json` getter throws
+ * `SyntaxError` on binary audio payloads) into a `TtsHttpResponse`.
+ */
+export function normalizeRequestUrlResponse(res: RawRequestUrlResponseLike): TtsHttpResponse {
+    const headers = res.headers ?? {};
+    const contentTypeKey = Object.keys(headers).find(k => k.toLowerCase() === 'content-type');
+    const contentType = contentTypeKey ? headers[contentTypeKey].toLowerCase() : '';
+    const isBinaryAudio =
+        res.status >= 200 &&
+        res.status < 300 &&
+        (contentType.startsWith('audio/') || contentType.includes('application/octet-stream'));
+
+    let buf: ArrayBuffer = res.arrayBuffer instanceof ArrayBuffer ? res.arrayBuffer : new ArrayBuffer(0);
+
+    let rawText = '';
+    if (!isBinaryAudio) {
+        try {
+            if (typeof res.text === 'string') {
+                rawText = res.text;
+            }
+        } catch {
+            rawText = '';
+        }
+    }
+    if (!buf.byteLength && rawText) {
+        buf = new TextEncoder().encode(rawText).buffer;
+    }
+
+    let parsedJson: unknown;
+    if (!isBinaryAudio) {
+        try {
+            parsedJson = res.json;
+        } catch {
+            parsedJson = undefined;
+        }
+        if (parsedJson === undefined && rawText) {
+            try {
+                parsedJson = JSON.parse(rawText);
+            } catch {
+                parsedJson = undefined;
+            }
+        }
+    }
+
+    return {
+        status: res.status,
+        headers,
+        arrayBuffer: buf,
+        text: rawText,
+        json: parsedJson,
+    };
+}
+
 export const defaultTtsTransport: TtsHttpTransport = async (req: TtsHttpRequest): Promise<TtsHttpResponse> => {
     const res = await requestUrl({
         url: req.url,
@@ -58,33 +120,7 @@ export const defaultTtsTransport: TtsHttpTransport = async (req: TtsHttpRequest)
         body: req.body,
         throw: false,
     });
-
-    const rawText = typeof res.text === 'string' ? res.text : '';
-    let parsedJson: unknown = res.json;
-    if (parsedJson === undefined && rawText) {
-        try {
-            parsedJson = JSON.parse(rawText);
-        } catch {
-            parsedJson = undefined;
-        }
-    }
-
-    let buf: ArrayBuffer;
-    if (res.arrayBuffer instanceof ArrayBuffer) {
-        buf = res.arrayBuffer;
-    } else if (rawText) {
-        buf = new TextEncoder().encode(rawText).buffer;
-    } else {
-        buf = new ArrayBuffer(0);
-    }
-
-    return {
-        status: res.status,
-        headers: res.headers ?? {},
-        arrayBuffer: buf,
-        text: rawText,
-        json: parsedJson,
-    };
+    return normalizeRequestUrlResponse(res);
 };
 
 function parseErrorMessage(res: TtsHttpResponse, fallback: string): string {
@@ -114,7 +150,7 @@ function assertOk(provider: TtsProviderId, res: TtsHttpResponse, action: string)
 }
 
 export function normalizeOpenAiCompatEndpoint(apiBase: string): string {
-    let clean = apiBase.trim().replace(/\/+$/, '');
+    const clean = apiBase.trim().replace(/\/+$/, '');
     if (!clean) return '';
     if (clean.endsWith('/audio/speech')) return clean;
     if (clean.endsWith('/v1')) return `${clean}/audio/speech`;

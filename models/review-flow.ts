@@ -580,6 +580,11 @@ export class ReviewFlowModel {
         return [...this.order];
     }
 
+    /** The notes the run still has to get through, the current one included. */
+    pendingNotePaths(): string[] {
+        return this.order.filter(step => !isCardsStep(step) && !this.handled.has(step));
+    }
+
     nextPendingPath(): string | null {
         const found = this.findNext(this.cursor + 1);
         return found ? found.path : null;

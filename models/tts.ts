@@ -18,7 +18,30 @@ export type TtsProviderId =
 
 export type TtsChunkType = 'sentence' | 'paragraph';
 export type TtsCacheType = 'local' | 'vault';
-export type TtsExportDestination = 'vault' | 'browser';
+/**
+ * Where saved audio goes. `cache` is the hidden `.tts/` folder at the vault
+ * root — the same place Obsidian Aloud keeps its audio cache — so both
+ * plugins' audio lives in one place Obsidian does not index as notes.
+ */
+export type TtsExportDestination = 'cache' | 'vault' | 'browser';
+
+/** The hidden vault folder Obsidian Aloud caches into; Spaceforge shares it. */
+export const TTS_HIDDEN_DIR = '.tts';
+/** Saved (exported) audio inside the shared folder, apart from cache clips. */
+export const TTS_EXPORT_DIR = `${TTS_HIDDEN_DIR}/exports`;
+const LEGACY_AUDIO_FOLDER = 'spaceforge/tts-audio';
+
+/** Aloud says "download" where Spaceforge says "browser"; an untouched old default reads as the new one. */
+export function normalizeExportDestination(value: unknown, audioFolder?: unknown): TtsExportDestination {
+    if (value === 'browser' || value === 'download') return 'browser';
+    if (value === 'cache') return 'cache';
+    if (value === 'vault') {
+        const folder = typeof audioFolder === 'string' ? audioFolder.trim() : '';
+        // 'vault' + the old built-in folder is the previous default, never a choice.
+        return folder && folder !== LEGACY_AUDIO_FOLDER ? 'vault' : 'cache';
+    }
+    return 'cache';
+}
 export type TtsTargetSource = 'auto' | 'note' | 'mindmap' | 'visualize' | 'summary' | 'tutor';
 export type TtsOpenAICompatFormat = 'mp3' | 'wav' | 'pcm';
 export type TtsHumeSourceType = 'HUME_AI' | 'CUSTOM_VOICE';
@@ -143,7 +166,7 @@ export const DEFAULT_TTS_SETTINGS: TtsSettings = {
     cacheType: 'local',
     cacheDurationMillis: 24 * ONE_HOUR_MS,
     audioFolder: 'spaceforge/tts-audio',
-    audioExportDestination: 'vault',
+    audioExportDestination: 'cache',
     useVaultAloudSettingsPath: 'plugins/aloud-tts/data.json',
 
     openai_apiKey: '',
@@ -234,7 +257,7 @@ export function normalizeTtsSettings(raw: unknown): TtsSettings {
         audioFolder: typeof src.audioFolder === 'string' && src.audioFolder.trim()
             ? src.audioFolder.trim()
             : DEFAULT_TTS_SETTINGS.audioFolder,
-        audioExportDestination: src.audioExportDestination === 'browser' ? 'browser' : 'vault',
+        audioExportDestination: normalizeExportDestination(src.audioExportDestination, src.audioFolder),
         openaicompat_responseFormat:
             src.openaicompat_responseFormat === 'wav' || src.openaicompat_responseFormat === 'pcm'
                 ? src.openaicompat_responseFormat
@@ -337,8 +360,11 @@ export function parseAloudTtsSettings(raw: unknown): Partial<TtsSettings> | null
     if (typeof src.audioFolder === 'string' && src.audioFolder.trim()) {
         imported.audioFolder = src.audioFolder.trim();
     }
-    if (src.audioExportDestination === 'vault' || src.audioExportDestination === 'browser') {
-        imported.audioExportDestination = src.audioExportDestination;
+    // Aloud's "download" is Spaceforge's "browser"; its "vault" means its own audio folder.
+    if (src.audioExportDestination === 'download' || src.audioExportDestination === 'browser') {
+        imported.audioExportDestination = 'browser';
+    } else if (src.audioExportDestination === 'vault') {
+        imported.audioExportDestination = 'vault';
     }
 
     for (const key of ALOUD_PROVIDER_FIELDS) {

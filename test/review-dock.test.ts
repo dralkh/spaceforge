@@ -148,8 +148,10 @@ test('the dock tells the bar what each tab has waiting, and has no row of its ow
     const { dock, calls, host } = makeDock();
 
     const state = dock.tabState();
-    assert.equal(state.study?.label, 'Study · 40 objectives');
-    assert.equal(state.mcq?.label, 'MCQs · 3');
+    assert.equal(state.study?.label, 'Learn');
+    assert.equal(state.study?.count, undefined, 'nothing due, no badge');
+    assert.equal(state.mcq?.label, 'MCQs');
+    assert.equal(state.mcq?.count, '3');
     assert.equal(state.active, null, 'nothing is open until it is opened');
     assert.ok(calls.tabs.length > 0, 'the bar was told');
 
@@ -329,18 +331,18 @@ test('a note keeps the decks\u2019 control out of the tab row until the run reac
 test('the cards tab joins the bar when the vault has a deck lane', () => {
     const { dock, plugin } = makeDock({ cardsReached: true });
 
-    assert.equal(dock.tabState().cards?.label, 'Cards', 'no count yet means no number');
+    assert.equal(dock.tabState().cards?.count, undefined, 'no count yet means no number');
     assert.match(dock.tabState().cards?.title ?? '', /opens a card sitting/);
 
     plugin.deckDueCount = 33;
     plugin.deckDueCountedAt = Date.now();
-    assert.equal(dock.tabState().cards?.label, 'Cards · 33', 'a fresh count rides on the label');
+    assert.equal(dock.tabState().cards?.count, '33', 'a fresh count rides on the label');
     assert.match(dock.tabState().cards?.title ?? '', /33 cards due/, 'and is explained on hover');
 
     // The sidebar counted a while ago: a number that might be an hour old is
     // worse than none, so it is dropped rather than shown wrong.
     plugin.deckDueCountedAt = Date.now() - 90_000;
-    assert.equal(dock.tabState().cards?.label, 'Cards', 'a stale count is not printed');
+    assert.equal(dock.tabState().cards?.count, undefined, 'a stale count is not printed');
 });
 
 test('without a deck lane there is no cards tab to offer', () => {
@@ -370,16 +372,16 @@ test('a docked sitting counts itself down: the tab drops a card per answer', () 
 
     // The number is the sitting's own — not the sidebar's, which has not been
     // re-counted since the reader started answering.
-    assert.equal(dock.tabState().cards?.label, 'Cards · 43', 'the sitting says what is left in it');
+    assert.equal(dock.tabState().cards?.count, '43', 'the sitting says what is left in it');
     assert.match(dock.tabState().cards?.title ?? '', /left in the sitting/);
 
     answered = 1;
     dock.cardSittingChanged();
-    assert.equal(dock.tabState().cards?.label, 'Cards · 42', 'one card answered is one card less');
-    assert.equal(calls.tabs.at(-1)?.cards?.label, 'Cards · 42', 'and the bar is told at once');
+    assert.equal(dock.tabState().cards?.count, '42', 'one card answered is one card less');
+    assert.equal(calls.tabs.at(-1)?.cards?.count, '42', 'and the bar is told at once');
 
     answered = 43;
-    assert.equal(dock.tabState().cards?.label, 'Cards', 'a spent sitting prints no number, not a zero');
+    assert.equal(dock.tabState().cards?.count, undefined, 'a spent sitting prints no number, not a zero');
     assert.match(dock.tabState().cards?.title ?? '', /done/);
 });
 
@@ -396,7 +398,7 @@ test('a finished sitting reads as nothing left, not as one more card', () => {
     } as unknown as typeof plugin.deckSessionController;
     dock.dockCards({ mount: () => () => undefined });
 
-    assert.equal(dock.tabState().cards?.label, 'Cards', 'nothing left is not a count of one');
+    assert.equal(dock.tabState().cards?.count, undefined, 'nothing left is not a count of one');
     assert.match(dock.tabState().cards?.title ?? '', /done/);
 });
 
@@ -412,7 +414,7 @@ test('with no sitting docked the sidebar’s last count still stands', () => {
         summary: () => ({ deckName: 'Demo', deckCount: 1, position: 1, total: 12, answered: 0 }),
     } as unknown as typeof plugin.deckSessionController;
 
-    assert.equal(dock.tabState().cards?.label, 'Cards · 12', 'the sidebar count, because nothing is docked here');
+    assert.equal(dock.tabState().cards?.count, '12', 'the sidebar count, because nothing is docked here');
 });
 
 test('the cards tab mounts the sitting once, and a tab switch only hides it', async () => {
@@ -771,4 +773,21 @@ test('the note changing takes every panel with it, preparation included', async 
     await settle();
     await settle();
     assert.equal(host.byClass('sf-mcq-runner').length, 1, 'its questions are on screen without another click');
+});
+
+test('a study view is a tab of its own: another view switches, the open one puts the panel away', async () => {
+    const { dock } = makeDock();
+    dock.openTab('study', 'mindmap');
+    await settle();
+    assert.equal(dock.isExpanded(), true);
+    assert.equal(dock.tabState().active, 'study');
+    assert.equal(dock.tabState().view, 'mindmap', 'the panel opens on the view the bar asked for');
+
+    dock.openTab('study', 'summary');
+    await settle();
+    assert.equal(dock.isExpanded(), true, 'another view switches the panel, it does not collapse it');
+    assert.equal(dock.tabState().view, 'summary');
+
+    dock.openTab('study', 'summary');
+    assert.equal(dock.isExpanded(), false, 'pressing the open view puts the panel away');
 });

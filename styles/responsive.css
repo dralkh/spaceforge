@@ -26,37 +26,6 @@
     font-size: var(--sf-font-display);
   }
   
-  .review-note-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .review-note-title {
-    margin-right: 0;
-    margin-bottom: 5px;
-    width: 100%;
-  }
-
-  .review-note-info {
-    margin-right: 0;
-    margin-bottom: 5px;
-    width: 100%;
-  }
-
-  .review-note-buttons {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .review-note-actions {
-    flex-grow: 1;
-    justify-content: flex-start;
-  }
-
-  .review-note-drag-handle {
-    margin-left: 0;
-  }
-  
   .sf-setting-grid {
     grid-template-columns: 1fr;
   }

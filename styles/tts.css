@@ -2,109 +2,141 @@
 
 .sf-dock-tts {
   flex: 0 0 auto;
-  border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
+  container-type: inline-size;
+  container-name: sf-dock-tts;
 }
 
+/* The transport: one row, as tall as its buttons. Idle, it is not on screen
+   at all — the review bar's speaker starts it. */
 .sf-tts-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 5px 8px;
-  font-size: var(--sf-font-ui);
-}
-
-.sf-tts-controls {
+  position: relative;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sf-space-xs);
+  flex-wrap: nowrap;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 6px 3px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--sf-font-small);
 }
 
-.sf-tts-play-btn,
-.sf-tts-icon-btn,
-.sf-tts-chip-btn {
+.sf-tts-bar.is-idle {
+  display: none;
+}
+
+.sf-tts-bar button.sf-tts-icon-btn:not(.clickable-icon),
+.sf-tts-bar button.sf-tts-chip-btn:not(.clickable-icon) {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 24px;
-  padding: 2px 6px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  border: none;
   border-radius: var(--sf-radius-sm);
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font-size: var(--sf-font-small);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
-.sf-tts-play-btn:hover:not(:disabled),
-.sf-tts-icon-btn:hover:not(:disabled),
-.sf-tts-chip-btn:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
+.sf-tts-bar button.sf-tts-icon-btn:not(.clickable-icon) {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
 }
 
-.sf-tts-play-btn:disabled,
-.sf-tts-icon-btn:disabled,
-.sf-tts-chip-btn:disabled {
-  opacity: 0.45;
+.sf-tts-bar button.sf-tts-chip-btn:not(.clickable-icon) {
+  padding: 0 5px;
+  font-size: var(--sf-font-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-tts-bar button.sf-tts-icon-btn:not(.clickable-icon):hover:not(:disabled),
+.sf-tts-bar button.sf-tts-chip-btn:not(.clickable-icon):hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.sf-tts-bar button:disabled {
+  opacity: 0.35;
   cursor: default;
 }
 
-.sf-tts-bar.is-playing .sf-tts-play-btn {
-  border-color: var(--sf-primary);
-  color: var(--sf-primary);
+/* Play / pause: the one filled control. */
+.sf-tts-bar button.sf-tts-icon-btn.sf-tts-play-btn:not(.clickable-icon) {
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
 }
 
-.sf-tts-bar.is-loading .sf-tts-play-btn {
-  border-color: var(--sf-warning);
+.sf-tts-bar button.sf-tts-icon-btn.sf-tts-play-btn:not(.clickable-icon):hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
 }
 
-.sf-tts-bar.is-error .sf-tts-caption {
-  color: var(--sf-danger);
+.sf-tts-bar.is-loading .sf-tts-btn-icon {
+  animation: sf-tts-spin 1s linear infinite;
+}
+
+@keyframes sf-tts-spin {
+  to { transform: rotate(360deg); }
 }
 
 .sf-tts-btn-icon {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
 }
 
-.sf-tts-btn-icon svg,
-.sf-tts-icon-btn svg,
-.sf-study-material-listen-icon svg {
-  width: 14px;
-  height: 14px;
+.sf-tts-bar button svg,
+.sf-tts-btn-icon svg {
+  flex: 0 0 auto;
+  display: block;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
 }
 
-.sf-tts-source {
-  height: 24px;
-  padding: 0 6px;
-  border-radius: var(--sf-radius-sm);
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font-size: var(--sf-font-small);
-}
-
-.sf-tts-follow-btn.is-on {
-  border-color: var(--sf-primary);
+.sf-tts-bar button.sf-tts-follow-btn.is-on:not(.clickable-icon) {
   color: var(--sf-primary);
 }
 
-.sf-tts-follow-btn.is-paused {
-  border-color: var(--sf-warning);
+.sf-tts-bar button.sf-tts-follow-btn.is-paused:not(.clickable-icon) {
   color: var(--sf-warning);
 }
 
+.sf-tts-source {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 8.5em;
+  height: 26px;
+  padding: 0 24px 0 6px;
+  border: none;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+  text-overflow: ellipsis;
+}
+
+/* What is being read: the middle of the row, whatever width is left. */
 .sf-tts-info {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sf-space-sm);
+  gap: 6px;
   min-width: 0;
-  font-size: var(--sf-font-small);
-  color: var(--sf-text-muted);
+  padding: 0 4px;
+  color: var(--text-muted);
 }
 
 .sf-tts-caption {
@@ -115,17 +147,23 @@
   text-overflow: ellipsis;
 }
 
+.sf-tts-bar.is-error .sf-tts-caption {
+  color: var(--sf-danger);
+}
+
 .sf-tts-count {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
 }
 
+/* A hairline along the row's bottom edge instead of a row of its own. */
 .sf-tts-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
   height: 2px;
-  width: 100%;
-  margin-top: 2px;
-  border-radius: 999px;
-  background: var(--background-modifier-border);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -134,6 +172,15 @@
   width: var(--sf-tts-progress, 0%);
   background: var(--sf-primary);
   transition: width var(--sf-transition-fast);
+}
+
+/* Narrow panes: the extras go, play / skip / what-is-read / stop stay. */
+@container sf-dock-tts (max-width: 560px) {
+  .sf-tts-source,
+  .sf-tts-bar button.sf-tts-chip-btn:not(.clickable-icon),
+  .sf-tts-bar button.sf-tts-icon-btn[aria-label="Save this audio"] {
+    display: none;
+  }
 }
 
 /* Listen button inside Study Material header */
@@ -171,4 +218,11 @@
 
 .sf-tts-provider-slot {
   margin-top: var(--sf-space-xs);
+}
+
+.sf-tts-bar button:focus-visible,
+.sf-tts-bar select:focus-visible,
+.sf-study-material-listen:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
 }

@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS } from '../models/settings';
 import {
     describeActiveTtsModel,
     listTtsVoices,
+    normalizeRequestUrlResponse,
     synthesizeSpeech,
     TtsHttpRequest,
     TtsHttpTransport,
@@ -269,4 +270,53 @@ test('lists voices for providers with remote discovery endpoints', async () => {
         json: { voices: [{ voice_id: 'v1', name: 'Rachel' }] },
     }));
     assert.deepEqual(voices, [{ id: 'v1', label: 'Rachel' }]);
+});
+
+test('normalizeRequestUrlResponse ignores lazy .json/.text getter errors on binary audio payloads', () => {
+    const mp3Bytes = new Uint8Array([0x49, 0x44, 0x33, 0x03, 0x00, 0x64, 0x00, 0x00, 0x00, 0x54]).buffer;
+
+    const fakeBinaryRes = {
+        status: 200,
+        headers: { 'content-type': 'audio/mpeg' },
+        arrayBuffer: mp3Bytes,
+        get text(): string {
+            return new TextDecoder().decode(mp3Bytes);
+        },
+        get json(): unknown {
+            return JSON.parse(this.text);
+        },
+    };
+    const normalizedBinary = normalizeRequestUrlResponse(fakeBinaryRes);
+    assert.equal(normalizedBinary.status, 200);
+    assert.equal(normalizedBinary.arrayBuffer.byteLength, mp3Bytes.byteLength);
+    assert.equal(normalizedBinary.json, undefined);
+    assert.equal(normalizedBinary.text, '');
+
+    const fakeNoHeaderBinaryRes = {
+        status: 200,
+        headers: {},
+        arrayBuffer: mp3Bytes,
+        get text(): string {
+            return new TextDecoder().decode(mp3Bytes);
+        },
+        get json(): unknown {
+            return JSON.parse(this.text);
+        },
+    };
+    const normalizedFallback = normalizeRequestUrlResponse(fakeNoHeaderBinaryRes);
+    assert.equal(normalizedFallback.arrayBuffer.byteLength, mp3Bytes.byteLength);
+    assert.equal(normalizedFallback.json, undefined);
+});
+
+
+test('saved audio defaults to the hidden .tts folder Aloud shares, and Aloud\'s choices map across', async () => {
+    const { normalizeExportDestination, normalizeTtsSettings, DEFAULT_TTS_SETTINGS, TTS_EXPORT_DIR } = await import('../models/tts');
+    assert.equal(DEFAULT_TTS_SETTINGS.audioExportDestination, 'cache');
+    assert.equal(TTS_EXPORT_DIR, '.tts/exports');
+    assert.equal(normalizeExportDestination('download'), 'browser', 'Aloud says download');
+    assert.equal(normalizeExportDestination('browser'), 'browser');
+    assert.equal(normalizeExportDestination('vault', 'spaceforge/tts-audio'), 'cache', 'the old untouched default moves to the shared folder');
+    assert.equal(normalizeExportDestination('vault', 'Audio/Lectures'), 'vault', 'a folder the reader chose is kept');
+    assert.equal(normalizeExportDestination(undefined), 'cache');
+    assert.equal(normalizeTtsSettings({ audioExportDestination: 'vault', audioFolder: 'Audio' }).audioExportDestination, 'vault');
 });

@@ -29,14 +29,14 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding: 4px 8px;
   border-top: 1px solid var(--background-modifier-border);
   background-color: var(--background-secondary);
   color: var(--text-normal);
   /* A footer band: two rows, a decision row when one is due, and never more of
      the pane than that. */
-  max-height: 30vh;
+  max-height: 40vh;
   overflow-y: auto;
   /* The bar is its own size container, so the narrow-host rules at the end of
      this file fire on the room the bar was actually given. A viewport-sized
@@ -50,8 +50,8 @@
 }
 
 .sf-strip.sf-strip-active {
-  border-top-width: 2px;
-  border-top-color: var(--sf-primary);
+  /* The progress bar is the active bar's top edge; no second accent line. */
+  border-top-color: transparent;
 }
 
 .sf-strip.sf-strip-asking {
@@ -64,30 +64,33 @@
   border-top-color: var(--sf-success);
 }
 
-/* Header: the status line, then the bar's own controls */
+/* ------------------------------------------------------------------ header
+
+   ▬▬▬▬▬▬░░░░░░░░░░░░░░░░░░░░░░░░░░░░  (progress, flush with the bar's top edge)
+   Cirrhosis Part 1                    ↶  ‹ 5/26 ›  ⋯  ✕
+   1d overdue · FSRS · new
+
+   The name is the subject, the line under it is one quiet sentence, and the
+   controls are a single cluster of borderless icons on the right. */
 
 .sf-strip-header {
   display: flex;
   align-items: center;
-  gap: var(--sf-space-sm);
-  min-width: 0;
-  /* A split pane is often narrow while the window is not, so the header reflows
-     on its own instead of trusting a viewport-sized media query. */
+  /* When the name and the controls cannot share a line, the controls drop to
+     their own line — the name is never squeezed to a column of letters. */
   flex-wrap: wrap;
-  row-gap: 2px;
+  justify-content: flex-end;
+  gap: 2px var(--sf-space-sm);
+  min-width: 0;
+  padding: 2px 0 0;
 }
 
-/* The status line is a line of groups — identity, scheduler, due state — so a
-   host that cannot hold it wraps *between* the facts rather than through the
-   middle of one, and no group is ever cut to make the others fit. */
 .sf-strip-status {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sf-space-sm);
-  row-gap: 2px;
-  min-width: 0;
-  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 12em;
+  min-width: min(100%, 12em);
 }
 
 .sf-strip-group {
@@ -95,75 +98,65 @@
   align-items: center;
   gap: var(--sf-space-xs);
   min-width: 0;
-  flex: 0 1 auto;
 }
 
-/* Identity: the count, then the note's own name, read as one phrase
-   ("6/23 · Cell biology"). */
 .sf-strip-group-identity {
   align-items: baseline;
-  gap: 6px;
 }
 
-.sf-strip-group-identity .sf-strip-title::before {
+.sf-strip-title {
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* The line under the name: "1d overdue · FSRS · new". */
+.sf-strip-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.sf-strip-group-due + .sf-strip-group-schedule::before,
+.sf-strip-group-time + .sf-strip-group-schedule::before,
+.sf-strip-time-left::before {
   content: '·';
   margin-right: 6px;
   color: var(--text-faint);
 }
 
-/* The scheduler, muted: "SM-2 · interval 6d". */
 .sf-strip-group-schedule {
   color: var(--text-muted);
 }
 
-/* The due state, and only when there is one to state: "3d overdue". */
+/* "4 min read · 1h 20m left today" */
+.sf-strip-group-time {
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-strip-time-note {
+  color: var(--text-normal);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sf-strip-time-left {
+  white-space: nowrap;
+}
+
 .sf-strip-group-due {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-.sf-strip-progress {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  padding: 0 6px;
-  font-size: var(--sf-font-small);
-  border-radius: var(--sf-radius-sm);
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  line-height: 1.2;
-}
-
-.sf-strip-progress-count {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.sf-strip-title {
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 26ch;
-  min-width: 0;
-}
-
-.sf-strip-meta {
-  /* The app's own smallest UI step; the scheduler line is one line by design and
-     says so with an ellipsis when it cannot fit. */
-  font-size: var(--sf-font-small);
-  white-space: nowrap;
-  flex: 0 1 auto;
-  min-width: 0;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sf-strip-spacer {
-  flex: 1 1 auto;
 }
 
 .sf-strip-due {
@@ -172,91 +165,195 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The keyboard reminders, behind one affordance: the keys still work, they are
-   just not prose on the status line any more. The button's hover and its label
-   carry the shortcuts; pressing it prints the same sentence under the line. */
-.sf-strip-help {
+.sf-strip-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* The bar's controls: one cluster, borderless until touched. */
+.sf-strip-secondary {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+/* ‹ 5/26 › — the walk through the queue, with the place in it between. */
+.sf-strip-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 2px;
+  border-radius: var(--sf-radius-md);
+  background-color: var(--background-modifier-hover);
+}
+
+.sf-strip-progress {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 2px;
+  font-size: var(--sf-font-small);
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.sf-strip-progress-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Icon buttons. Obsidian 1.15 pads every tablet button with
+     .is-tablet button:not(.clickable-icon) { padding: 4px 20px }   (0,2,1)
+   which left a 22px icon button 40px of padding and no room inside, so on
+   iPadOS the icons collapsed to nothing. These rules carry the same
+   `:not(.clickable-icon)` plus two classes (0,3,1), so they win outright
+   rather than by load order. */
+.sf-strip button.sf-strip-icon-button:not(.clickable-icon) {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: var(--sf-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color var(--sf-transition-fast), color var(--sf-transition-fast);
+}
+
+.sf-strip button.sf-strip-icon-button:not(.clickable-icon):hover:not(:disabled) {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.sf-strip-nav button.sf-strip-icon-button:not(.clickable-icon):hover:not(:disabled) {
+  background-color: var(--background-modifier-active-hover, var(--background-modifier-border));
+}
+
+.sf-strip button.sf-strip-icon-button:not(.clickable-icon):disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The glyph's own box: fixed, never shrunk, drawn in the button's colour. */
+.sf-strip-icon {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
-  padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 50%;
-  background-color: transparent;
-  color: var(--text-muted);
-  font-size: var(--sf-font-small);
-  line-height: 1;
-  cursor: pointer;
-  transition: color var(--sf-transition-fast), border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
+  pointer-events: none;
 }
 
-.sf-strip-help:hover,
-.sf-strip-help.is-open {
+.sf-strip-icon svg {
+  flex: 0 0 auto;
+  display: block;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  stroke: currentColor;
+}
+
+.sf-strip-secondary .sf-strip-action {
+  flex: 0 0 auto;
+}
+
+.sf-strip button.sf-strip-icon-button.sf-strip-undo {
   color: var(--sf-primary);
-  border-color: var(--sf-primary);
-  background-color: color-mix(in srgb, var(--sf-primary), transparent 92%);
 }
 
-/* The hint, on demand: its own full row under the status line, so asking for
-   it never pushes the line's own groups sideways. */
+.sf-strip-icon-button:focus-visible,
+.sf-strip-grade:focus-visible,
+.sf-strip-tab:focus-visible,
+.sf-strip-decision-button:focus-visible,
+.sf-strip-next-button:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
+}
+
+/* The keyboard reminders, printed under the header when asked for from ⋯. */
 .sf-strip-help-text {
-  flex: 1 1 100%;
-  min-width: 0;
+  padding: 4px 8px;
+  border-radius: var(--sf-radius-sm);
+  background-color: var(--background-primary);
   color: var(--text-muted);
   font-size: var(--sf-font-small);
   white-space: normal;
+  cursor: pointer;
 }
 
-/* Grades */
+/* ------------------------------------------------------------------ grades
+
+   One segmented control: the name in its grade's colour, the interval under
+   it. The key is printed only where there is a keyboard to press it. */
 
 .sf-strip-grades {
   display: flex;
-  /* Wrapping is the safety net: a grade row that cannot fit goes to a second
-     line instead of running off the edge of the bar. */
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   align-items: stretch;
 }
 
-.sf-strip-grade {
+.sf-strip button.sf-strip-grade:not(.clickable-icon) {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
   flex: 1 1 0;
   min-width: 64px;
+  height: auto;
+  min-height: 44px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
+  justify-content: center;
+  gap: 0;
+  padding: 4px 6px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--sf-radius-md);
   background-color: var(--background-primary);
+  box-shadow: none;
   color: var(--text-normal);
   cursor: pointer;
-  transition: var(--sf-transition-fast, 150ms ease);
+  transition: background-color var(--sf-transition-fast), border-color var(--sf-transition-fast), transform 80ms ease;
 }
 
-.sf-strip-grade:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--sf-shadow);
+.sf-strip button.sf-strip-grade:not(.clickable-icon):hover {
+  border-color: var(--sf-grade-color);
+  background-color: color-mix(in srgb, var(--sf-grade-color), transparent 90%);
 }
 
-.sf-strip-grade:active {
-  transform: translateY(0);
+.sf-strip button.sf-strip-grade:not(.clickable-icon):active {
+  transform: scale(0.97);
 }
 
 .sf-strip-grade-main {
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
   min-width: 0;
-  flex: 1 1 auto;
-  line-height: 1.3;
+  max-width: 100%;
+  line-height: 1.2;
 }
 
 .sf-strip-grade-label {
   font-weight: 600;
+  color: var(--sf-grade-color, var(--text-normal));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -273,19 +370,28 @@
   display: none;
 }
 
+/* The key, tucked in the corner, for keyboards only. */
 .sf-strip-grade-key {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 3px;
-  border-radius: var(--sf-radius-sm);
-  background-color: var(--background-modifier-hover);
-  color: var(--text-muted);
-  font-size: var(--sf-font-small);
-  font-variant-numeric: tabular-nums;
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sf-strip-grade-key {
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    display: block;
+    color: var(--text-faint);
+    font-size: var(--sf-font-small);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    transition: opacity var(--sf-transition-fast);
+  }
+
+  .sf-strip-grades:hover .sf-strip-grade-key {
+    opacity: 1;
+  }
 }
 
 /* The reader's layout choice, as a data attribute so the three layouts share
@@ -299,12 +405,6 @@
   min-width: 0;
 }
 
-.sf-strip-grades[data-grade-layout="row"] .sf-strip-grade-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .sf-strip-grades[data-grade-layout="stack"] {
   flex-direction: column;
   flex-wrap: nowrap;
@@ -314,144 +414,161 @@
   flex: initial;
   width: 100%;
   min-width: 0;
-  min-height: 24px;
+  flex-direction: row;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 4px 10px;
 }
 
-/* Study / MCQs / Cards: the bar's own tab row. Its own line, so the status
-   above stays a status and these read as places to go; each tab wears its own
-   count in its own label, and the row scrolls when the host is too narrow
-   rather than wrapping a label in half. */
-.sf-strip-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: var(--sf-space-xs);
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.sf-strip-tab {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 22px;
-  padding: 0 10px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--sf-radius-sm);
-  background-color: var(--background-primary);
-  color: var(--text-muted);
-  font-size: var(--sf-font-small);
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color var(--sf-transition-fast), border-color var(--sf-transition-fast), background-color var(--sf-transition-fast);
-}
-
-.sf-strip-tab:hover {
-  color: var(--text-normal);
-  border-color: var(--sf-primary);
-}
-
-/* The open tab is the selected one — accent edge, tinted fill, the label a
-   step stronger — so which panel is showing is readable at a glance rather
-   than by comparing two shades of grey. */
-.sf-strip-tab.is-active {
-  color: var(--sf-primary);
-  font-weight: 600;
-  border-color: var(--sf-primary);
-  background-color: color-mix(in srgb, var(--sf-primary), transparent 88%);
-}
-
-/* The card lane's button: the same tab, with a count that can change while it
-   is on screen, so its digits stay tabular. */
-.sf-strip-tab-cards {
-  font-variant-numeric: tabular-nums;
+.sf-strip-grades[data-grade-layout="stack"] .sf-strip-grade-main {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
 }
 
 /* The grade a finished sitting's score implies, marked where it will be pressed:
-   ringed, with the percentage in the button itself. */
-.sf-strip-grade.is-suggested {
-  border-color: var(--sf-primary);
-  box-shadow: inset 0 0 0 1px var(--sf-primary);
+   filled with its colour, with the percentage in the button itself. */
+.sf-strip button.sf-strip-grade:not(.clickable-icon).is-suggested {
+  border-color: var(--sf-grade-color);
+  box-shadow: inset 0 0 0 1px var(--sf-grade-color);
+  background-color: color-mix(in srgb, var(--sf-grade-color), transparent 88%);
 }
 
 .sf-strip-grade-score {
-  flex: 0 0 auto;
-  padding: 0 4px;
-  border-radius: var(--sf-radius-sm);
-  background: color-mix(in srgb, var(--sf-primary), transparent 80%);
-  color: var(--text-normal);
+  margin-top: 2px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--sf-grade-color);
+  color: var(--text-on-accent, #fff);
   font-size: var(--sf-font-small);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-/* Grade colours mirror the review buttons so both interfaces read the same */
-
+/* Grade colours mirror the review buttons so both interfaces read the same. */
 .sf-strip-grade-again,
 .sf-strip-grade-blackout,
 .sf-strip-grade-incorrect {
-  border-left: 4px solid #e53e3e;
+  --sf-grade-color: #e53e3e;
 }
 
 .sf-strip-grade-familiar {
-  border-left: 4px solid #feb2b2;
+  --sf-grade-color: #e57373;
 }
 
 .sf-strip-grade-difficulty {
-  border-left: 4px solid #fbd38d;
+  --sf-grade-color: #d69e2e;
 }
 
 .sf-strip-grade-hesitation {
-  border-left: 4px solid #c6f6d5;
+  --sf-grade-color: #48bb78;
 }
 
 .sf-strip-grade-hard {
-  border-left: 4px solid #dd6b20;
+  --sf-grade-color: #dd6b20;
 }
 
 .sf-strip-grade-good {
-  border-left: 4px solid #38a169;
+  --sf-grade-color: #38a169;
 }
 
 .sf-strip-grade-easy,
 .sf-strip-grade-perfect {
-  border-left: 4px solid #2b6cb0;
+  --sf-grade-color: #3182ce;
 }
 
-/* Secondary actions */
+/* --------------------------------------------------------------- tab row
 
-.sf-strip-secondary {
+   Learn · Visualize · Mind map · Summary · MCQs 4                🔊
+   ─────────
+
+   One row of underline tabs for everything the reader can do with the note,
+   sitting on the dock's top edge like the tabs of the panel they open. */
+
+.sf-strip-tabbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  margin: 2px -8px -4px;
+  padding: 0 4px 0 8px;
+  border-top: 1px solid var(--background-modifier-border);
 }
 
-.sf-strip-action {
+.sf-strip-tabs {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.sf-strip-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sf-strip button.sf-strip-tab:not(.clickable-icon) {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 20px;
-  padding: 0;
-  border-radius: var(--sf-radius-sm);
-  background-color: transparent;
+  gap: 5px;
+  height: 36px;
+  min-height: 0;
+  padding: 0 10px;
+  margin: 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--text-muted);
-  border: 1px solid transparent;
+  font-size: var(--sf-font-ui);
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
+  transition: color var(--sf-transition-fast), border-color var(--sf-transition-fast);
 }
 
-.sf-strip-action:hover:not(:disabled) {
-  background-color: var(--background-modifier-hover);
+.sf-strip button.sf-strip-tab:not(.clickable-icon):hover {
   color: var(--text-normal);
-  border-color: var(--background-modifier-border);
+  background: transparent;
 }
 
-.sf-strip-action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+/* The open tab: accent underline and a label a step stronger. */
+.sf-strip button.sf-strip-tab:not(.clickable-icon).is-active {
+  color: var(--text-normal);
+  font-weight: 600;
+  border-bottom-color: var(--sf-primary);
+}
+
+.sf-strip-tab-label {
+  min-width: 0;
+}
+
+.sf-strip-tab-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: var(--sf-font-small);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-strip-tab.is-active .sf-strip-tab-count {
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 82%);
+  color: var(--sf-primary);
+}
+
+/* Read aloud, at the row's end. */
+.sf-strip button.sf-strip-icon-button.sf-strip-listen.is-playing {
+  color: var(--sf-primary);
+  background-color: color-mix(in srgb, var(--sf-primary), transparent 88%);
 }
 
 /* Leech decision: the one thing that stops the flow */
@@ -558,20 +675,6 @@
   margin-left: auto;
 }
 
-/* Small screens: keep the buttons usable. The keyboard reminder no longer
-   costs a line — it lives behind the help affordance — so it stays available
-   here too. */
-@media (max-width: 640px) {
-  .sf-strip-grade {
-    flex: 1 1 45%;
-    min-width: 0;
-  }
-
-  .sf-strip-status {
-    flex: 1 1 100%;
-  }
-}
-
 /* The hand-off at the end of the note queue: the day's other half, one press
    away, in the same place the grades were pressed. */
 .sf-strip-next {
@@ -623,280 +726,107 @@
   border-radius: 0;
 }
 
-/* The status line takes its own rows: 368px cannot hold identity, scheduler
-   and due state abreast, and an ellipsised note title is the one thing in this
-   bar the reader cannot do without. The groups wrap; nothing inside them is
-   cut away. The scheduler line is the one fact that becomes a hover: it is
-   reference material, and it was costing a whole row above the panel. */
 .sf-host-sidebar .sf-strip {
   padding: 3px 6px;
-  gap: 3px;
 }
 
-.sf-host-sidebar .sf-strip-status {
-  flex: 1 1 auto;
-  row-gap: 2px;
+.sf-host-sidebar .sf-strip-tabbar {
+  margin-left: -6px;
+  margin-right: -6px;
 }
 
-.sf-host-sidebar .sf-strip-group-identity {
-  flex: 1 1 100%;
-}
+/* -------------------------------------------- a host that is simply small */
 
-.sf-host-sidebar .sf-strip-group-schedule {
-  display: none;
-}
-
-/* The keyboard hint is reference, and the grade keys are already printed on
-   the buttons. In the sidebar it was the 22 px that pushed the five controls
-   onto their own row; below 300 px it does the same in a narrow dock. */
-.sf-host-sidebar .sf-strip-help {
-  display: none;
-}
-
-.sf-host-sidebar .sf-strip-title {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  max-width: none;
-}
-
-.sf-host-sidebar .sf-strip-group-schedule {
-  flex: 1 1 auto;
-}
-
-.sf-host-sidebar .sf-strip-meta {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-/* The tab row scrolls rather than wrapping: three labels that do not fit are
-   read by scrolling the row, never by clipping half a word. */
-.sf-host-sidebar .sf-strip-tabs {
-  flex-wrap: nowrap;
-}
-
-.sf-host-sidebar .sf-strip-progress,
-.sf-host-window .sf-strip-progress {
-  flex: 0 0 auto;
-}
-
-/* ------------------------------------------------ a host that is simply small */
-
-/* Measured, not guessed: a session in a 340px split pane or a narrow window got
-   the wide layout — six grades in one row ran the row off the edge (324px box,
-   404px of content) and every label was cut to nothing, while the note title
-   ellipsised. The same treatment the sidebar gets is applied to any host this
-   narrow, so which layout appears follows the room the bar was given rather
-   than which button opened the session. */
+/* The layout follows the room the bar was given, not which button opened the
+   session: a 340px split pane gets the same treatment as the sidebar. */
 @container sf-strip (max-width: 480px) {
-  /* The header is a three-line grid, not a flex row that wraps: the progress
-     bar and the note span both columns, the due state sits left and the
-     controls sit right on the same line. The old flex row held a full-width
-     status block, so the controls were always a fourth line below the due
-     state even when there was room beside it. */
-  .sf-strip-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 2px 4px;
-  }
-
-  /* The status keeps its own box and spans the header's columns: one grid of
-     its own is what stacks the bar and the note inside it, so the header never
-     has to reach through the wrapper with `display: contents`. */
-  .sf-strip-status {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-  }
-
-  .sf-strip-progress-bar {
-    margin: 0;
-  }
-
-  .sf-strip-group-due {
-    grid-column: 1;
-  }
-
-  .sf-strip-spacer {
-    display: none;
-  }
-
-  .sf-strip-help {
-    grid-column: 2;
-  }
-
-  .sf-strip-secondary {
-    grid-column: 3;
-    justify-self: end;
-  }
-
-  /* The controls lost the row they used to occupy; the pixels they saved buy
-     a finger-sized target instead of a 20 px one. */
-  .sf-strip-action,
-  .sf-strip-help {
-    width: 24px;
-    height: 24px;
-  }
-
-  /* The note's name reads in full and wraps; a group that cannot fit moves to
-     its own line rather than being clipped. */
+  /* The name wraps instead of being cut: it is the one thing in this bar the
+     reader cannot do without. */
   .sf-strip-title {
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
-    max-width: none;
+    /* Whole words only: a long word breaks as a last resort, never a short
+       one letter by letter. */
+    overflow-wrap: break-word;
   }
 
-  .sf-strip-group-schedule {
-    flex: 1 1 auto;
+  /* Four grades as a 2 × 2 grid; six SM-2 grades as 3 × 2. */
+  .sf-strip-grades[data-grade-layout="auto"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
   }
 
-  .sf-strip-meta {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
+  .sf-strip-grades[data-grade-layout="auto"][data-grade-count="6"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  /* The tab row scrolls; it never wraps a label in half. */
-  .sf-strip-tabs {
-    flex-wrap: nowrap;
+  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade {
+    min-width: 0;
+    min-height: 40px;
   }
 
-  /* The scheduler reference line is a hover in a narrow bar. */
-  .sf-strip-group-schedule {
-    display: none;
-  }
-}
-
-/* ------------------------------------------------------- progress and help */
-/* The sitting's progress as a bar. It takes its own line at any width: a bar
-   squeezed between two groups reads as a divider, not as progress. */
-.sf-strip-progress-bar {
-  flex: 1 1 100%;
-  height: 4px;
-  margin-top: 2px;
-  border-radius: 2px;
-  background: var(--background-modifier-border);
-  overflow: hidden;
-}
-
-.sf-strip-progress-bar-fill {
-  width: var(--sf-strip-progress, 0%);
-  height: 100%;
-  border-radius: 2px;
-  background: var(--interactive-accent);
-  transition: width 160ms ease-out;
-}
-
-/* The help affordance has to look like something you can press: an 18px box
-   with a hairline border read as decoration, which is why the shortcuts stayed
-   invisible to anyone who did not hover it by accident. */
-.sf-strip-help {
-  width: 22px;
-  height: 22px;
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  border-radius: var(--radius-s);
-  font-size: var(--sf-font-small);
-  cursor: pointer;
-}
-
-.sf-strip-help:hover {
-  color: var(--text-normal);
-  border-color: var(--interactive-accent);
-}
-
-/* At sidebar width the grades stop being four paragraphs: the same words, less
-   air, in a two-column palette. Four grades cost two ~30px rows instead of
-   four ~50px ones; six deck grades cost three. The reader can override this
-   with the Grade layout setting, but the default is the compact one. */
-@container sf-strip (max-width: 480px) {
-  /* "One row" is the reader's call even when the pane is narrow: the grades
-     keep their names and the intervals step aside, because a row of blank
-     buttons is not a choice. Six long SM-2 names scroll sideways instead of
-     being squeezed to a letter each. */
+  /* "One row" is the reader's call even when the pane is narrow: the names
+     stay and the intervals step aside. */
   .sf-strip-grades[data-grade-layout="row"] {
-    flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: thin;
   }
 
   .sf-strip-grades[data-grade-layout="row"] .sf-strip-grade {
-    flex: 1 1 0;
     min-width: 60px;
-    gap: 2px;
-    padding: 1px 4px;
+    padding: 2px 4px;
   }
 
   .sf-strip-grades[data-grade-layout="row"] .sf-strip-grade-interval {
     display: none;
   }
 
-  .sf-strip-grades[data-grade-layout="row"] .sf-strip-grade-key {
-    min-width: 14px;
-    height: 14px;
+  .sf-strip-tabs {
+    gap: 0;
+    /* A row that does not fit fades at its edge, so it reads as one that
+       scrolls rather than one that was cut. */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+  }
+
+  .sf-strip button.sf-strip-tab:not(.clickable-icon) {
+    padding: 0 7px;
     font-size: var(--sf-font-small);
   }
 
-  .sf-strip-grades[data-grade-layout="auto"] {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 3px;
-  }
-
-  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade {
-    flex: initial;
-    min-width: 0;
-    height: auto;
-    min-height: 30px;
-    padding: 1px 6px;
-  }
-
-  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-main {
-    flex-wrap: wrap;
-    gap: 2px 4px;
-    line-height: 1.15;
-  }
-
-  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-label {
-    font-size: var(--sf-font-small);
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-  }
-
-  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-interval {
-    font-size: var(--sf-font-small);
-  }
-
-  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-key {
-    margin-left: auto;
-    min-width: 14px;
-    height: 14px;
-    font-size: var(--sf-font-small);
-  }
-}
-
-/* At the smallest split the intervals must not force every grade name onto two
-   lines again. The label and the key stay; the full advice remains in the
-   bar's menu. */
-@container sf-strip (max-width: 230px) {
-  .sf-strip-grades[data-grade-layout="auto"] .sf-strip-grade-interval {
+  /* The scheduler is reference: in a narrow bar it lives on the title's
+     hover, and the line under the name is the due state alone. */
+  .sf-strip-group-schedule {
     display: none;
   }
 }
 
-@container sf-strip (max-width: 300px) {
-  .sf-strip-help {
-    display: none;
+@container sf-strip (max-width: 340px) {
+  .sf-strip button.sf-strip-icon-button:not(.clickable-icon) {
+    width: 26px;
+    min-width: 26px;
   }
 }
 
-/* The sidebar list's charting line and the Study panel's chart line never share
-   a pane: the list lives in `.spaceforge-container`, the session in its own
-   child, so a rule that tried to suppress one from the other's presence was a
-   `:has()` that could never match. The panel's line carries the progress bar and
-   the retry, which is why the panel is the one that matters. */
+/* --------------------------------------------------------- progress bar */
+
+/* Flush with the bar's top edge: where the run stands, without a word. */
+.sf-strip-progress-bar {
+  height: 3px;
+  margin: -4px -8px 0;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sf-host-sidebar .sf-strip-progress-bar {
+  margin: -3px -6px 0;
+}
+
+.sf-strip-progress-bar-fill {
+  width: var(--sf-strip-progress, 0%);
+  height: 100%;
+  background: var(--interactive-accent);
+  transition: width 160ms ease-out;
+}

@@ -124,16 +124,17 @@
     height: auto;
     min-height: 24px;
     padding: 1px 6px;
-    border: 1px solid var(--background-modifier-border);
+    border: none;
     border-radius: var(--radius-s);
-    background: var(--background-primary);
+    background: transparent;
+    box-shadow: none;
     color: var(--text-muted);
     font-size: var(--sf-font-small);
     cursor: pointer;
 }
 
 .sf-vg-collapse-all:hover:not(:disabled) {
-    border-color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
     color: var(--text-normal);
 }
 

@@ -784,9 +784,8 @@
 }
 
 .sf-study-research.is-live {
-  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
-  background-size: 200% 100%;
-  animation: fadeIn 0.35s ease-out, shimmer 1.6s linear infinite;
+  border-style: solid;
+  animation: fadeIn var(--sf-transition-fast) ease-out, pulse 2s ease-in-out infinite;
 }
 
 .sf-study-research-head {
@@ -1934,68 +1933,6 @@
 .sf-study-lightbox-missing {
   padding: var(--sf-space-xl);
   color: var(--sf-text-muted);
-}
-
-/* ============================== Review-dialog integration ============================== */
-/* Collapsed by default: the dialog looks exactly as it always did until study
-   mode is asked for. The grid trick animates height without magic numbers. */
-
-.sf-review-study-header {
-  display: flex;
-  align-items: center;
-  gap: var(--sf-space-sm);
-  flex-wrap: wrap;
-}
-
-.sf-review-study-status {
-  font-size: var(--sf-font-ui);
-  color: var(--sf-text-muted);
-}
-
-.sf-review-study-collapse {
-  background: transparent;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--sf-radius-sm);
-  color: var(--sf-text-muted);
-  cursor: pointer;
-  height: auto;
-  padding: 2px 6px;
-  box-shadow: none;
-}
-
-.review-button-study.is-active {
-  border-color: var(--sf-primary);
-  background: var(--sf-primary-light);
-}
-
-.sf-review-study-host {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 320ms cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-
-.sf-review-study-host.is-open {
-  grid-template-rows: 1fr;
-  margin-top: var(--sf-space-md);
-}
-
-.sf-review-study-inner {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.sf-review-study-host.is-open .sf-review-study-inner {
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--sf-radius-md);
-  height: min(66vh, 720px);
-}
-
-/* The dialog grows when study mode is open, so the panel has room to work. */
-
-.modal.sf-review-study-expanded {
-  width: min(1120px, 95vw);
-  max-width: min(1120px, 95vw);
 }
 
 /* ============================== Sidebar chart status ============================== */

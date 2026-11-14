@@ -3,14 +3,14 @@
 /* ====== Cards & Containers ====== */
 .sf-card {
   background-color: var(--sf-bg-secondary);
+  border: 1px solid var(--sf-border);
   border-radius: var(--sf-radius-md);
   padding: var(--sf-space-md);
-  box-shadow: var(--sf-shadow);
-  transition: var(--sf-transition);
+  transition: border-color var(--sf-transition-fast);
 }
 
 .sf-card:hover {
-  box-shadow: var(--sf-shadow-lg);
+  border-color: var(--sf-border-strong);
 }
 
 .sf-card-header {
@@ -19,7 +19,7 @@
   align-items: center;
   margin-bottom: var(--sf-space-md);
   padding-bottom: var(--sf-space-sm);
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--sf-border);
 }
 
 .sf-card-header h3 {
@@ -64,9 +64,9 @@
 /* ====== Progress Bars ====== */
 .sf-progress-container {
   width: 100%;
-  height: 8px;
-  background-color: var(--background-modifier-border);
-  border-radius: 4px;
+  height: 6px;
+  background-color: var(--sf-border);
+  border-radius: 999px;
   overflow: hidden;
   margin: var(--sf-space-md) 0;
 }
@@ -74,26 +74,8 @@
 .sf-progress-bar {
   height: 100%;
   background-color: var(--sf-primary);
-  transition: width 0.5s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.sf-progress-bar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.15) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite linear;
+  border-radius: 999px;
+  transition: width 260ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .sf-progress-bar-success {
@@ -108,49 +90,49 @@
   background-color: var(--sf-danger);
 }
 
-/* Enhanced time indicators with modern styling */
+/* Semantic time & phase indicators */
 .review-time-short {
-  color: #38a169; /* Modern green */
+  color: var(--sf-success);
   font-weight: 500;
-  background-color: rgba(56, 161, 105, 0.1);
+  background-color: var(--sf-success-light);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--sf-radius-sm);
   font-size: var(--sf-font-ui);
 }
 
 .review-time-medium {
-  color: #dd6b20; /* Modern orange */
+  color: var(--sf-warning);
   font-weight: 500;
-  background-color: rgba(221, 107, 32, 0.1);
+  background-color: var(--sf-warning-light);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--sf-radius-sm);
   font-size: var(--sf-font-ui);
 }
 
 .review-time-long {
-  color: #e53e3e; /* Modern red */
+  color: var(--sf-danger);
   font-weight: 500;
-  background-color: rgba(229, 62, 62, 0.1);
+  background-color: var(--sf-danger-light);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--sf-radius-sm);
   font-size: var(--sf-font-ui);
 }
 
 .review-phase-initial {
-  color: var(--text-accent); /* Use Obsidian accent color */
+  color: var(--text-accent);
   font-weight: 500;
-  background-color: var(--background-modifier-success-hover);
+  background-color: var(--sf-primary-light);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--sf-radius-sm);
   font-size: var(--sf-font-ui);
 }
 
 .review-phase-spaced {
-  color: var(--text-success, #50fa7b); /* Use Obsidian success color */
+  color: var(--sf-success);
   font-weight: 500;
-  background-color: var(--background-modifier-success-hover);
+  background-color: var(--sf-success-light);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--sf-radius-sm);
   font-size: var(--sf-font-ui);
 }
 

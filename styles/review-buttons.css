@@ -34,103 +34,70 @@
   gap: 10px;
 }
 
-/* Modern color palette for review buttons */
-.review-button-complete-blackout {
-  background-color: #e53e3e; /* Modern red */
-  color: white;
-  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.2);
-}
-
-.review-button-incorrect {
-  background-color: #e53e3e; /* Modern red */
-  color: white;
-  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.2);
+/* Adaptive semantic palette for review buttons */
+.review-button-complete-blackout,
+.review-button-incorrect,
+.review-button-hard {
+  background-color: var(--sf-danger);
+  color: var(--text-on-accent, white);
 }
 
 .review-button-incorrect-familiar {
-  background-color: #feb2b2; /* Light red */
-  color: #c53030; /* Dark red */
-  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.1);
+  background-color: var(--sf-danger-light);
+  color: var(--sf-danger);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 35%, transparent);
 }
 
-.review-button-correct-difficulty {
-  background-color: #fbd38d; /* Light amber */
-  color: #c05621; /* Dark amber */
-  box-shadow: 0 1px 3px rgba(192, 86, 33, 0.1);
-}
-
-.review-button-correct-hesitation {
-  background-color: #c6f6d5; /* Light green */
-  color: #2f855a; /* Dark green */
-  box-shadow: 0 1px 3px rgba(47, 133, 90, 0.1);
-}
-
-.review-button-perfect-recall {
-  background-color: #38a169; /* Modern green */
-  color: white;
-  box-shadow: 0 1px 3px rgba(56, 161, 105, 0.2);
-}
-
-/* Legacy button styles with modern colors */
-.review-button-hard {
-  background-color: #e53e3e; /* Modern red */
-  color: white;
-  box-shadow: 0 1px 3px rgba(229, 62, 62, 0.2);
-}
-
+.review-button-correct-difficulty,
 .review-button-fair {
-  background-color: #fbd38d; /* Light amber */
-  color: #c05621; /* Dark amber */
-  box-shadow: 0 1px 3px rgba(192, 86, 33, 0.1);
+  background-color: var(--sf-warning-light);
+  color: var(--sf-warning);
+  border: 1px solid color-mix(in srgb, var(--sf-warning) 35%, transparent);
 }
 
+.review-button-correct-hesitation,
 .review-button-good {
-  background-color: #c6f6d5; /* Light green */
-  color: #2f855a; /* Dark green */
-  box-shadow: 0 1px 3px rgba(47, 133, 90, 0.1);
+  background-color: var(--sf-success-light);
+  color: var(--sf-success);
+  border: 1px solid color-mix(in srgb, var(--sf-success) 35%, transparent);
 }
 
+.review-button-perfect-recall,
 .review-button-perfect {
-  background-color: #38a169; /* Modern green */
-  color: white;
-  box-shadow: 0 1px 3px rgba(56, 161, 105, 0.2);
+  background-color: var(--sf-success);
+  color: var(--text-on-accent, white);
 }
 
 .review-button-postpone {
-  background-color: #ed8936; /* Modern orange */
-  color: white;
-  box-shadow: 0 1px 3px rgba(237, 137, 54, 0.2);
+  background-color: var(--sf-warning);
+  color: var(--text-on-accent, white);
 }
 
 .review-button-skip {
-  background-color: #f7fafc; /* Light gray */
-  color: #4a5568; /* Dark gray */
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--sf-border);
 }
 
 .review-button-mcq {
-  background-color: #4299e1; /* Modern blue */
-  color: white;
-  box-shadow: 0 1px 3px rgba(66, 153, 225, 0.2);
+  background-color: var(--sf-info);
+  color: var(--text-on-accent, white);
 }
 
 .review-button-mcq-refresh {
-  background-color: #667eea; /* Modern indigo */
-  color: white;
-  box-shadow: 0 1px 3px rgba(102, 126, 234, 0.2);
+  background-color: var(--sf-primary);
+  color: var(--sf-text-on-primary);
 }
 
 .review-button-advance,
-.review-note-advance, /* For individual note item button if specific styling needed */
-.review-bulk-advance, /* For bulk action button */
-.review-date-advance-all /* For date section button */ {
-  background-color: #38B2AC; /* Teal */
-  color: white;
-  box-shadow: 0 1px 3px rgba(56, 178, 172, 0.2); /* Teal shadow */
+.review-note-advance,
+.review-bulk-advance,
+.review-date-advance-all {
+  background-color: var(--color-cyan, #2c7a7b);
+  color: var(--text-on-accent, white);
 }
 
-/* Button hover states */
+/* Button hover & keyboard focus states */
 .review-button-complete-blackout:hover,
 .review-button-incorrect:hover,
 .review-button-incorrect-familiar:hover,
@@ -149,9 +116,30 @@
 .review-note-advance:hover,
 .review-bulk-advance:hover,
 .review-date-advance-all:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sf-shadow);
-  filter: brightness(1.1);
+  filter: brightness(1.06);
+}
+
+.review-button-complete-blackout:focus-visible,
+.review-button-incorrect:focus-visible,
+.review-button-incorrect-familiar:focus-visible,
+.review-button-correct-difficulty:focus-visible,
+.review-button-correct-hesitation:focus-visible,
+.review-button-perfect-recall:focus-visible,
+.review-button-hard:focus-visible,
+.review-button-fair:focus-visible,
+.review-button-good:focus-visible,
+.review-button-perfect:focus-visible,
+.review-button-postpone:focus-visible,
+.review-button-skip:focus-visible,
+.review-button-mcq:focus-visible,
+.review-button-mcq-refresh:focus-visible,
+.review-button-advance:focus-visible,
+.review-note-advance:focus-visible,
+.review-bulk-advance:focus-visible,
+.review-date-advance-all:focus-visible,
+.review-skip-next-day-button:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
 }
 
 /* Disabled state for buttons */
@@ -216,8 +204,8 @@ button.disabled:hover {
 }
 
 .review-skip-next-day-button {
-  background-color: var(--warning-color, #e78a4e);
-  color: white;
+  background-color: var(--sf-warning);
+  color: var(--text-on-accent, white);
   padding: var(--sf-space-sm) var(--sf-space-md);
   border-radius: var(--sf-radius-md);
   cursor: pointer;
@@ -225,7 +213,7 @@ button.disabled:hover {
   text-align: center;
   border: none;
   margin-top: var(--sf-space-sm);
-  transition: var(--sf-transition);
+  transition: filter var(--sf-transition-fast);
   width: 100%;
 }
 

@@ -15,6 +15,8 @@ import { MiniElement, flatten, textsOfClass } from './support/mini-dom';
 
 interface Recorded {
     tabs: DockTab[];
+    views: Array<string | undefined>;
+    listens: number;
     grades: number[];
     skips: number;
     previouses: number;
@@ -31,12 +33,13 @@ interface Recorded {
 
 function makeStrip(mcqAvailable = false): { strip: ReviewStrip; host: MiniElement; calls: Recorded } {
     const calls: Recorded = {
-        tabs: [],
+        tabs: [], views: [], listens: 0,
         grades: [], skips: 0, previouses: 0, nexts: 0, postpones: 0, undos: 0, ends: 0,
         decisions: [], mcqTests: 0, mcqRegenerations: 0, removals: 0, hosts: [],
     };
     const strip = new ReviewStrip({
-        onTab: (tab) => calls.tabs.push(tab),
+        onTab: (tab, view) => { calls.tabs.push(tab); calls.views.push(view); },
+        onListen: () => { calls.listens += 1; },
         onGrade: (response) => calls.grades.push(response),
         onSkip: () => { calls.skips += 1; },
         onPrevious: () => { calls.previouses += 1; },
@@ -82,51 +85,61 @@ function reviewingState(overrides: Partial<StripState> = {}): StripState {
     };
 }
 
-test('the status line reads as groups: the note, its scheduler, and the due state', () => {
+/** The bar's ⋯ button. */
+function moreButton(host: MiniElement): MiniElement {
+    const more = host.byClass('sf-strip-action').find(button => button.getAttribute('aria-label') === 'More');
+    assert.ok(more, 'the bar has a ⋯ menu');
+    return more;
+}
+
+/** Open ⋯ and press the item with this title. */
+function pickMenu(host: MiniElement, title: string): void {
+    moreButton(host).click();
+    const item = menuItems.find(entry => entry.title === title);
+    assert.ok(item, `the menu offers "${title}"`);
+    item.click();
+}
+
+test('the header reads as the note, with its due state and scheduler on one quiet line under it', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState());
 
-    const element = host.byClass('sf-strip')[0];
-    assert.ok(element, 'the strip is mounted into the note pane');
+    assert.ok(host.byClass('sf-strip')[0], 'the strip is mounted into the note pane');
 
-    // (a) the note and how far through the run: "6/23 · Cell biology".
     const identity = host.byClass('sf-strip-group-identity')[0];
     assert.ok(identity, 'the identity is a group of its own');
-    assert.equal(identity.textOf('sf-strip-progress-count'), '7/23 notes', 'six passed, standing on the seventh');
-    // One number, not two: "17 left" beside "1/18" read as a second total.
-    assert.equal(host.byClass('sf-strip-progress-left').length, 0);
     assert.equal(identity.textOf('sf-strip-title'), 'Cell biology');
 
-    // (b) the scheduler, muted, with the longer numbers left on the hover.
+    // The place in the run sits between the arrows that move it.
+    const nav = host.byClass('sf-strip-nav')[0];
+    assert.ok(nav, 'previous / place / next are one cluster');
+    assert.equal(nav.textOf('sf-strip-progress-count'), '7/23 notes', 'six passed, standing on the seventh');
+    assert.equal(host.byClass('sf-strip-progress-left').length, 0);
+
     const schedule = host.byClass('sf-strip-group-schedule')[0];
-    assert.ok(schedule, 'the scheduler is a group of its own');
     const meta = schedule.byClass('sf-strip-meta')[0];
     assert.equal(flatten(meta), 'FSRS · review');
     assert.match(meta.getAttribute('title') ?? '', /stability 12\.0/);
 
-    // (c) the due state is a group of its own.
     const due = host.byClass('sf-strip-group-due')[0];
-    assert.ok(due, 'the due state is a group of its own');
     assert.equal(due.textOf('sf-strip-due'), '3d overdue');
 
     // Three facts, three elements — not one run-on line.
     assert.equal(host.byClass('sf-strip-group').length, 3);
 });
 
-test('the due state is the header\'s own child, so a narrow host can place it beside the controls', () => {
+test('the due state and the scheduler share one line under the name', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState());
 
-    const header = host.byClass('sf-strip-header')[0];
-    const due = host.byClass('sf-strip-group-due')[0];
     const status = host.byClass('sf-strip-status')[0];
-    assert.ok(header && due && status, 'the bar draws a header, a status block and a due state');
-    // A sibling of the status block, not a child of it: the narrow layout puts
-    // the due state on the controls' line by placing it in the header grid, and
-    // the wrapper no longer has to be flattened with `display: contents` (which
-    // the plugin review rejects) for that to work.
-    assert.equal(due.parentElement, header);
-    assert.notEqual(due.parentElement, status, 'the due state is not part of the status block');
+    const sub = host.byClass('sf-strip-sub')[0];
+    assert.ok(status && sub, 'the bar draws a status block with a line under the name');
+    assert.equal(sub.parentElement, status);
+    assert.equal(host.byClass('sf-strip-group-due')[0].parentElement, sub);
+    assert.equal(host.byClass('sf-strip-group-schedule')[0].parentElement, sub);
+    // Due first: it is the fact that asks for something.
+    assert.ok(sub.children[0].hasClass('sf-strip-group-due'));
 });
 
 test('the scheduler group keeps the short form on the line and the full string on the hover', () => {
@@ -148,36 +161,25 @@ test('a fact with nothing to say gets no group at all', () => {
     assert.equal(host.byClass('sf-strip-group-due').length, 0, 'no due group when nothing is due');
 });
 
-test('the keyboard hints sit behind the help affordance, not on the line', () => {
+test('the keyboard hints wait in the menu, not on the line', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState());
 
-    // The status line is a status line again: no keys, no prose about keys.
     const status = host.byClass('sf-strip-status')[0];
-    assert.ok(status, 'the status line is one element');
     assert.doesNotMatch(flatten(status), /rate|next|esc end/);
     assert.equal(host.byClass('sf-strip-hint').length, 0, 'the old inline hint is gone');
+    assert.equal(host.byClass('sf-strip-help').length, 0, 'and so is the separate ? button');
     assert.doesNotMatch(flatten(host.byClass('sf-strip')[0]), /n next|esc end/, 'nothing prints them inline anywhere on the bar');
 
-    // The affordance carries them: hover for the pointer, the label for
-    // assistive tech.
-    const help = host.byClass('sf-strip-help')[0];
-    assert.ok(help, 'the bar has a help affordance');
-    assert.equal(help.text, '?');
-    assert.match(help.getAttribute('title') ?? '', /1-4 rate · n next · u undo · p postpone · esc end/);
-    assert.match(help.getAttribute('aria-label') ?? '', /Keyboard shortcuts — 1-4 rate/);
-    assert.equal(help.getAttribute('aria-expanded'), 'false');
-
-    // Asked for, it prints the same sentence once; asked again, it puts it away.
-    help.click();
+    // Asked for from ⋯, the same sentence prints once, and survives a re-render.
+    pickMenu(host, 'Keyboard shortcuts');
     assert.equal(host.byClass('sf-strip-help-text').length, 1, 'the hint appears once');
     assert.match(host.textOf('sf-strip-help-text'), /n next · u undo · p postpone · esc end/);
-    assert.equal(help.getAttribute('aria-expanded'), 'true');
-    assert.ok(help.hasClass('is-open'), 'and the affordance says it is showing');
+    strip.render(reviewingState());
+    assert.equal(host.byClass('sf-strip-help-text').length, 1, 'a tick does not take it away');
 
-    help.click();
-    assert.equal(host.byClass('sf-strip-help-text').length, 0, 'pressing it again puts the hint away');
-    assert.equal(help.getAttribute('aria-expanded'), 'false');
+    pickMenu(host, 'Hide keyboard shortcuts');
+    assert.equal(host.byClass('sf-strip-help-text').length, 0, 'asking again puts the hint away');
 });
 
 test('each grade button carries its label, key and resulting interval', () => {
@@ -221,9 +223,9 @@ test('SM-2 notes get their six grades', () => {
     }));
 
     assert.deepEqual(textsOfClass(host, 'sf-strip-grade-key'), ['0', '1', '2', '3', '4', '5']);
-    // The reminder names the scale the running algorithm really offers, and it
-    // reaches the reader through the help affordance.
-    assert.match(host.byClass('sf-strip-help')[0].getAttribute('title') ?? '', /0-5 rate/);
+    // The reminder names the scale the running algorithm really offers.
+    pickMenu(host, 'Keyboard shortcuts');
+    assert.match(host.textOf('sf-strip-help-text'), /0-5 rate/);
 });
 
 test('a grade button hands its own rating back', () => {
@@ -238,71 +240,80 @@ test('a grade button hands its own rating back', () => {
     assert.deepEqual(calls.grades, [3, 1]);
 });
 
-test('secondary controls skip, postpone, undo and end', () => {
+test('the bar walks, undoes and ends; postpone and skip wait in the menu', () => {
     const { strip, host, calls } = makeStrip();
-    strip.render(reviewingState());
+    strip.render(reviewingState({ canUndo: true }));
 
     const actions = host.byClass('sf-strip-action');
-    assert.equal(actions.length, 6);
-    for (const action of actions) action.click();
-
+    assert.deepEqual(
+        actions.map(action => action.getAttribute('aria-label')),
+        ['Undo last rating (u)', 'Previous (b)', 'Next (n)', 'More', 'End review (esc)'],
+    );
+    for (const action of actions) {
+        if (action.getAttribute('aria-label') !== 'More') action.click();
+    }
     assert.equal(calls.undos, 1);
     assert.equal(calls.previouses, 1);
     assert.equal(calls.nexts, 1);
-    assert.equal(calls.postpones, 1);
     assert.equal(calls.ends, 1);
-    // The fourth control opens the overflow menu rather than acting on its own.
+
+    pickMenu(host, 'Postpone to tomorrow (p)');
+    assert.equal(calls.postpones, 1);
+    pickMenu(host, 'Skip this note (s)');
+    assert.equal(calls.skips, 1);
     assert.equal(calls.mcqTests, 0);
 });
 
 test('undo is not offered until something has been graded', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState({ canUndo: false }));
-
-    const undo = host.byClass('sf-strip-action')[0];
-    assert.equal(undo.disabled, true);
+    assert.equal(host.byClass('sf-strip-undo').length, 0, 'nothing to undo, no button to press');
 
     strip.render(reviewingState({ canUndo: true }));
-    assert.equal(host.byClass('sf-strip-action')[0].disabled, false);
+    const undo = host.byClass('sf-strip-undo');
+    assert.equal(undo.length, 1);
+    assert.equal(undo[0].disabled, false);
 });
 
 test('the overflow menu only offers questions when MCQs are available', () => {
     const withoutMCQ = makeStrip(false);
     withoutMCQ.strip.render(reviewingState());
-    withoutMCQ.host.byClass('sf-strip-action')[4].click();   // More, past Previous/Next
-    // The menu also says where the session lives — but a question action only
-    // appears when there are questions to make.
+    moreButton(withoutMCQ.host).click();
     assert.deepEqual(menuItems.map(item => item.title), [
+        'Postpone to tomorrow (p)',
         'Skip this note (s)',
-        'Keep the review under the note',
-        'Split the review to the right',
-        'Move the review into a window',
-        'Move the review into the sidebar',
+        'Review under the note',
+        'Review in a split',
+        'Review in a window',
+        'Review in the sidebar',
+        'Keyboard shortcuts',
         'Remove from review schedule',
     ]);
     assert.equal(menuItems.filter(item => /MCQ/.test(item.title)).length, 0);
-    menuItems[4].click();
-    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar']);
-    menuItems[2].click();
-    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar', 'split']);
     menuItems[5].click();
+    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar']);
+    menuItems[3].click();
+    assert.deepEqual(withoutMCQ.calls.hosts, ['sidebar', 'split']);
+    menuItems[7].click();
     assert.equal(withoutMCQ.calls.removals, 1);
 
     const withMCQ = makeStrip(true);
     withMCQ.strip.render(reviewingState());
-    withMCQ.host.byClass('sf-strip-action')[4].click();
+    moreButton(withMCQ.host).click();
     assert.deepEqual(menuItems.map(item => item.title), [
+        'Postpone to tomorrow (p)',
+        'Skip this note (s)',
         'Test with MCQs',
         'Generate new MCQs',
-        'Skip this note (s)',
-        'Keep the review under the note',
-        'Split the review to the right',
-        'Move the review into a window',
-        'Move the review into the sidebar',
+        'Review under the note',
+        'Review in a split',
+        'Review in a window',
+        'Review in the sidebar',
+        'Keyboard shortcuts',
         'Remove from review schedule',
     ]);
-    menuItems[0].click();
-    menuItems[1].click();
+    menuItems[2].click();
+    menuItems[3].click();
     assert.equal(withMCQ.calls.mcqTests, 1);
     assert.equal(withMCQ.calls.mcqRegenerations, 1);
 });
@@ -391,13 +402,13 @@ test('re-mounting into the same pane keeps a single bar', () => {
     assert.equal(host.byClass('sf-strip').length, 1);
 });
 
-test('the tab row is its own row of tabs: each count in its label, the open one selected', () => {
+test('one tab row for everything: the study views flattened in, each count a badge, the open one selected', () => {
     const { strip, host, calls } = makeStrip();
     strip.render(reviewingState({
         tabs: {
-            study: { label: 'Study · 40 objectives', title: 'teach me these' },
-            mcq: { label: 'MCQs · 3', title: 'sit three questions' },
-            cards: { label: 'Cards · 33', title: 'sit the card lane' },
+            study: { label: 'Learn', title: 'teach me these', count: '2 due' },
+            mcq: { label: 'MCQs', title: 'sit three questions', count: '3' },
+            cards: { label: 'Cards', title: 'sit the card lane', count: '33' },
             active: 'mcq',
         },
     }));
@@ -406,31 +417,61 @@ test('the tab row is its own row of tabs: each count in its label, the open one 
     const row = host.byClass('sf-strip-tabs')[0];
     assert.ok(row, 'the bar has a tab row');
     assert.equal(row.getAttribute('role'), 'tablist');
-    assert.equal(stripEl.children[0].hasClass('sf-strip-header'), true);
-    assert.equal(stripEl.children[1], row, 'the row sits under the status and above the grades');
+    const last = stripEl.children[stripEl.children.length - 1];
+    assert.ok(last.hasClass('sf-strip-tabbar'), 'the row is the bar\'s last line, sitting on the panel it opens');
     assert.equal(host.byClass('sf-strip-status')[0].byClass('sf-strip-tab').length, 0, 'the tabs are not on the status line');
 
     const tabs = row.byClass('sf-strip-tab');
     assert.deepEqual(
-        tabs.map(tab => flatten(tab)),
-        ['Study · 40 objectives', 'MCQs · 3', 'Cards · 33'],
-        'each tab carries its own count inside its own label',
+        tabs.map(tab => tab.textOf('sf-strip-tab-label')),
+        ['Learn', 'Visualize', 'Mind map', 'Summary', 'MCQs', 'Cards'],
+        'the study panel\'s views are tabs of the same row',
     );
-    assert.deepEqual(tabs.map(tab => tab.getAttribute('role')), ['tab', 'tab', 'tab']);
-    assert.deepEqual(tabs.map(tab => tab.getAttribute('aria-selected')), ['false', 'true', 'false']);
-    assert.deepEqual(tabs.map(tab => tab.hasClass('is-active')), [false, true, false], 'and the open one is the selected one');
+    assert.deepEqual(tabs.map(tab => tab.byClass('sf-strip-tab-count')[0]?.text ?? ''), ['2 due', '', '', '', '3', '33']);
+    assert.ok(tabs.every(tab => tab.getAttribute('role') === 'tab'));
+    assert.deepEqual(tabs.map(tab => tab.hasClass('is-active')), [false, false, false, false, true, false]);
+    assert.equal(tabs[4].getAttribute('aria-selected'), 'true');
     assert.equal(tabs[0].getAttribute('title'), 'teach me these');
 
     host.byClass('sf-strip-tab-mcq')[0].click();
-    assert.deepEqual(calls.tabs, ['mcq'], 'clicking a tab asks for it');
+    host.byClass('sf-strip-tab-view-mindmap')[0].click();
+    assert.deepEqual(calls.tabs, ['mcq', 'study'], 'clicking a tab asks for it');
+    assert.deepEqual(calls.views, [undefined, 'mindmap'], 'a study view says which');
+});
+
+test('the open study view is the marked tab', () => {
+    const { strip, host } = makeStrip();
+    strip.render(reviewingState({
+        tabs: { study: { label: 'Learn', title: 'study' }, mcq: null, cards: null, active: 'study', view: 'board' },
+    }));
+    const marked = host.byClass('sf-strip-tab').filter(tab => tab.hasClass('is-active'));
+    assert.equal(marked.length, 1);
+    assert.ok(marked[0].hasClass('sf-strip-tab-view-board'));
+});
+
+test('read aloud sits at the end of the tab row and shows when it is playing', () => {
+    const { strip, host, calls } = makeStrip();
+    strip.render(reviewingState({
+        tabs: { study: null, mcq: { label: 'MCQs', title: 'q' }, cards: null, active: null, listen: { playing: false } },
+    }));
+    const listen = host.byClass('sf-strip-listen')[0];
+    assert.ok(listen, 'a speaker on the tab row');
+    assert.equal(listen.getAttribute('aria-pressed'), 'false');
+    listen.click();
+    assert.equal(calls.listens, 1);
+
+    strip.render(reviewingState({
+        tabs: { study: null, mcq: { label: 'MCQs', title: 'q' }, cards: null, active: null, listen: { playing: true } },
+    }));
+    assert.ok(host.byClass('sf-strip-listen')[0].hasClass('is-playing'));
 });
 
 test('a re-render replaces the bar, never stacking a second copy of it', () => {
     const { strip, host } = makeStrip();
     const withTabs = reviewingState({
         tabs: {
-            study: { label: 'Study · 40 objectives', title: 'teach me these' },
-            mcq: { label: 'MCQs · 3', title: 'sit three questions' },
+            study: { label: 'Learn', title: 'teach me these' },
+            mcq: { label: 'MCQs', title: 'sit three questions', count: '3' },
             cards: null,
             active: 'study',
         },
@@ -446,15 +487,15 @@ test('a re-render replaces the bar, never stacking a second copy of it', () => {
     assert.equal(host.byClass('sf-strip-header').length, 1, 'one header');
     assert.equal(host.byClass('sf-strip-group').length, 3, 'one group per fact');
     assert.equal(host.byClass('sf-strip-tabs').length, 1, 'one tab row');
-    assert.equal(host.byClass('sf-strip-tab').length, 2, 'one of each tab');
-    assert.equal(host.byClass('sf-strip-help').length, 1, 'one help affordance');
+    assert.equal(host.byClass('sf-strip-tab').length, 5, 'one of each tab');
+    assert.equal(host.byClass('sf-strip-nav').length, 1, 'one set of controls');
     assert.equal(second, first, 'and no element was added by the second render');
 });
 
 test('the open tab is the marked one, and a missing side is not offered', () => {
     const { strip, host } = makeStrip();
     strip.render(reviewingState({
-        tabs: { study: { label: 'Study', title: 'study' }, mcq: null, cards: null, active: 'study' },
+        tabs: { study: null, mcq: { label: 'MCQs', title: 'q' }, cards: null, active: 'mcq' },
     }));
 
     const tabs = host.byClass('sf-strip-tab');
@@ -469,13 +510,14 @@ test('the cards tab is a tab like the others: same row, same active marking', ()
         tabs: {
             study: null,
             mcq: { label: 'MCQs', title: 'sit the questions' },
-            cards: { label: 'Cards · 33', title: 'sit the card lane' },
+            cards: { label: 'Cards', title: 'sit the card lane', count: '33' },
             active: 'cards',
         },
     }));
 
     const tabs = host.byClass('sf-strip-tab');
-    assert.deepEqual(tabs.map(button => flatten(button)), ['MCQs', 'Cards · 33'], 'the card lane joins the same row');
+    assert.deepEqual(tabs.map(button => button.textOf('sf-strip-tab-label')), ['MCQs', 'Cards'], 'the card lane joins the same row');
+    assert.equal(tabs[1].textOf('sf-strip-tab-count'), '33');
     assert.equal(tabs[0].hasClass('is-active'), false, 'the questions are not the open tab');
     assert.equal(tabs[1].hasClass('is-active'), true, 'the cards tab is, and is marked like the rest');
     assert.deepEqual(tabs.map(tab => tab.getAttribute('aria-selected')), ['false', 'true']);
@@ -561,7 +603,7 @@ test('the cards step takes the place of the grades and names where the sitting i
         tabs: {
             study: null,
             mcq: null,
-            cards: { label: 'Cards · 3', title: 'sit the card lane' },
+            cards: { label: 'Cards', title: 'sit the card lane', count: '3' },
             active: 'cards',
         },
     }));
@@ -596,3 +638,37 @@ test('a finished run that carried cards says both, because both were steps of it
     assert.match(host.textOf('sf-strip-finished'), /Review session complete — 3 notes and 3 cards handled/);
 });
 
+
+test('every icon button draws its glyph inside a box of its own, so iPadOS cannot shrink it away', () => {
+    const { strip, host } = makeStrip();
+    strip.render(reviewingState({
+        canUndo: true,
+        tabs: { study: null, mcq: { label: 'MCQs', title: 'q' }, cards: null, active: null, listen: { playing: false } },
+    }));
+    const buttons = host.byClass('sf-strip-icon-button');
+    assert.equal(buttons.length, 6, 'undo, previous, next, more, end, and read aloud');
+    for (const button of buttons) {
+        // A bare SVG straight in the button is what collapsed to nothing under
+        // Obsidian's mobile button padding; the span is the fixed-size box the
+        // stylesheet sizes explicitly.
+        assert.equal(button.children.length, 1, `${button.getAttribute('aria-label')} has one child`);
+        assert.ok(button.children[0].hasClass('sf-strip-icon'), `${button.getAttribute('aria-label')} wraps its glyph`);
+        assert.ok(button.getAttribute('aria-label'), 'and an icon-only button still says what it does');
+    }
+});
+
+
+test('the line under the name is reading time: this note, then what is left of the day', () => {
+    const { strip, host } = makeStrip();
+    strip.render(reviewingState({ timing: { note: '4 min', left: '1h 20m', notesLeft: 26, scope: null } }));
+    const time = host.byClass('sf-strip-group-time')[0];
+    assert.ok(time, 'a timing group');
+    assert.equal(time.textOf('sf-strip-time-note'), '4 min read');
+    assert.equal(time.textOf('sf-strip-time-left'), '1h 20m left today');
+    assert.equal(host.byClass('sf-strip-group-due').length, 0, 'how late a note is moves to the hover');
+    assert.match(time.getAttribute('title') ?? '', /Due: 3d overdue/);
+
+    // A day picked on the calendar names that day; a total still being counted says the notes.
+    strip.render(reviewingState({ timing: { note: '2 min', left: null, notesLeft: 3, scope: 'Nov 16' } }));
+    assert.equal(host.textOf('sf-strip-time-left'), '3 notes left for Nov 16');
+});

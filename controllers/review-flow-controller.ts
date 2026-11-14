@@ -25,7 +25,7 @@ import {
 } from '../models/review-flow';
 import { ReviewSchedule } from '../models/review-schedule';
 import { FSRS, SM2 } from '../ui/constants';
-import { DockSuggestion, DockTab, ReviewDock } from '../ui/review-dock';
+import { DockStudyView, DockSuggestion, DockTab, ReviewDock } from '../ui/review-dock';
 import { ReviewStrip, StripGradeButton, StripState } from '../ui/review-strip';
 import { REVIEW_WINDOW_VIEW, ReviewWindowView } from '../ui/review-window-view';
 import { DateUtils } from '../utils/dates';
@@ -133,7 +133,8 @@ export class ReviewFlowController {
             onTestWithMCQs: () => { void this.testWithMCQs(); },
             onRegenerateMCQs: () => { void this.regenerateMCQs(); },
             onRemoveFromSchedule: () => { void this.removeCurrentFromSchedule(); },
-            onTab: (tab) => this.selectDockTab(tab),
+            onTab: (tab, view) => this.selectDockTab(tab, view),
+            onListen: () => this.dock?.toggleListen(),
             onHost: (host) => { void this.moveToHost(host); },
         });
         this.host = plugin.settings.reviewSessionHost ?? 'note';
@@ -1021,9 +1022,9 @@ export class ReviewFlowController {
      * to it — the same step the bar's Next takes — and the sitting is on
      * screen the moment it lands.
      */
-    private selectDockTab(tab: DockTab): void {
+    private selectDockTab(tab: DockTab, view?: DockStudyView): void {
         if (tab !== 'cards') {
-            this.dock?.openTab(tab);
+            this.dock?.openTab(tab, view);
             return;
         }
         // The cards control positions the run rather than opening a tab that
@@ -1683,6 +1684,7 @@ export class ReviewFlowController {
             title,
             meta: this.describeSchedule(schedule, algorithm),
             dueLabel: schedule ? formatDueLabel(schedule.nextReviewDate, now) : '',
+            timing: this.timingFor(path),
             position,
             queue,
             algorithm,
@@ -1805,6 +1807,76 @@ export class ReviewFlowController {
         this.render();
     }
 
+    /** Notes whose word count is being read, so a render never asks twice. */
+    private priming = new Set<string>();
+    /**
+     * What a background count answered, kept for notes the word-count cache
+     * will not hold (a note that is gone answers a default and is never
+     * cached): without it every redraw would ask again, and redraw again.
+     */
+    private primedSeconds = new Map<string, number>();
+
+    /**
+     * How long the note on screen takes to read, and how long the rest of the
+     * run will take — the run being the day picked on the calendar, or every
+     * due note when none was.
+     *
+     * Estimates come from the cached word counts the calendar uses. A note not
+     * counted yet is read in the background and the bar is drawn again once it
+     * is, so a number only ever appears when it can be stood behind.
+     */
+    private timingFor(path: string): StripState['timing'] {
+        // A line of information must never be able to take the bar down: a
+        // count that cannot be read is simply not printed.
+        try {
+            return this.computeTiming(path);
+        } catch {
+            return null;
+        }
+    }
+
+    private computeTiming(path: string): StripState['timing'] {
+        const service = this.plugin.reviewScheduleService;
+        const pending = this.model.pendingNotePaths();
+        if (!pending.includes(path)) pending.unshift(path);
+        let left = 0;
+        let unknown = 0;
+        const estimate = (note: string): number | null =>
+            service.estimateReviewTimeCached(note) ?? this.primedSeconds.get(note) ?? null;
+        for (const note of pending) {
+            const seconds = estimate(note);
+            if (seconds === null) {
+                unknown += 1;
+                this.primeEstimate(note);
+            } else {
+                left += seconds;
+            }
+        }
+        const current = estimate(path);
+        if (current === null) return null;
+        const override = this.plugin.reviewController.getCurrentReviewDateOverride?.() ?? null;
+        const scope = override !== null
+            ? new Date(override).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+            : null;
+        return {
+            note: formatReadTime(current),
+            left: unknown === 0 ? formatReadTime(left) : null,
+            notesLeft: pending.length,
+            scope,
+        };
+    }
+
+    private primeEstimate(path: string): void {
+        if (this.priming.has(path) || this.primedSeconds.has(path)) return;
+        this.priming.add(path);
+        void this.plugin.reviewScheduleService.estimateReviewTime(path).catch(() => 60).then(seconds => {
+            this.primedSeconds.set(path, seconds);
+            this.priming.delete(path);
+            // One redraw for the batch: the last count to land paints the total.
+            if (this.priming.size === 0 && this.model.isActive()) this.render();
+        });
+    }
+
     private describeSchedule(schedule: ReviewSchedule | undefined, algorithm: ReviewAlgorithm): string {
         const label = algorithm === 'fsrs' ? FSRS : SM2;
         if (!schedule) return label;
@@ -1922,4 +1994,14 @@ function FsrsStateName(state: number): string {
         case 3: return 'relearning';
         default: return 'review';
     }
+}
+
+/** "45s" reads as noise on a bar: under a minute is "<1 min"; hours read "1h 20m". */
+export function formatReadTime(seconds: number): string {
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 1) return '<1 min';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
 }

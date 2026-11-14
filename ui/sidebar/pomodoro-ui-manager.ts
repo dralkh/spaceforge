@@ -137,6 +137,8 @@ export class PomodoroUIManager {
         if (!this.pomodoroStartBtn || this.pomodoroStartBtn.parentElement !== mainControlsRow) {
             this.pomodoroStartBtn?.remove();
             this.pomodoroStartBtn = mainControlsRow.createEl("button", { cls: "pomodoro-start-btn" });
+            this.pomodoroStartBtn.type = "button";
+            this.pomodoroStartBtn.setAttribute("aria-label", "Start Pomodoro timer");
             setIcon(this.pomodoroStartBtn, "play");
             this.pomodoroStartBtn.addEventListener("click", () => this.plugin.pomodoroService.start());
         }
@@ -145,19 +147,31 @@ export class PomodoroUIManager {
         if (!this.pomodoroStopBtn || this.pomodoroStopBtn.parentElement !== mainControlsRow) {
             this.pomodoroStopBtn?.remove();
             this.pomodoroStopBtn = mainControlsRow.createEl("button", { cls: "pomodoro-stop-btn" });
+            this.pomodoroStopBtn.type = "button";
+            this.pomodoroStopBtn.setAttribute("aria-label", "Pause Pomodoro timer");
             setIcon(this.pomodoroStopBtn, "pause");
             this.pomodoroStopBtn.addEventListener("click", () => this.plugin.pomodoroService.stop());
         }
         // this.pomodoroStopBtn.hide(); // Initial state, updatePomodoroUI will manage visibility
 
-        // Timer Display
+        // Timer Display (listeners attached once when element is created)
         if (!this.pomodoroTimerDisplayEl || this.pomodoroTimerDisplayEl.parentElement !== mainControlsRow) {
             this.pomodoroTimerDisplayEl?.remove();
             this.pomodoroTimerDisplayEl = mainControlsRow.createDiv({ cls: "pomodoro-timer-display pomodoro-timer-fade" });
-        }
-        this.pomodoroTimerDisplayEl.setText(this.plugin.pomodoroService.getFormattedTimeLeft());
-        // Add event listeners for long-press and click on timer display
-        if (this.pomodoroTimerDisplayEl) {
+            this.pomodoroTimerDisplayEl.setAttribute("role", "button");
+            this.pomodoroTimerDisplayEl.setAttribute("tabindex", "0");
+            this.pomodoroTimerDisplayEl.setAttribute("aria-label", "Pomodoro timer — click to toggle quick settings");
+            this.pomodoroTimerDisplayEl.setAttribute("title", "Click for quick settings; hold to toggle controls");
+
+            this.pomodoroTimerDisplayEl.addEventListener("keydown", (e: KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (this.isTimerTextVisible) {
+                        this.toggleSettingsPanel();
+                    }
+                }
+            });
+
             this.pomodoroTimerDisplayEl.addEventListener("mousedown", (e) => {
                 // Prevent text selection during long press
                 e.preventDefault();
@@ -165,15 +179,12 @@ export class PomodoroUIManager {
                 this.didVeryLongPress = false;
 
                 this.longPressTimer = window.setTimeout(() => {
-                    this.didLongPress = true; // Mark that the first threshold was met
-                    // Action for long press (toggle buttons) will be decided on mouseup/touchend
-                    // unless veryLongPressTimer also fires.
+                    this.didLongPress = true;
                 }, this.LONG_PRESS_DURATION);
 
                 this.veryLongPressTimer = window.setTimeout(() => {
                     this.didVeryLongPress = true;
-                    this.isTimerTextVisible = !this.isTimerTextVisible; // Toggle timer text
-                    // If timer text is now hidden, also hide buttons. If shown, show buttons.
+                    this.isTimerTextVisible = !this.isTimerTextVisible;
                     this.areButtonsVisible = this.isTimerTextVisible;
                     this.updateTimerTextDisplay();
                     this.updateButtonVisibility();
@@ -187,18 +198,18 @@ export class PomodoroUIManager {
                 this.longPressTimer = null;
 
                 if (this.didVeryLongPress) {
-                    // Action for very long press (timer text + buttons) already taken by its timeout.
+                    // Already handled by timeout.
                 } else if (this.didLongPress) {
-                    if (!this.isTimerTextVisible) { // If timer text was hidden
-                        this.isTimerTextVisible = true; // Make text visible
-                        this.areButtonsVisible = true;  // Make buttons visible
-                    } else { // Timer text was already visible
-                        this.areButtonsVisible = !this.areButtonsVisible; // Just toggle buttons
+                    if (!this.isTimerTextVisible) {
+                        this.isTimerTextVisible = true;
+                        this.areButtonsVisible = true;
+                    } else {
+                        this.areButtonsVisible = !this.areButtonsVisible;
                     }
                     this.updateTimerTextDisplay();
                     this.updateButtonVisibility();
-                } else { // Short click
-                    if (this.isTimerTextVisible) { // Only toggle settings if timer text is visible
+                } else {
+                    if (this.isTimerTextVisible) {
                         this.toggleSettingsPanel();
                     }
                 }
@@ -221,7 +232,6 @@ export class PomodoroUIManager {
             this.pomodoroTimerDisplayEl.addEventListener("mouseleave", cancelPress);
             this.pomodoroTimerDisplayEl.addEventListener("touchmove", cancelPress);
 
-            // Touchstart needs to mirror mousedown logic for setting up timers
             this.pomodoroTimerDisplayEl.addEventListener("touchstart", (e) => {
                 e.preventDefault();
                 this.didLongPress = false;
@@ -240,12 +250,15 @@ export class PomodoroUIManager {
                 }, this.VERY_LONG_PRESS_DURATION);
             }, { passive: false });
         }
+        this.pomodoroTimerDisplayEl.setText(this.plugin.pomodoroService.getFormattedTimeLeft());
 
 
         // Skip Button
         if (!this.pomodoroSkipBtn || this.pomodoroSkipBtn.parentElement !== mainControlsRow) {
             this.pomodoroSkipBtn?.remove();
             this.pomodoroSkipBtn = mainControlsRow.createEl("button", { cls: "pomodoro-skip-btn" });
+            this.pomodoroSkipBtn.type = "button";
+            this.pomodoroSkipBtn.setAttribute("aria-label", "Skip Pomodoro session");
             setIcon(this.pomodoroSkipBtn, "skip-forward");
             this.pomodoroSkipBtn.addEventListener("click", () => this.plugin.pomodoroService.skipSession());
         }
@@ -352,6 +365,7 @@ export class PomodoroUIManager {
             // Add to estimation toggle
             const toggleContainer = overrideContainer.createDiv("pomodoro-override-toggle-container");
             this.pomodoroUserAddToEstimationCheckbox = toggleContainer.createEl("input", { type: "checkbox", cls: "pomodoro-add-to-estimation" });
+            this.pomodoroUserAddToEstimationCheckbox.id = "pomodoro-add-to-estimation";
             this.pomodoroUserAddToEstimationCheckbox.checked = this.plugin.pluginState.pomodoroUserAddToEstimation;
 
             const toggleLabel = toggleContainer.createEl("label", { text: "Add to estimated time", cls: "pomodoro-toggle-label" });

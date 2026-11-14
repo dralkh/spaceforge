@@ -35,6 +35,7 @@ import {
 import { EstimationUtils } from '../utils/estimation';
 import { stripRestatedQuestion } from './study-copy';
 import { repairStudyWorkspace, studyUniqueId } from '../models/study-workspace';
+import { centerInScroller } from '../utils/scroll-center';
 
 interface WorkspaceViewState {
     activeView?: 'learn' | StudyMaterialView;
@@ -52,6 +53,8 @@ export interface StudyPanelOptions {
     onRequestSpace?: () => void;
     /** Called when reader triggers aloud reading directly from a material section. */
     onReadAloud?: (view: StudyMaterialView) => void;
+    /** The view on screen changed — by the reader, or by read-aloud following its place. */
+    onViewChange?: (view: 'learn' | StudyMaterialView) => void;
 }
 
 /**
@@ -380,13 +383,8 @@ export class StudyPanel {
         this.materialSection?.destroy();
         this.materialSection = null;
         host.addClass('sf-study-workspace');
-        const heading = host.createDiv('sf-study-workspace-heading');
-        const title = heading.createEl('button', { cls: 'sf-study-workspace-note', text: this.noteTitle });
-        title.setAttribute('title', 'Open source note');
-        title.addEventListener('click', () => void this.plugin.app.workspace.openLinkText(this.notePath, '', false));
-        this.workspaceProgress = heading.createDiv('sf-study-workspace-progress');
-        this.updateWorkspaceProgress();
-        const nav = host.createDiv('sf-study-workspace-views');
+        const topbar = host.createDiv('sf-study-workspace-topbar');
+        const nav = topbar.createDiv('sf-study-workspace-views');
         nav.setAttribute('role', 'group');
         nav.setAttribute('aria-label', 'Learning view');
         this.viewButtons.clear();
@@ -395,6 +393,12 @@ export class StudyPanel {
             button.addEventListener('click', () => this.switchWorkspaceView(view));
             this.viewButtons.set(view, button);
         }
+        const heading = topbar.createDiv('sf-study-workspace-heading');
+        const title = heading.createEl('button', { cls: 'sf-study-workspace-note', text: this.noteTitle });
+        title.setAttribute('title', 'Open source note');
+        title.addEventListener('click', () => void this.plugin.app.workspace.openLinkText(this.notePath, '', false));
+        this.workspaceProgress = heading.createDiv('sf-study-workspace-progress');
+        this.updateWorkspaceProgress();
         this.learningEl = host.createDiv('sf-study-workspace-learn');
         this.materialEl = host.createDiv('sf-study-workspace-material');
         this.switchWorkspaceView(this.activeView, false);
@@ -407,6 +411,7 @@ export class StudyPanel {
 
     private switchWorkspaceView(view: 'learn' | StudyMaterialView, capture = true): void {
         if (capture) this.captureWorkspace();
+        const changed = this.activeView !== view;
         this.activeView = view;
         this.viewState.activeView = view;
         this.learningEl?.toggleClass('sf-hidden', view !== 'learn');
@@ -422,6 +427,7 @@ export class StudyPanel {
         const key = `${view}:${this.session?.getActiveObjectiveId() ?? ''}`;
         if (this.overflowEl) this.overflowEl.scrollTop = this.viewState.scroll?.[key] ?? 0;
         this.saveWorkspace();
+        if (changed || !capture) this.options.onViewChange?.(view);
     }
 
     private captureWorkspace(): void {
@@ -525,7 +531,9 @@ export class StudyPanel {
             generate: () => this.generateVisuals(),
             state: this.viewState.material ??= {},
             saveState: () => this.saveWorkspace(),
-            onReadAloud: view => this.options.onReadAloud?.(view),
+            // A host with a read-aloud control of its own (the review bar's
+            // speaker) does not get a second one inside the material.
+            onReadAloud: this.options.onReadAloud ? view => this.options.onReadAloud?.(view) : undefined,
         };
         section.mount(card, host, { externalNavigation: true });
     }
@@ -1817,17 +1825,18 @@ export class StudyPanel {
         ) {
             const targetView: StudyMaterialView =
                 segment.targetSurface === 'visualize' ? 'board' : segment.targetSurface;
+            // A segment of a view the reader has left marks nothing and moves
+            // nothing; it picks up again if they come back to it.
             if (this.activeView !== targetView) {
-                this.setWorkspaceView(targetView);
+                this.materialSection?.clearTtsHighlight();
+                return;
             }
             this.materialSection?.highlightTtsSegment(segment, autoScroll);
             return;
         }
         if (segment.targetSurface === 'tutor') {
             this.materialSection?.clearTtsHighlight();
-            if (this.activeView !== 'learn') {
-                this.setWorkspaceView('learn');
-            }
+            if (this.activeView !== 'learn') return;
             if (this.streamEl && typeof segment.tutorTurnIndex === 'number') {
                 const bubbles = Array.from(this.streamEl.children ?? []).filter(el =>
                     (el as HTMLElement).hasClass?.('sf-study-turn'),
@@ -1836,7 +1845,7 @@ export class StudyPanel {
                 if (target) {
                     target.addClass('sf-tts-active-segment');
                     if (autoScroll) {
-                        target.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+                        centerInScroller(target);
                     }
                 }
             }

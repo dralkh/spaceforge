@@ -78,7 +78,7 @@ export class StudyMaterialSection {
         if (host.onReadAloud) {
             this.listenEl = head.createEl('button', {
                 cls: 'sf-btn sf-study-material-listen',
-                attr: { type: 'button', title: 'Read current study material aloud' },
+                attr: { type: 'button', title: 'Read current Study material aloud' },
             });
             const icon = this.listenEl.createSpan('sf-study-material-listen-icon');
             setIcon(icon, 'volume-2');
@@ -139,6 +139,12 @@ export class StudyMaterialSection {
             if (pending) this.generateEl.setAttribute('disabled', 'true');
         }
         if (this.busy) this.generateEl.setAttribute('disabled', 'true');
+        // Nothing to say and nothing to do but the rare remake: the head steps
+        // out of the way to a quiet footer under the material instead of
+        // costing a row above it. Stale, missing or failed material keeps it
+        // on top, where it is the first thing the reader needs.
+        const pendingPrep = !!preparation && preparation.materials !== 'ready' && preparation.materials !== 'skipped';
+        this.rootEl?.toggleClass('is-settled', this.externalNavigation && !!pack && !stale && !pendingPrep && !this.busy);
         if (this.listenEl) {
             this.listenEl.disabled = !pack;
         }

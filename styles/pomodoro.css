@@ -73,7 +73,17 @@
 .pomodoro-main-controls .pomodoro-stop-btn:hover,
 .pomodoro-main-controls .pomodoro-skip-btn:hover {
   background-color: var(--background-modifier-hover);
-  border-color: var(--interactive-accent-hover); /* Use a variable if possible */
+  border-color: var(--interactive-accent-hover);
+}
+
+.pomodoro-main-controls .pomodoro-start-btn:focus-visible,
+.pomodoro-main-controls .pomodoro-stop-btn:focus-visible,
+.pomodoro-main-controls .pomodoro-skip-btn:focus-visible,
+.pomodoro-timer-display:focus-visible,
+.pomodoro-quick-save-btn:focus-visible,
+.pomodoro-quick-calculate-btn:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
 }
 
 .pomodoro-main-controls .pomodoro-start-btn svg,
@@ -124,44 +134,25 @@
 
 /* Removed .pomodoro-quick-settings-toggle styles as the element is gone */
 
-/* New container for the settings panel to allow absolute positioning of the panel itself */
+/* In-flow expandable settings drawer so it never overlaps or clips sidebar items */
 .pomodoro-settings-panel-container {
-  position: relative; /* Anchor for the absolute positioned panel */
   width: 100%;
-  z-index: 10; /* Ensure dropdown is above other elements if necessary */
 }
 
 .pomodoro-quick-settings-panel {
-  position: absolute;
-  top: 0; /* Position it right below where the toggle was (conceptually) */
-  left: 0;
-  right: 0;
-  background-color: var(--background-secondary); /* Modern dropdown bg */
-  border: 1px solid var(--background-modifier-border);
-  border-top: none; /* Remove top border as it connects visually */
-  border-radius: 0 0 var(--radius-m) var(--radius-m); /* Rounded bottom corners */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Modern shadow */
-  padding: 0; /* Initial padding for transition */
-  display: flex; /* Always flex to allow transition of other properties */
+  display: none;
   flex-direction: column;
-  gap: 8px; /* Increased gap for better spacing */
-  overflow: hidden; /* Crucial for max-height transition */
-  max-height: 0; /* Initially hidden */
-  opacity: 0; /* Initially transparent */
-  transition: max-height 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), /* Smoother ease */
-              opacity 0.3s ease-out,
-              padding 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
-  /* margin-top: 0; /* Removed original margin-top */
-  pointer-events: none; /* Prevent interaction when closed */
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background-color: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px solid var(--sf-border);
+  border-radius: var(--radius-m);
 }
 
 /* Styles when the panel is open */
 .pomodoro-quick-settings-panel.is-open {
-  padding: 12px; /* Restored padding */
-  max-height: 800px; /* Large enough to fit content */
-  opacity: 1;
-  border-top: 1px solid var(--background-modifier-border); /* Add a separator line when open */
-  pointer-events: auto; /* Allow interaction when open */
+  display: flex;
 }
 
 .pomodoro-quick-setting { /* Added for individual setting item styling */
@@ -251,12 +242,11 @@
 
 /* User Override Styles */
 .pomodoro-override-container {
-    margin: 12px 0;
+    margin: 8px 0;
     padding: 10px;
-    background-color: var(--background-secondary-alt);
+    background-color: var(--background-primary);
     border-radius: var(--radius-s);
-    border: 1px solid var(--background-modifier-border);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--sf-border);
 }
 
 .pomodoro-override-label {

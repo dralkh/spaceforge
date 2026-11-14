@@ -50,6 +50,7 @@
 
 import { StudyFlow, StudyFlowStep, StudyMatrix, StudySummary, StudyTimeline, StudyTimelineEntry, StudyVisual } from '../models/study-visuals';
 import type { AloudSegmentSummaryTarget } from '../services/tts/study-aloud-converter';
+import { centerInScroller } from '../utils/scroll-center';
 
 const ACTIVE_TTS_CLS = 'sf-tts-active-segment';
 
@@ -1334,7 +1335,7 @@ export class StudySummaryView {
         candidate.addClass(ACTIVE_TTS_CLS);
         this.highlightedEl = candidate;
         if (autoScroll) {
-            candidate.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+            centerInScroller(candidate);
         }
     }
 

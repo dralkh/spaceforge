@@ -161,7 +161,12 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
             const collapseIndicator = headingSetting.settingEl.createSpan({
                 cls: 'sf-settings-collapse-indicator'
             });
+            collapseIndicator.setAttribute('aria-hidden', 'true');
             headingSetting.nameEl.appendChild(collapseIndicator);
+
+            headingSetting.settingEl.addClass('sf-settings-section-header');
+            headingSetting.settingEl.setAttribute('role', 'button');
+            headingSetting.settingEl.setAttribute('tabindex', '0');
 
             // Create content container
             const contentContainer = sectionContainer.createDiv({
@@ -177,13 +182,22 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 contentContainer.classList.toggle('sf-hidden', !open);
                 contentContainer.classList.toggle('sf-visible', open);
                 collapseIndicator.textContent = open ? '▾' : '▸';
+                headingSetting.settingEl.setAttribute('aria-expanded', String(open));
                 this.sectionOpenState.set(title, open);
             };
             setOpen(this.sectionOpenState.get(title) ?? defaultOpen);
 
-            // Add click handler for toggling
-            headingSetting.settingEl.addEventListener('click', () => {
+            const toggleSection = () => {
                 setOpen(contentContainer.classList.contains('sf-hidden'));
+            };
+
+            // Add click and keyboard handlers for toggling
+            headingSetting.settingEl.addEventListener('click', toggleSection);
+            headingSetting.settingEl.addEventListener('keydown', (event: KeyboardEvent) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleSection();
+                }
             });
 
             return contentContainer;
@@ -233,18 +247,20 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 const dataJson = JSON.stringify(dataToExport, null, 2);
                 const blob = new Blob([dataJson], { type: 'application/json' });
 
+                const url = URL.createObjectURL(blob);
                 const a = document.body.createEl('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'spaceforge-data.json'; // Changed filename
+                a.href = url;
+                a.download = 'spaceforge-data.json';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
+                window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 
                 new Notice('All data exported successfully');
             });
 
             // Import all data button
-            const importBtn = actionsContainer.createEl('button', { text: 'Import all data', cls: 'sf-btn sf-btn-primary' });
+            const importBtn = actionsContainer.createEl('button', { text: 'Import all data', cls: 'sf-btn sf-btn-ghost' });
             importBtn.addEventListener('click', () => {
                 const input = document.body.createEl('input');
                 input.type = 'file';
@@ -1877,7 +1893,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                 }));
 
         // ========= TEXT-TO-SPEECH (TTS) SECTION =========
-        const ttsSection = createCollapsible('Text-to-speech (aloud)', 'volume-2', false);
+        const ttsSection = createCollapsible('Text-to-speech', 'volume-2', false);
         renderTtsSettingsSection(ttsSection, this.plugin);
 
         // ========= DATA MANAGEMENT SECTION =========
@@ -2204,7 +2220,7 @@ export class SpaceforgeSettingTab extends PluginSettingTab {
                     button.setButtonText('Asking…');
                     const result = await discoverModels(field, this.plugin.settings);
                     button.setDisabled(false);
-                    button.setButtonText('Find models');
+                    button.setButtonText('List models');
                     const suggest = this.modelSuggests.get(field);
                     if (result.models.length > 0) {
                         this.modelCache.set(field, result.models);

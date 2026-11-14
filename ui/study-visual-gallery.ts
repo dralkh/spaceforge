@@ -6,6 +6,7 @@ import { StudyVisualDiagramView } from './study-visual-diagram';
 import { StudyVisualGraphView } from './study-visual-graph';
 import { StudyVisualLabView } from './study-visual-lab';
 import { StudySequenceState, StudyVisualSequenceView } from './study-visual-sequence';
+import { centerInScroller } from '../utils/scroll-center';
 
 const ACTIVE_TTS_CLS = 'sf-tts-active-segment';
 
@@ -241,7 +242,7 @@ export class StudyVisualGalleryView {
         focusEl.addClass(ACTIVE_TTS_CLS);
         this.highlightedEl = focusEl;
         if (autoScroll) {
-            focusEl.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+            centerInScroller(focusEl);
         }
     }
 

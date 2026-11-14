@@ -1165,7 +1165,7 @@ test("the bar's Cards tab sits the deck in the dock, under the grades", async ()
 
     const cards = shell.strip()?.byClass('sf-strip-tab-cards')[0];
     assert.ok(cards, 'the bar carries the cards tab');
-    assert.equal(cards.text, 'Cards');
+    assert.equal(cards.textOf('sf-strip-tab-label'), 'Cards');
 
     cards.click();
     await shell.settle();
@@ -1303,7 +1303,11 @@ function counterText(shell: FakeShell): string {
 
 /** The card lane's own tab label, as the bar prints it. */
 function cardTabText(shell: FakeShell): string {
-    return shell.strip()?.byClass('sf-strip-tab-cards')[0]?.text ?? '';
+    const tab = shell.strip()?.byClass('sf-strip-tab-cards')[0];
+    if (!tab) return '';
+    // Read as the reader does: the name, then the badge beside it.
+    const count = tab.byClass('sf-strip-tab-count')[0]?.text;
+    return count ? `${tab.textOf('sf-strip-tab-label')} · ${count}` : tab.textOf('sf-strip-tab-label');
 }
 
 /**
@@ -2430,4 +2434,13 @@ test('walking the queue from the list never marks the reader\'s work done', asyn
     await press(shell, 's');
     await shell.settle();
     assert.equal(shell.flow.runPosition().handled, 1, 'a real skip counts');
+});
+
+
+test('reading times read as minutes and hours, never as seconds', async () => {
+    const { formatReadTime } = await import('../controllers/review-flow-controller');
+    assert.equal(formatReadTime(20), '<1 min');
+    assert.equal(formatReadTime(240), '4 min');
+    assert.equal(formatReadTime(3600), '1h');
+    assert.equal(formatReadTime(4800), '1h 20m');
 });

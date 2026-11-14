@@ -4,6 +4,11 @@ import type { TtsPlayerService, TtsPlayerSnapshot } from '../services/tts/tts-pl
 
 export interface TtsPlayerBarHandlers {
     onReadTarget: (source: TtsTargetSource) => Promise<void> | void;
+    /**
+     * Play / pause in "read what is on screen" mode. The host knows which view
+     * is showing; without this the bar falls back to its own source choice.
+     */
+    onToggle?: () => void;
     onSourceChange?: (source: TtsTargetSource) => void;
     onResumeFollow?: () => void;
 }
@@ -11,7 +16,7 @@ export interface TtsPlayerBarHandlers {
 const SPEED_STEPS = [0.85, 1.0, 1.25, 1.5, 1.75, 2.0];
 
 const SOURCE_OPTIONS: Array<{ value: TtsTargetSource; label: string }> = [
-    { value: 'auto', label: 'Auto' },
+    { value: 'auto', label: 'On screen' },
     { value: 'note', label: 'Note' },
     { value: 'summary', label: 'Summary' },
     { value: 'mindmap', label: 'Mind map' },
@@ -20,8 +25,13 @@ const SOURCE_OPTIONS: Array<{ value: TtsTargetSource; label: string }> = [
 ];
 
 /**
- * Compact TTS transport bar rendered inside the review bar/dock so it appears in all
- * review hosts (under note, split pane, popout window, and sidebar Review tab).
+ * The read-aloud transport: one row, no taller than a button.
+ *
+ *   ▶  ⏮ ⏭   Reflection — angle in equals angle out…  3/12   1.0× ◎ On screen ▾ ⤓ ■
+ *   ▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  (hairline progress)
+ *
+ * It is hidden while idle — the review bar's speaker starts it — so it only
+ * ever costs a row while something is actually being read.
  */
 export class TtsPlayerBar {
     private player: TtsPlayerService;
@@ -41,6 +51,7 @@ export class TtsPlayerBar {
     private fillEl: HTMLElement | null = null;
     private unsubscribe: (() => void) | null = null;
     private selectedSource: TtsTargetSource = 'auto';
+    private lastPlayIcon = '';
 
     constructor(player: TtsPlayerService, handlers: TtsPlayerBarHandlers) {
         this.player = player;
@@ -54,48 +65,46 @@ export class TtsPlayerBar {
         const root = container.createDiv('sf-tts-bar');
         this.rootEl = root;
 
-        const controls = root.createDiv('sf-tts-controls');
+        this.playBtn = this.iconButton(root, 'volume-2', 'Play / pause (reads what is on screen)', 'sf-tts-play-btn');
+        this.playIconEl = this.playBtn.querySelector<HTMLElement>('.sf-tts-btn-icon');
+        this.playBtn.addEventListener('click', () => this.play());
 
-        const playBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-play-btn',
-            attr: { type: 'button', title: 'Read aloud (Play / Pause)', 'aria-label': 'Read aloud (Play / Pause)' },
-        });
-        this.playIconEl = playBtn.createSpan('sf-tts-btn-icon');
-        setIcon(this.playIconEl, 'volume-2');
-        playBtn.addEventListener('click', () => {
-            const snap = this.player.getSnapshot();
-            if (snap.status === 'playing' || snap.status === 'loading' || snap.status === 'paused') {
-                void this.player.togglePlayPause();
-            } else {
-                void this.handlers.onReadTarget(this.selectedSource);
-            }
-        });
-        this.playBtn = playBtn;
-
-        this.prevBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-icon-btn',
-            attr: { type: 'button', title: 'Previous chunk', 'aria-label': 'Previous chunk' },
-        });
-        setIcon(this.prevBtn, 'skip-back');
+        this.prevBtn = this.iconButton(root, 'skip-back', 'Previous part', 'sf-tts-secondary');
         this.prevBtn.addEventListener('click', () => void this.player.previous());
-
-        this.nextBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-icon-btn',
-            attr: { type: 'button', title: 'Next chunk', 'aria-label': 'Next chunk' },
-        });
-        setIcon(this.nextBtn, 'skip-forward');
+        this.nextBtn = this.iconButton(root, 'skip-forward', 'Next part', 'sf-tts-secondary');
         this.nextBtn.addEventListener('click', () => void this.player.next());
 
-        this.stopBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-icon-btn',
-            attr: { type: 'button', title: 'Stop reading aloud', 'aria-label': 'Stop reading aloud' },
-        });
-        setIcon(this.stopBtn, 'square');
-        this.stopBtn.addEventListener('click', () => this.player.stop());
+        // What is being read, taking whatever width the row has left.
+        const info = root.createDiv('sf-tts-info');
+        this.captionEl = info.createDiv('sf-tts-caption');
+        this.countEl = info.createDiv('sf-tts-count');
 
-        const sourceSelect = controls.createEl('select', {
-            cls: 'sf-tts-source',
-            attr: { 'aria-label': 'Read aloud source' },
+        this.speedBtn = root.createEl('button', {
+            cls: 'sf-tts-chip-btn sf-tts-secondary',
+            attr: { type: 'button', title: 'Reading speed (click to change)' },
+        });
+        this.speedBtn.addEventListener('click', () => {
+            const cur = this.player.getSettings().playbackSpeed;
+            const nextIdx = SPEED_STEPS.findIndex(s => s > cur + 0.02);
+            this.player.setPlaybackRate(nextIdx >= 0 ? SPEED_STEPS[nextIdx] : SPEED_STEPS[0]);
+        });
+
+        this.followBtn = this.iconButton(root, 'locate-fixed', 'Follow along: keep the part being read centred', 'sf-tts-follow-btn sf-tts-secondary');
+        this.followBtn.addEventListener('click', () => {
+            const snap = this.player.getSnapshot();
+            if (snap.autoScrollPausedByUser) {
+                this.player.resumeAutoScroll();
+                this.handlers.onResumeFollow?.();
+            } else {
+                const next = !this.player.getSettings().autoScroll;
+                this.player.setAutoScroll(next);
+                if (next) this.handlers.onResumeFollow?.();
+            }
+        });
+
+        const sourceSelect = root.createEl('select', {
+            cls: 'sf-tts-source dropdown',
+            attr: { 'aria-label': 'What to read', title: 'What to read' },
         });
         for (const opt of SOURCE_OPTIONS) {
             sourceSelect.createEl('option', { value: opt.value, text: opt.label });
@@ -113,43 +122,11 @@ export class TtsPlayerBar {
         });
         this.sourceEl = sourceSelect;
 
-        this.speedBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-chip-btn',
-            attr: { type: 'button', title: 'Cycle reading speed' },
-        });
-        this.speedBtn.addEventListener('click', () => {
-            const cur = this.player.getSettings().playbackSpeed;
-            const nextIdx = SPEED_STEPS.findIndex(s => s > cur + 0.02);
-            const next = nextIdx >= 0 ? SPEED_STEPS[nextIdx] : SPEED_STEPS[0];
-            this.player.setPlaybackRate(next);
-        });
-
-        this.followBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-chip-btn sf-tts-follow-btn',
-            attr: { type: 'button', title: 'Toggle highlight auto-scroll' },
-        });
-        this.followBtn.addEventListener('click', () => {
-            const snap = this.player.getSnapshot();
-            if (snap.autoScrollPausedByUser) {
-                this.player.resumeAutoScroll();
-                this.handlers.onResumeFollow?.();
-            } else {
-                const next = !this.player.getSettings().autoScroll;
-                this.player.setAutoScroll(next);
-                if (next) this.handlers.onResumeFollow?.();
-            }
-        });
-
-        this.exportBtn = controls.createEl('button', {
-            cls: 'sf-btn sf-tts-icon-btn',
-            attr: { type: 'button', title: 'Export audio track', 'aria-label': 'Export audio track' },
-        });
-        setIcon(this.exportBtn, 'download');
+        this.exportBtn = this.iconButton(root, 'download', 'Save this audio', 'sf-tts-secondary');
         this.exportBtn.addEventListener('click', () => void this.player.exportCurrentTrack());
 
-        const info = root.createDiv('sf-tts-info');
-        this.captionEl = info.createDiv('sf-tts-caption');
-        this.countEl = info.createDiv('sf-tts-count');
+        this.stopBtn = this.iconButton(root, 'square', 'Stop', 'sf-tts-secondary');
+        this.stopBtn.addEventListener('click', () => this.player.stop());
 
         const progress = root.createDiv('sf-tts-progress');
         this.fillEl = progress.createDiv('sf-tts-progress-fill');
@@ -162,6 +139,30 @@ export class TtsPlayerBar {
         return this.selectedSource;
     }
 
+    private play(): void {
+        // "On screen" is the host's to resolve: it knows which tab is showing.
+        if (this.selectedSource === 'auto' && this.handlers.onToggle) {
+            this.handlers.onToggle();
+            return;
+        }
+        const snap = this.player.getSnapshot();
+        if (snap.status === 'playing' || snap.status === 'loading' || snap.status === 'paused') {
+            void this.player.togglePlayPause();
+        } else {
+            void this.handlers.onReadTarget(this.selectedSource);
+        }
+    }
+
+    /** An icon-only button with its glyph in a fixed box (see the iPad note in tts.css). */
+    private iconButton(parent: HTMLElement, icon: string, label: string, cls: string): HTMLButtonElement {
+        const button = parent.createEl('button', {
+            cls: `sf-tts-icon-btn ${cls}`,
+            attr: { type: 'button', title: label, 'aria-label': label },
+        });
+        setIcon(button.createSpan('sf-tts-btn-icon'), icon);
+        return button;
+    }
+
     private render(snapshot: TtsPlayerSnapshot): void {
         const root = this.rootEl;
         if (!root) return;
@@ -171,25 +172,22 @@ export class TtsPlayerBar {
             snapshot.status === 'loading' ||
             snapshot.status === 'paused';
 
+        const hasSegments = snapshot.segments.length > 0;
+        const isIdle = !isActive && !hasSegments && snapshot.status !== 'error' && !snapshot.errorMessage;
+        root.toggleClass('is-idle', isIdle);
         root.toggleClass('is-active', isActive);
         root.toggleClass('is-playing', snapshot.status === 'playing');
         root.toggleClass('is-paused', snapshot.status === 'paused');
         root.toggleClass('is-loading', snapshot.status === 'loading');
         root.toggleClass('is-error', snapshot.status === 'error');
 
-        if (this.playIconEl) {
+        const icon = snapshot.status === 'playing' ? 'pause' : snapshot.status === 'loading' ? 'loader' : 'play';
+        if (this.playIconEl && icon !== this.lastPlayIcon) {
+            this.lastPlayIcon = icon;
             this.playIconEl.empty();
-            setIcon(
-                this.playIconEl,
-                snapshot.status === 'playing'
-                    ? 'pause'
-                    : snapshot.status === 'loading'
-                      ? 'loader'
-                      : 'volume-2',
-            );
+            setIcon(this.playIconEl, icon);
         }
 
-        const hasSegments = snapshot.segments.length > 0;
         if (this.prevBtn) this.prevBtn.disabled = !hasSegments || snapshot.currentIndex <= 0;
         if (this.nextBtn) {
             this.nextBtn.disabled = !hasSegments || snapshot.currentIndex >= snapshot.segments.length - 1;
@@ -198,35 +196,37 @@ export class TtsPlayerBar {
         if (this.exportBtn) this.exportBtn.disabled = !hasSegments;
 
         if (this.speedBtn) {
-            this.speedBtn.setText(`${snapshot.playbackRate.toFixed(snapshot.playbackRate % 1 === 0 ? 1 : 2)}x`);
+            this.speedBtn.setText(`${snapshot.playbackRate.toFixed(snapshot.playbackRate % 1 === 0 ? 1 : 2)}×`);
         }
 
         if (this.followBtn) {
-            const on = snapshot.autoScroll;
+            const on = snapshot.autoScroll && !snapshot.autoScrollPausedByUser;
             this.followBtn.toggleClass('is-on', on);
             this.followBtn.toggleClass('is-paused', snapshot.autoScrollPausedByUser);
             this.followBtn.setAttribute('aria-pressed', String(on));
-            this.followBtn.setText(snapshot.autoScrollPausedByUser ? 'Resume follow' : on ? 'Follow' : 'Manual');
+            const label = snapshot.autoScrollPausedByUser
+                ? 'Follow paused because you scrolled — click to resume'
+                : on ? 'Following along — click to stop' : 'Not following — click to follow along';
+            this.followBtn.setAttribute('title', label);
+            this.followBtn.setAttribute('aria-label', label);
         }
 
         if (this.captionEl) {
             if (snapshot.status === 'error') {
-                this.captionEl.setText(snapshot.errorMessage || 'TTS error');
+                this.captionEl.setText(snapshot.errorMessage || 'Read aloud failed');
             } else if (snapshot.currentSegment) {
                 this.captionEl.setText(snapshot.currentSegment.label || snapshot.currentSegment.text);
-            } else if (snapshot.errorMessage) {
-                this.captionEl.setText(snapshot.errorMessage);
             } else {
-                this.captionEl.setText('Read aloud');
+                this.captionEl.setText(snapshot.errorMessage || snapshot.title || '');
             }
         }
 
         if (this.countEl) {
-            if (snapshot.segments.length > 0 && snapshot.currentIndex >= 0) {
-                this.countEl.setText(`${snapshot.currentIndex + 1}/${snapshot.segments.length}`);
-            } else {
-                this.countEl.setText('');
-            }
+            this.countEl.setText(
+                snapshot.segments.length > 0 && snapshot.currentIndex >= 0
+                    ? `${snapshot.currentIndex + 1}/${snapshot.segments.length}`
+                    : '',
+            );
         }
 
         if (this.fillEl) {
@@ -255,5 +255,6 @@ export class TtsPlayerBar {
         this.captionEl = null;
         this.countEl = null;
         this.fillEl = null;
+        this.lastPlayIcon = '';
     }
 }

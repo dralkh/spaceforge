@@ -2,7 +2,6 @@
 
 .sf-settings-section {
   margin-bottom: var(--sf-space-lg);
-  animation: fadeIn 0.3s ease-out;
 }
 
 .sf-settings-section-header {
@@ -11,23 +10,28 @@
   padding: var(--sf-space-sm) var(--sf-space-md);
   margin-top: var(--sf-space-lg);
   margin-bottom: var(--sf-space-sm);
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--sf-border);
   cursor: pointer;
   border-radius: var(--sf-radius-sm);
-  transition: var(--sf-transition);
+  transition: background-color var(--sf-transition-fast);
 }
 
 .sf-settings-section-header:hover {
   background-color: var(--sf-bg-secondary);
 }
 
+.sf-settings-section-header:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
+}
+
 .sf-settings-icon {
-  margin-right: var(--sf-space-md);
-  display: flex;
+  margin-inline-end: var(--sf-space-sm);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .sf-settings-section-header h3 {
@@ -37,15 +41,14 @@
 }
 
 .sf-settings-collapse-indicator {
-  margin-left: var(--sf-space-sm);
+  margin-inline-start: var(--sf-space-sm);
   font-size: var(--sf-font-small);
-  transition: var(--sf-transition);
+  color: var(--sf-text-muted);
 }
 
 .sf-settings-section-content {
-  padding-left: var(--sf-space-md);
+  padding-inline-start: var(--sf-space-md);
   margin-bottom: var(--sf-space-lg);
-  transition: max-height 0.3s ease, opacity 0.3s ease;
 }
 
 .sf-settings-subsection {
@@ -53,7 +56,7 @@
   font-weight: 600;
   font-size: var(--sf-font-text);
   color: var(--sf-text);
-  border-bottom: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--sf-border);
   padding-bottom: 6px;
 }
 
@@ -62,13 +65,13 @@
   color: var(--sf-text-muted);
   margin-top: -8px;
   margin-bottom: var(--sf-space-md);
-  margin-left: 26px;
+  margin-inline-start: 26px;
   font-style: italic;
 }
 
 .sf-setting-highlight {
   background-color: var(--sf-bg-secondary);
-  border-left: 3px solid var(--sf-primary);
+  border-inline-start: 3px solid var(--sf-primary);
   padding: var(--sf-space-md);
   margin: var(--sf-space-md) 0;
   border-radius: var(--sf-radius-sm);
@@ -84,45 +87,21 @@
 .sf-settings-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sf-space-md);
+  gap: var(--sf-space-sm);
   margin: var(--sf-space-md) 0 var(--sf-space-lg) 0;
 }
 
-.sf-settings-actions button {
-  flex: 1;
-  min-width: 120px;
-  padding: var(--sf-space-sm) var(--sf-space-md);
-  background-color: var(--sf-primary);
-  color: var(--sf-text-on-primary);
-  border: none;
-  border-radius: var(--sf-radius-sm);
-  cursor: pointer;
-  font-weight: 500;
-  transition: var(--sf-transition);
-}
-
-.sf-settings-actions button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Ensure button classes work properly in settings actions */
 .sf-settings-actions .sf-btn {
-  flex: 1;
+  flex: 1 1 140px;
   min-width: 120px;
-}
-
-.sf-settings-actions .sf-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
 }
 
 .sf-info-box {
   background-color: var(--sf-bg-secondary);
+  border: 1px solid var(--sf-border);
   padding: var(--sf-space-md);
   border-radius: var(--sf-radius-md);
   margin: var(--sf-space-md) 0;
-  box-shadow: var(--sf-shadow);
 }
 
 .sf-info-box h4 {
@@ -205,7 +184,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.1em;
-    font-size: var(--font-ui-smaller, 0.85em);
+    font-size: var(--sf-font-small);
 }
 
 .sf-detect-row {

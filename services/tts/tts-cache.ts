@@ -22,41 +22,44 @@ interface CacheIndexEntry {
 export class MemoryTtsCache implements TtsCacheAdapter {
     private entries = new Map<string, { audio: TtsSynthesizedAudio; lastRead: number; size: number }>();
 
-    async getAudio(key: string): Promise<TtsSynthesizedAudio | null> {
+    getAudio(key: string): Promise<TtsSynthesizedAudio | null> {
         const hit = this.entries.get(key);
-        if (!hit) return null;
+        if (!hit) return Promise.resolve(null);
         hit.lastRead = Date.now();
-        return hit.audio;
+        return Promise.resolve(hit.audio);
     }
 
-    async saveAudio(key: string, audio: TtsSynthesizedAudio): Promise<void> {
+    saveAudio(key: string, audio: TtsSynthesizedAudio): Promise<void> {
         this.entries.set(key, {
             audio: { data: audio.data.slice(0), format: audio.format },
             lastRead: Date.now(),
             size: audio.data.byteLength,
         });
+        return Promise.resolve();
     }
 
-    async expire(olderThanMillis: number): Promise<void> {
-        if (olderThanMillis <= 0) return;
+    expire(olderThanMillis: number): Promise<void> {
+        if (olderThanMillis <= 0) return Promise.resolve();
         const cutoff = Date.now() - olderThanMillis;
         for (const [key, entry] of this.entries.entries()) {
             if (entry.lastRead < cutoff) {
                 this.entries.delete(key);
             }
         }
+        return Promise.resolve();
     }
 
-    async getStorageSize(): Promise<number> {
+    getStorageSize(): Promise<number> {
         let total = 0;
         for (const entry of this.entries.values()) {
             total += entry.size;
         }
-        return total;
+        return Promise.resolve(total);
     }
 
-    async clear(): Promise<void> {
+    clear(): Promise<void> {
         this.entries.clear();
+        return Promise.resolve();
     }
 }
 
@@ -187,6 +190,179 @@ export class IndexedDBTtsCache implements TtsCacheAdapter {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         });
+    }
+}
+
+/** Obsidian Aloud's "Local" cache: its IndexedDB database and stores. */
+export const ALOUD_IDB_NAME = 'tts-aloud-db';
+const ALOUD_AUDIO_STORE = 'audio';
+const ALOUD_META_STORE = 'audioMetadata';
+/** Spaceforge's clips in Aloud's database carry this prefix, so they are told apart from Aloud's own. */
+export const SHARED_KEY_PREFIX = 'spaceforge:';
+
+interface AloudAudioRecord { hash: string; blob: Blob; format: TtsAudioFormat }
+interface AloudMetaRecord { hash: string; size: number; lastread: number; format: TtsAudioFormat }
+
+/**
+ * The "this device only" cache, kept in the same place Obsidian Aloud's
+ * "Local" cache keeps its audio: the `tts-aloud-db` IndexedDB database, in
+ * Aloud's own record shapes, so both plugins' spoken audio lives in one store
+ * with one retention.
+ *
+ * Living in another plugin's database is done carefully:
+ *  - Spaceforge never asks for a database version, so it can never block or
+ *    out-version Aloud's own upgrades; it lets go of its connection the moment
+ *    Aloud asks to upgrade.
+ *  - Its records are keyed `spaceforge:…`, and clearing or sizing touches
+ *    only those — Aloud's clips are never deleted from here.
+ *  - If the database cannot be used as Aloud lays it out, the cache falls back
+ *    to Spaceforge's own database rather than reshaping Aloud's.
+ */
+export class AloudSharedTtsCache implements TtsCacheAdapter {
+    private dbPromise: Promise<IDBDatabase | null> | null = null;
+    private fallback: TtsCacheAdapter;
+
+    constructor(fallback: TtsCacheAdapter = new IndexedDBTtsCache()) {
+        this.fallback = fallback;
+    }
+
+    private open(): Promise<IDBDatabase | null> {
+        if (this.dbPromise) return this.dbPromise;
+        this.dbPromise = new Promise<IDBDatabase | null>(resolve => {
+            if (typeof indexedDB === 'undefined') {
+                resolve(null);
+                return;
+            }
+            let req: IDBOpenDBRequest;
+            try {
+                // No version: whatever Aloud has made it, never an upgrade of ours.
+                req = indexedDB.open(ALOUD_IDB_NAME);
+            } catch {
+                resolve(null);
+                return;
+            }
+            req.onupgradeneeded = () => {
+                // Only reached when the database does not exist yet: lay it out
+                // exactly as Aloud does, so Aloud opens it as its own.
+                const db = req.result;
+                if (!db.objectStoreNames.contains(ALOUD_AUDIO_STORE)) {
+                    db.createObjectStore(ALOUD_AUDIO_STORE, { keyPath: 'hash' });
+                }
+                if (!db.objectStoreNames.contains(ALOUD_META_STORE)) {
+                    db.createObjectStore(ALOUD_META_STORE, { keyPath: 'hash' }).createIndex('lastread', 'lastread');
+                }
+            };
+            req.onsuccess = () => {
+                const db = req.result;
+                const usable = db.objectStoreNames.contains(ALOUD_AUDIO_STORE) && db.objectStoreNames.contains(ALOUD_META_STORE);
+                if (!usable) {
+                    db.close();
+                    resolve(null);
+                    return;
+                }
+                // Aloud wants to upgrade: step aside, reopen on next use.
+                db.onversionchange = () => {
+                    db.close();
+                    this.dbPromise = null;
+                };
+                resolve(db);
+            };
+            req.onerror = () => resolve(null);
+            req.onblocked = () => resolve(null);
+        });
+        return this.dbPromise;
+    }
+
+    private static hash(key: string): string {
+        return `${SHARED_KEY_PREFIX}${key}`;
+    }
+
+    private static run<T>(request: IDBRequest<T>): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
+        });
+    }
+
+    private static done(tx: IDBTransaction): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
+            tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+        });
+    }
+
+    /** Walk Spaceforge's own metadata rows, in one read-write transaction. */
+    private async eachOwn(db: IDBDatabase, visit: (meta: AloudMetaRecord, tx: IDBTransaction) => void): Promise<void> {
+        const tx = db.transaction([ALOUD_AUDIO_STORE, ALOUD_META_STORE], 'readwrite');
+        const range = IDBKeyRange.bound(SHARED_KEY_PREFIX, `${SHARED_KEY_PREFIX}\uffff`);
+        const req = tx.objectStore(ALOUD_META_STORE).openCursor(range);
+        req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            visit(cursor.value as AloudMetaRecord, tx);
+            cursor.continue();
+        };
+        await AloudSharedTtsCache.done(tx);
+    }
+
+    async getAudio(key: string): Promise<TtsSynthesizedAudio | null> {
+        const db = await this.open();
+        if (!db) return this.fallback.getAudio(key);
+        const hash = AloudSharedTtsCache.hash(key);
+        const record = await AloudSharedTtsCache.run(
+            db.transaction(ALOUD_AUDIO_STORE, 'readonly').objectStore(ALOUD_AUDIO_STORE).get(hash),
+        ) as AloudAudioRecord | undefined;
+        if (!record?.blob) return null;
+        const data = await record.blob.arrayBuffer();
+        const format = record.format ?? 'mp3';
+        const tx = db.transaction(ALOUD_META_STORE, 'readwrite');
+        tx.objectStore(ALOUD_META_STORE).put({ hash, size: data.byteLength, lastread: Date.now(), format } satisfies AloudMetaRecord);
+        await AloudSharedTtsCache.done(tx).catch(() => undefined);
+        return { data, format };
+    }
+
+    async saveAudio(key: string, audio: TtsSynthesizedAudio): Promise<void> {
+        const db = await this.open();
+        if (!db) return this.fallback.saveAudio(key, audio);
+        const hash = AloudSharedTtsCache.hash(key);
+        const tx = db.transaction([ALOUD_AUDIO_STORE, ALOUD_META_STORE], 'readwrite');
+        // A Blob, as Aloud stores it — never a bare buffer Aloud could not read.
+        tx.objectStore(ALOUD_AUDIO_STORE).put({ hash, blob: new Blob([audio.data.slice(0)]), format: audio.format } satisfies AloudAudioRecord);
+        tx.objectStore(ALOUD_META_STORE).put({ hash, size: audio.data.byteLength, lastread: Date.now(), format: audio.format } satisfies AloudMetaRecord);
+        await AloudSharedTtsCache.done(tx);
+    }
+
+    async expire(olderThanMillis: number): Promise<void> {
+        if (olderThanMillis <= 0) return;
+        const db = await this.open();
+        if (!db) return this.fallback.expire(olderThanMillis);
+        const cutoff = Date.now() - olderThanMillis;
+        await this.eachOwn(db, (meta, tx) => {
+            if (meta.lastread >= cutoff) return;
+            tx.objectStore(ALOUD_AUDIO_STORE).delete(meta.hash);
+            tx.objectStore(ALOUD_META_STORE).delete(meta.hash);
+        });
+    }
+
+    async getStorageSize(): Promise<number> {
+        const db = await this.open();
+        if (!db) return this.fallback.getStorageSize();
+        let total = 0;
+        await this.eachOwn(db, meta => { total += meta.size || 0; });
+        return total;
+    }
+
+    /** Spaceforge's clips only: Aloud's own audio is Aloud's to clear. */
+    async clear(): Promise<void> {
+        const db = await this.open();
+        if (!db) return this.fallback.clear();
+        await this.eachOwn(db, (meta, tx) => {
+            tx.objectStore(ALOUD_AUDIO_STORE).delete(meta.hash);
+            tx.objectStore(ALOUD_META_STORE).delete(meta.hash);
+        });
+        // What the old private database held is Spaceforge's too.
+        await this.fallback.clear().catch(() => undefined);
     }
 }
 

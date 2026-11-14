@@ -3,6 +3,16 @@ import { LeechChoice, LeechAction, ReviewAlgorithm, ReviewSessionHost } from '..
 import type { ReviewGradeLayout } from '../models/settings';
 import type { DockTab } from './review-dock';
 
+/** The study panel's four views, flattened into the bar's one tab row. */
+export type StripStudyView = 'learn' | 'board' | 'mindmap' | 'summary';
+
+const STUDY_VIEWS: ReadonlyArray<[StripStudyView, string]> = [
+    ['learn', 'Learn'],
+    ['board', 'Visualize'],
+    ['mindmap', 'Mind map'],
+    ['summary', 'Summary'],
+];
+
 export interface StripGradeButton {
     response: number;
     label: string;
@@ -21,6 +31,8 @@ export interface StripDecision {
 export interface StripTab {
     label: string;
     title: string;
+    /** A short count worn as a badge beside the label ("4", "3 due"). */
+    count?: string;
 }
 
 export interface StripState {
@@ -34,8 +46,14 @@ export interface StripState {
     title: string;
     /** One line of scheduling context under the title. */
     meta: string;
-    /** e.g. "3d overdue". */
+    /** e.g. "3d overdue". Shown on the timing's hover once there is a timing. */
     dueLabel: string;
+    /**
+     * How long this note takes to read, and what is left of the run: the day
+     * picked on the calendar (`scope`), or every due note when none was.
+     * `left` is null while some notes are still being counted.
+     */
+    timing?: { note: string; left: string | null; notesLeft: number; scope: string | null } | null;
     /**
      * Where the run stands. `place` is the number the bar prints — the model's
      * own place in the run, one step at a time — and it is what a caller should
@@ -84,7 +102,16 @@ export interface StripState {
      * as more words on the status line. The cards entry comes from the dock
      * like the other two, and is null when the vault has no deck lane.
      */
-    tabs?: { study: StripTab | null; mcq: StripTab | null; cards: StripTab | null; active: DockTab | null };
+    tabs?: {
+        study: StripTab | null;
+        mcq: StripTab | null;
+        cards: StripTab | null;
+        active: DockTab | null;
+        /** Which of the study panel's views is on screen while study is open. */
+        view?: StripStudyView | null;
+        /** Read aloud, when there is a voice to read with. */
+        listen?: { playing: boolean } | null;
+    };
     /**
      * What a finished sitting scored, marked on the grade row itself. The bar
      * already prints the grades, so a sitting highlights the one its score
@@ -104,8 +131,10 @@ export interface ReviewStripHandlers {
     onUndo: () => void;
     onEnd: () => void;
     onDecision: (action: LeechAction) => void;
-    /** One of the three tabs: study, the questions, the card sitting. */
-    onTab: (tab: DockTab) => void;
+    /** One of the tabs: a study view, the questions, the card sitting. */
+    onTab: (tab: DockTab, view?: StripStudyView) => void;
+    /** Read aloud whatever is on screen, or pause what is playing. */
+    onListen?: () => void;
     onTestWithMCQs: () => void;
     onRegenerateMCQs: () => void;
     onRemoveFromSchedule: () => void;
@@ -127,6 +156,8 @@ export class ReviewStrip {
     private state: StripState | null = null;
     private handlers: ReviewStripHandlers;
     private mcqAvailable = false;
+    /** The keyboard reminders are printed under the header while true. */
+    private helpOpen = false;
 
     constructor(handlers: ReviewStripHandlers) {
         this.handlers = handlers;
@@ -178,10 +209,10 @@ export class ReviewStrip {
         el.toggleClass('sf-strip-done', state.phase === 'finished');
 
         this.renderHeader(el, state);
-        this.renderTabs(el, state);
 
         if (state.phase === 'finished') {
             this.renderFinished(el, state);
+            this.renderTabs(el, state);
             return;
         }
 
@@ -192,159 +223,158 @@ export class ReviewStrip {
 
         if (state.phase === 'cards') {
             this.renderCardsStep(el, state);
+            this.renderTabs(el, state);
             return;
         }
 
         this.renderGrades(el, state);
+        this.renderTabs(el, state);
     }
 
     /**
-     * The header: the status line, then whatever the reader can do from here.
+     * The header, three things and nothing else:
      *
-     * The status is a line of groups — (a) what this is and how far through,
-     * (b) the scheduler, (c) the due state when there is one — each its own
-     * element, so a narrow host wraps between the groups instead of through the
-     * middle of one. The keyboard reminders are not on the line at all: they
-     * wait behind the help affordance, where they cost it nothing.
+     *   ▬▬▬▬▬▬░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  where the run is
+     *   Cirrhosis Part 1                  ↶  ‹ 5/26 ›  ⋯  ✕
+     *   1d overdue · FSRS · new
+     *
+     * The note's name is the line's subject; the due state and the scheduler
+     * sit under it as one quiet sentence. Every control the reader needs on
+     * every note is on the right, and everything they need now and then —
+     * postpone, skip, where the review lives, the keyboard — is behind ⋯.
      */
     private renderHeader(el: HTMLElement, state: StripState): void {
-        const header = el.createDiv({ cls: 'sf-strip-header' });
-
-        const status = header.createDiv({ cls: 'sf-strip-status' });
-        // How far through the queue this sitting is. "0/6 notes" is a fact; a bar
-        // is what tells a reader, at a glance and at sidebar width, whether to
-        // keep going.
-        // Not `.sf-strip-progress`: that class already belongs to the counter's
-        // own container, and borrowing it turned "0/6 notes" into a 4px clipped
-        // strip the moment the bar's rules landed.
-        const progressBar = status.createDiv({ cls: 'sf-strip-progress-bar' });
-        // Where the reader is, not how many they have finished. The run's own
-        // place is what the bar prints (see `ReviewFlowModel.place`): it moves
-        // by exactly one per step — a grade, a skip, Next or Previous alike —
-        // and it is already capped at the run's size, so a number can never
-        // read past the end of the queue.
-        //
-        // It used to be computed here as `max(handled, index) + 1`, and that
-        // max is what the reader hit as a stuck counter: the handled tally
-        // includes whole card series a live sitting marks at once, so once it
-        // ran ahead of the walk the number stood still — `7/11 steps` — for
-        // every place behind the tally, in both directions.
+        // Where the reader is, not how many they have finished: the run's own
+        // place (see `ReviewFlowModel.place`) moves by exactly one per step and
+        // is already capped at the run's size.
         const total = Math.max(1, state.position.total);
         const at = Math.min(Math.max(1, state.position.place ?? (state.position.index ?? 0) + 1), total);
-        const fraction = total > 0 ? at / total : 0;
-        progressBar.setCssProps({ '--sf-strip-progress': `${Math.round(fraction * 100)}%` });
+        const progressBar = el.createDiv({ cls: 'sf-strip-progress-bar' });
+        progressBar.setCssProps({ '--sf-strip-progress': `${Math.round((at / total) * 100)}%` });
         progressBar.createDiv({ cls: 'sf-strip-progress-bar-fill' });
 
-        // (a) the note and how far through its run: "6/23 · Cell biology".
+        const header = el.createDiv({ cls: 'sf-strip-header' });
+        const status = header.createDiv({ cls: 'sf-strip-status' });
+
         const identity = status.createDiv({ cls: 'sf-strip-group sf-strip-group-identity' });
-        const progress = identity.createDiv({ cls: 'sf-strip-progress' });
-        // Just the count: "3/12" already says how many are left, and the second
-        // number was read as a second total.
-        // "0/6" alone left the reader guessing what was being counted, so the
-        // counter says what it counts — and it counts every step of the run,
-        // the notes and the card lane's own steps alike (see counterLabel).
-        const count = progress.createSpan({ cls: 'sf-strip-progress-count', text: this.counterLabel(state, at) });
-        const split = this.counterSplit(state);
-        if (split) count.setAttribute('title', split);
         const title = identity.createDiv({ cls: 'sf-strip-title', text: state.title });
-        // The scheduler line is dropped from the narrow header; its facts stay
-        // one hover away on the note's own name.
         title.setAttribute('title', state.meta ? `${state.title} — ${state.meta}` : state.title);
 
-        // (b) the scheduler, muted: the algorithm, then the interval it is
-        // standing on. "interval 6d" says the number twice inside a group that
-        // is already a fact, so it prints as "SM-2 · 6d" — and the whole
-        // scheduler string, ease and stability and difficulty included, stays
-        // on the hover rather than in the line.
+        // One quiet line under the name: the due state when there is one, then
+        // the scheduler in its short form. The whole scheduler string, ease and
+        // stability included, stays one hover away.
         const [algorithm = '', context = ''] = state.meta.split(' · ');
         const interval = context.replace(/^interval\s+/, '');
         const scheduleText = [algorithm, interval].filter(Boolean).join(' · ');
-        if (scheduleText) {
-            const schedule = status.createDiv({ cls: 'sf-strip-group sf-strip-group-schedule' });
-            const meta = schedule.createSpan({ cls: 'sf-strip-meta', text: scheduleText });
-            meta.setAttribute('title', state.meta);
+        const timing = state.timing ?? null;
+        if (timing || state.dueLabel || scheduleText) {
+            const sub = status.createDiv({ cls: 'sf-strip-sub' });
+            if (timing) {
+                // "4 min read · 1h 20m left today": what this note costs, then
+                // what the rest of the sitting does. The due state moves to the
+                // hover — how late a note is changes nothing about reading it.
+                const group = sub.createDiv({ cls: 'sf-strip-group sf-strip-group-time' });
+                group.createSpan({ cls: 'sf-strip-time-note', text: `${timing.note} read` });
+                const where = timing.scope ? `for ${timing.scope}` : 'today';
+                const notes = `${timing.notesLeft} note${timing.notesLeft === 1 ? '' : 's'}`;
+                group.createSpan({
+                    cls: 'sf-strip-time-left',
+                    text: timing.left ? `${timing.left} left ${where}` : `${notes} left ${where}`,
+                });
+                group.setAttribute('title', [
+                    `This note: about ${timing.note}`,
+                    timing.left ? `Left ${where}: about ${timing.left} across ${notes}` : `Left ${where}: ${notes} (still counting)`,
+                    state.dueLabel ? `Due: ${state.dueLabel}` : '',
+                ].filter(Boolean).join('\n'));
+            } else if (state.dueLabel) {
+                const due = sub.createDiv({ cls: 'sf-strip-group sf-strip-group-due' });
+                due.createSpan({ cls: 'sf-strip-due', text: state.dueLabel });
+            }
+            if (scheduleText) {
+                const schedule = sub.createDiv({ cls: 'sf-strip-group sf-strip-group-schedule' });
+                const meta = schedule.createSpan({ cls: 'sf-strip-meta', text: scheduleText });
+                meta.setAttribute('title', state.meta);
+            }
         }
 
-        // (c) the due state, said only when there is one to say. It is the
-        // header's own fact, not the status block's: a narrow host puts it on
-        // the controls' line, and being a sibling is what lets it sit there
-        // without the wrapper resorting to `display: contents`.
-        if (state.dueLabel) {
-            const due = header.createDiv({ cls: 'sf-strip-group sf-strip-group-due' });
-            due.createSpan({ cls: 'sf-strip-due', text: state.dueLabel });
-        }
-
-        header.createDiv({ cls: 'sf-strip-spacer' });
-
-        // Once the run is over, only the run-level actions belong on the bar;
-        // the finished panel renders those itself.
         if (state.phase !== 'finished') {
-            if (state.hint) this.renderHelp(header, state.hint);
-            this.renderSecondary(header, state);
+            this.renderSecondary(header, state, at);
+        } else {
+            // The run is over: the place stays as a fact, with nothing to walk.
+            const progress = header.createDiv({ cls: 'sf-strip-progress' });
+            progress.createSpan({ cls: 'sf-strip-progress-count', text: this.counterLabel(state, at) });
+        }
+
+        // The keyboard reminders, printed only when asked for from the menu.
+        if (this.helpOpen && state.hint && state.phase !== 'finished') {
+            const help = el.createDiv({ cls: 'sf-strip-help-text', text: state.hint });
+            help.setAttribute('title', 'Click to hide');
+            help.addEventListener('click', () => {
+                this.helpOpen = false;
+                help.remove();
+            });
         }
     }
 
     /**
-     * The Study / MCQs / Cards row: real tabs, on a line of their own.
+     * One row of tabs for everything the reader can do with this note:
      *
-     * Each tab carries its own count inside its own label, the open one is
-     * marked selected for the eye and for assistive tech alike, and the row
-     * scrolls when the host cannot hold it — a label cut in half is worse than
-     * one the reader has to scroll to.
+     *   Learn · Visualize · Mind map · Summary · MCQs 4 · Cards 12      🔊
+     *
+     * The study panel's four views used to be a second row of tabs inside the
+     * first one's panel; they are flattened here, so the reader never has to
+     * learn that "Visualize" lives under "Study". Pressing the open tab puts
+     * the panel away. Read aloud sits at the row's end and reads whatever the
+     * open tab is showing.
      */
     private renderTabs(el: HTMLElement, state: StripState): void {
         const tabs = state.tabs;
-        if (!tabs || !(tabs.study || tabs.mcq || tabs.cards)) return;
+        if (!tabs || !(tabs.study || tabs.mcq || tabs.cards || tabs.listen)) return;
 
-        const row = el.createDiv({ cls: 'sf-strip-tabs' });
+        const bar = el.createDiv({ cls: 'sf-strip-tabbar' });
+        const row = bar.createDiv({ cls: 'sf-strip-tabs' });
         row.setAttribute('role', 'tablist');
-        // One row, one shape: the card lane is a tab like the other two, so it
-        // gets the same clothes and the same active marking.
-        for (const id of ['study', 'mcq', 'cards'] as const) {
-            const tab = tabs[id];
-            if (!tab) continue;
-            const selected = tabs.active === id;
-            const button = row.createEl('button', { cls: `sf-strip-tab sf-strip-tab-${id}` });
+
+        const addTab = (id: DockTab, label: string, title: string, selected: boolean, count: string | undefined, view?: StripStudyView): void => {
+            const button = row.createEl('button', {
+                cls: `sf-strip-tab sf-strip-tab-${id}${view ? ` sf-strip-tab-view-${view}` : ''}`,
+            });
             button.setAttribute('type', 'button');
             button.setAttribute('role', 'tab');
             button.setAttribute('aria-selected', selected ? 'true' : 'false');
-            button.setAttribute('title', tab.title);
+            button.setAttribute('title', title);
             button.toggleClass('is-active', selected);
-            button.setText(tab.label);
-            button.addEventListener('click', () => this.handlers.onTab(id));
-        }
-    }
+            button.createSpan({ cls: 'sf-strip-tab-label', text: label });
+            if (count) button.createSpan({ cls: 'sf-strip-tab-count', text: count });
+            button.addEventListener('click', () => this.handlers.onTab(id, view));
+        };
 
-    /**
-     * The keyboard reminders, behind one affordance instead of on the line.
-     *
-     * The keys themselves are unchanged — this only stops the reminder from
-     * competing with the status for the reader's eye. Its hover and its label
-     * carry the shortcuts for pointer and assistive tech; pressing it prints
-     * the same sentence under the line, and pressing it again puts it away.
-     * Nothing is rendered until it is asked for, so a re-render can never
-     * stack a second copy of it.
-     */
-    private renderHelp(header: HTMLElement, hint: string): void {
-        const help = header.createEl('button', { cls: 'sf-strip-help' });
-        help.setAttribute('type', 'button');
-        help.setAttribute('title', hint);
-        help.setAttribute('aria-label', `Keyboard shortcuts — ${hint}`);
-        help.setAttribute('aria-expanded', 'false');
-        help.setText('?');
-        help.addEventListener('click', (event) => {
-            event.preventDefault();
-            const shown = header.querySelector<HTMLElement>('.sf-strip-help-text');
-            if (shown) {
-                shown.remove();
-                help.removeClass('is-open');
-                help.setAttribute('aria-expanded', 'false');
-                return;
+        if (tabs.study) {
+            const studyOpen = tabs.active === 'study';
+            const openView = tabs.view ?? 'learn';
+            for (const [view, label] of STUDY_VIEWS) {
+                const learn = view === 'learn';
+                addTab(
+                    'study',
+                    learn ? tabs.study.label : label,
+                    learn ? tabs.study.title : `${label} — drawn from this note`,
+                    studyOpen && openView === view,
+                    learn ? tabs.study.count : undefined,
+                    view,
+                );
             }
-            header.createDiv({ cls: 'sf-strip-help-text', text: hint });
-            help.addClass('is-open');
-            help.setAttribute('aria-expanded', 'true');
-        });
+        }
+        if (tabs.mcq) addTab('mcq', tabs.mcq.label, tabs.mcq.title, tabs.active === 'mcq', tabs.mcq.count);
+        if (tabs.cards) addTab('cards', tabs.cards.label, tabs.cards.title, tabs.active === 'cards', tabs.cards.count);
+
+        if (tabs.listen && this.handlers.onListen) {
+            const playing = tabs.listen.playing;
+            const label = playing ? 'Pause reading aloud' : 'Read aloud what is on screen';
+            const listen = this.iconButton(bar, playing ? 'pause' : 'volume-2', label, () => this.handlers.onListen?.());
+            listen.addClass('sf-strip-listen');
+            listen.toggleClass('is-playing', playing);
+            listen.setAttribute('aria-pressed', String(playing));
+        }
     }
 
     /**
@@ -404,6 +434,7 @@ export class ReviewStrip {
             button.setAttribute('aria-label', suggested
                 ? `${grade.label} (${grade.key}) — the score suggests this grade, ${percent}`
                 : `${grade.label} (${grade.key})`);
+            button.setAttribute('title', `${grade.label}${grade.intervalText ? ` — next in ${grade.intervalText}` : ''} · key ${grade.key}`);
             const main = button.createSpan({ cls: 'sf-strip-grade-main' });
             main.createSpan({ cls: 'sf-strip-grade-label', text: grade.label });
             main.createSpan({ cls: 'sf-strip-grade-interval', text: grade.intervalText ?? '' });
@@ -413,6 +444,7 @@ export class ReviewStrip {
                 score.setAttribute('title', `${percent} on the questions — this is the grade your score implies`);
                 button.setAttribute('title', `Suggested: ${percent} of the questions were answered correctly, which implies ${suggestion.label}`);
             }
+            // Printed for keyboards only; a touch screen never shows it.
             button.createSpan({ cls: 'sf-strip-grade-key', text: grade.key });
             button.addEventListener('click', () => this.handlers.onGrade(grade.response));
         }
@@ -473,26 +505,54 @@ export class ReviewStrip {
         this.addSecondaryButton(actions, 'x', 'End review session (esc)', this.handlers.onEnd, true);
     }
 
-    private renderSecondary(el: HTMLElement, state: StripState): void {
+    /**
+     * The controls every note needs: undo (only once there is something to
+     * undo), the walk through the queue with the place in it between the
+     * arrows, the menu, and the way out.
+     */
+    private renderSecondary(el: HTMLElement, state: StripState, at: number): void {
         const actions = el.createDiv({ cls: 'sf-strip-secondary' });
 
-        this.addSecondaryButton(actions, 'undo-2', 'Undo last rating (u)', this.handlers.onUndo, state.canUndo);
-        // Navigation, the same as the list's own Previous/Next: the bar walks
-        // the queue, it does not decide anything about the note.
-        this.addSecondaryButton(actions, 'chevron-left', 'Previous note (b)', this.handlers.onPrevious, true);
-        this.addSecondaryButton(actions, 'chevron-right', 'Next note (n)', this.handlers.onNext, true);
-        this.addSecondaryButton(actions, 'calendar-clock', 'Postpone one day (p)', this.handlers.onPostpone, true);
-        this.addSecondaryButton(actions, 'more-horizontal', 'More actions', (event) => this.showMoreMenu(event), true);
-        this.addSecondaryButton(actions, 'x', 'End review session (esc)', this.handlers.onEnd, true);
+        if (state.canUndo) {
+            this.addSecondaryButton(actions, 'undo-2', 'Undo last rating (u)', this.handlers.onUndo, true)
+                .addClass('sf-strip-undo');
+        }
+
+        const nav = actions.createDiv({ cls: 'sf-strip-nav' });
+        this.addSecondaryButton(nav, 'chevron-left', 'Previous (b)', this.handlers.onPrevious, true);
+        const progress = nav.createDiv({ cls: 'sf-strip-progress' });
+        const count = progress.createSpan({ cls: 'sf-strip-progress-count', text: this.counterLabel(state, at) });
+        const split = this.counterSplit(state);
+        if (split) count.setAttribute('title', split);
+        this.addSecondaryButton(nav, 'chevron-right', 'Next (n)', this.handlers.onNext, true);
+
+        this.addSecondaryButton(actions, 'more-horizontal', 'More', (event) => this.showMoreMenu(event), true);
+        this.addSecondaryButton(actions, 'x', 'End review (esc)', this.handlers.onEnd, true);
     }
 
     private addSecondaryButton(container: HTMLElement, iconName: string, title: string, onClick: (event: MouseEvent) => void, enabled: boolean): HTMLButtonElement {
-        const button = container.createEl('button', { cls: 'sf-strip-action' });
+        const button = this.iconButton(container, iconName, title, onClick);
+        button.addClass('sf-strip-action');
+        button.disabled = !enabled;
+        return button;
+    }
+
+    /**
+     * An icon-only button that draws on every platform.
+     *
+     * The glyph goes into a span of its own, never straight into the button:
+     * Obsidian's mobile stylesheet pads every `button` for touch, and on
+     * iPadOS that padding left a 22px button with no room inside it, so
+     * WebKit shrank the bare SVG — a flex item with no size of its own — to
+     * nothing. The span is a fixed box the stylesheet sizes explicitly.
+     */
+    private iconButton(container: HTMLElement, iconName: string, title: string, onClick: (event: MouseEvent) => void): HTMLButtonElement {
+        const button = container.createEl('button', { cls: 'sf-strip-icon-button' });
         button.setAttribute('type', 'button');
         button.setAttribute('aria-label', title);
         button.setAttribute('title', title);
-        setIcon(button, iconName);
-        button.disabled = !enabled;
+        const glyph = button.createSpan({ cls: 'sf-strip-icon' });
+        setIcon(glyph, iconName);
         button.addEventListener('click', (event) => {
             event.preventDefault();
             onClick(event);
@@ -507,51 +567,44 @@ export class ReviewStrip {
 
     private showMoreMenu(event: MouseEvent): void {
         const menu = new Menu();
+        const item = (title: string, icon: string, onClick: () => void, checked?: boolean): void => {
+            menu.addItem(entry => {
+                entry.setTitle(title);
+                if (typeof entry.setIcon === 'function') entry.setIcon(icon);
+                if (checked !== undefined && typeof entry.setChecked === 'function') entry.setChecked(checked);
+                // The app's menu and the test shim both expose onClick; a
+                // stand-in without it keeps the item inert rather than breaking.
+                if (typeof entry.onClick === 'function') entry.onClick(onClick);
+            });
+        };
+
+        item('Postpone to tomorrow (p)', 'calendar-clock', () => this.handlers.onPostpone());
+        // The escape hatch for a note that failed and stayed due: pass it for
+        // this sitting without touching its schedule.
+        item('Skip this note (s)', 'skip-forward', () => this.handlers.onSkip());
+
         if (this.mcqAvailable) {
-            menu.addItem(item => item
-                .setTitle('Test with MCQs')
-                .setIcon('mcq-quiz')
-                .onClick(() => this.handlers.onTestWithMCQs()));
-            menu.addItem(item => item
-                .setTitle('Generate new MCQs')
-                .setIcon('refresh-cw')
-                .onClick(() => this.handlers.onRegenerateMCQs()));
+            menu.addSeparator();
+            item('Test with MCQs', 'mcq-quiz', () => this.handlers.onTestWithMCQs());
+            item('Generate new MCQs', 'refresh-cw', () => this.handlers.onRegenerateMCQs());
         }
-        // The bar's own buttons navigate, so the escape hatch for a note that
-        // failed and stayed due lives here: pass it for this sitting without
-        // touching its schedule.
-        menu.addItem(item => {
-            item.setTitle('Skip this note (s)');
-            // The app's menu and the test shim both expose onClick; a stand-in
-            // without it keeps the item inert rather than breaking the menu.
-            if (typeof item.onClick === 'function') item.onClick(() => this.handlers.onSkip());
-        });
-        menu.addItem(item => item
-            .setTitle('Keep the review under the note')
-            .setIcon('panel-bottom')
-            .setChecked(this.host === 'note')
-            .onClick(() => this.handlers.onHost('note')));
-        menu.addItem(item => item
-            .setTitle('Split the review to the right')
-            .setIcon('columns-2')
-            .setChecked(this.host === 'split')
-            .onClick(() => this.handlers.onHost('split')));
-        menu.addItem(item => item
-            .setTitle('Move the review into a window')
-            .setIcon('picture-in-picture-2')
-            .setChecked(this.host === 'window')
-            .onClick(() => this.handlers.onHost('window')));
-        menu.addItem(item => item
-            .setTitle('Move the review into the sidebar')
-            .setIcon('panel-right')
-            .setChecked(this.host === 'sidebar')
-            .onClick(() => this.handlers.onHost('sidebar')));
 
         menu.addSeparator();
-        menu.addItem(item => item
-            .setTitle('Remove from review schedule')
-            .setIcon('trash-2')
-            .onClick(() => this.handlers.onRemoveFromSchedule()));
+        item('Review under the note', 'panel-bottom', () => this.handlers.onHost('note'), this.host === 'note');
+        item('Review in a split', 'columns-2', () => this.handlers.onHost('split'), this.host === 'split');
+        item('Review in a window', 'picture-in-picture-2', () => this.handlers.onHost('window'), this.host === 'window');
+        item('Review in the sidebar', 'panel-right', () => this.handlers.onHost('sidebar'), this.host === 'sidebar');
+
+        if (this.state?.hint) {
+            menu.addSeparator();
+            item(this.helpOpen ? 'Hide keyboard shortcuts' : 'Keyboard shortcuts', 'keyboard', () => {
+                this.helpOpen = !this.helpOpen;
+                if (this.state) this.render(this.state);
+            });
+        }
+
+        menu.addSeparator();
+        item('Remove from review schedule', 'trash-2', () => this.handlers.onRemoveFromSchedule());
         menu.showAtMouseEvent(event);
     }
 }

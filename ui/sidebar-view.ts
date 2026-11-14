@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf, Setting, setIcon } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import SpaceforgePlugin from "../main";
 import { PomodoroUIManager } from "./sidebar/pomodoro-ui-manager";
 import { NoteItemRenderer } from "./sidebar/note-item-renderer";
@@ -134,7 +134,6 @@ export class ReviewSidebarView extends ItemView {
 
         if (!this.persistentHeaderEl) {
             this.persistentHeaderEl = this.mainContainer.createDiv("review-header");
-            new Setting(this.persistentHeaderEl).setHeading().setName("Review schedule");
             // The toggle and the statistics button share one row: the toggle
             // takes the width, the button keeps its own small square.
             const headerRow = this.persistentHeaderEl.createDiv("review-header-row");

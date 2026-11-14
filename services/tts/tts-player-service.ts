@@ -7,6 +7,8 @@ import {
     TtsProviderId,
     TtsSettings,
     TtsTargetSource,
+    TTS_EXPORT_DIR,
+    TTS_HIDDEN_DIR,
 } from '../../models/tts';
 import {
     chunkTextWithOffsets,
@@ -16,6 +18,7 @@ import {
 import type { AloudSegment } from './study-aloud-converter';
 import { HtmlAudioTtsSink, TtsAudioSink, TtsPlaybackHandle } from './tts-audio-sink';
 import {
+    AloudSharedTtsCache,
     IndexedDBTtsCache,
     MemoryTtsCache,
     TtsCacheAdapter,
@@ -66,7 +69,7 @@ export class TtsPlayerService {
     private sink: TtsAudioSink;
     private transport: TtsHttpTransport;
     private memoryCache = new MemoryTtsCache();
-    private idbCache: IndexedDBTtsCache | null = null;
+    private idbCache: AloudSharedTtsCache | null = null;
     private vaultCache: VaultTtsCache | null = null;
 
     private listeners = new Set<(snapshot: TtsPlayerSnapshot) => void>();
@@ -96,7 +99,7 @@ export class TtsPlayerService {
         return new TtsPlayerService({
             getSettings: () => plugin.settings.tts,
             saveSettings: async () => { await plugin.savePluginData(); },
-            vaultConfigDir: plugin.app?.vault?.configDir ?? '.obsidian',
+            vaultConfigDir: plugin.app?.vault?.configDir,
             vaultAdapter: adapter ?? null,
         });
     }
@@ -151,16 +154,17 @@ export class TtsPlayerService {
         if (this.deps.cache) return this.deps.cache;
         const settings = this.deps.getSettings();
         if (settings.cacheType === 'vault' && this.deps.vaultAdapter) {
+            // The same hidden folder Obsidian Aloud caches into: one place for
+            // both plugins' audio, out of the way of the reader's notes.
             if (!this.vaultCache) {
-                this.vaultCache = new VaultTtsCache(this.deps.vaultAdapter, settings.audioFolder);
-            } else {
-                this.vaultCache.setFolder(settings.audioFolder);
+                this.vaultCache = new VaultTtsCache(this.deps.vaultAdapter, TTS_HIDDEN_DIR);
             }
             return this.vaultCache;
         }
         if (typeof indexedDB !== 'undefined') {
+            // On this device: inside Obsidian Aloud's own "Local" cache database.
             if (!this.idbCache) {
-                this.idbCache = new IndexedDBTtsCache();
+                this.idbCache = new AloudSharedTtsCache(new IndexedDBTtsCache());
             }
             return this.idbCache;
         }
@@ -573,8 +577,11 @@ export class TtsPlayerService {
             .replace(/\s+/g, '-') || 'spaceforge-audio';
         const filename = `${safeName}-${Date.now()}.${format}`;
 
-        if (settings.audioExportDestination === 'vault' && this.deps.vaultAdapter?.writeBinary) {
-            const folder = normalizePath(settings.audioFolder || 'spaceforge/tts-audio');
+        const destination = settings.audioExportDestination;
+        if ((destination === 'cache' || destination === 'vault') && this.deps.vaultAdapter?.writeBinary) {
+            const folder = normalizePath(
+                destination === 'cache' ? TTS_EXPORT_DIR : (settings.audioFolder || 'spaceforge/tts-audio'),
+            );
             if (this.deps.vaultAdapter.mkdir && !(await this.deps.vaultAdapter.exists(folder))) {
                 const segs = folder.split('/').filter(Boolean);
                 let cur = '';
@@ -587,7 +594,7 @@ export class TtsPlayerService {
             }
             const dest = `${folder}/${filename}`;
             await this.deps.vaultAdapter.writeBinary(dest, merged.buffer);
-            new Notice(`Exported audio to ${dest}`);
+            new Notice(`Saved audio to ${dest}`);
             return dest;
         }
 
@@ -611,7 +618,8 @@ export class TtsPlayerService {
      * Resolve candidate paths where obsidian-aloud-tts saves its `data.json`.
      */
     private getAloudCandidatePaths(): string[] {
-        const configDir = this.deps.vaultConfigDir || '.obsidian';
+        const configDir = this.deps.vaultConfigDir?.trim();
+        if (!configDir) return [];
         const custom = this.deps.getSettings().useVaultAloudSettingsPath?.trim();
         const candidates = [
             custom ? `${configDir}/${custom.replace(/^\/+/, '')}` : '',

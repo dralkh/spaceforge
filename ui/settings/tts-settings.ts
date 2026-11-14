@@ -27,6 +27,16 @@ const CACHE_DURATION_OPTIONS: Array<{ value: string; label: string }> = [
     { value: '0', label: 'Keep forever (until cleared)' },
 ];
 
+const OPENAI_MODELS = ['gpt-4o-mini-tts', 'tts-1', 'tts-1-hd'] as const;
+const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse'] as const;
+const OPENAI_COMPAT_FORMATS: TtsOpenAICompatFormat[] = ['mp3', 'wav', 'pcm'];
+const GEMINI_MODELS = ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'] as const;
+const GEMINI_VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede', 'Callirrhoe', 'Autonoe'] as const;
+const ELEVENLABS_MODELS = ['eleven_multilingual_v2', 'eleven_flash_v2_5', 'eleven_turbo_v2_5', 'eleven_monolingual_v1'] as const;
+const FISH_MODELS = ['s1', 's2-pro'] as const;
+const INWORLD_MODELS = ['inworld-tts-1', 'inworld-tts-1-max'] as const;
+const SPEECHIFY_MODELS = ['simba-3.2', 'simba-3.0'] as const;
+
 export function renderTtsSettingsSection(container: HTMLElement, plugin: SpaceforgePlugin): void {
     const tts: TtsSettings = plugin.settings.tts;
     const save = () => void plugin.savePluginData();
@@ -37,50 +47,6 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
         statusBox.addClass(`is-${level}`);
         statusBox.setText(message);
     };
-
-    // --- Porting / Sharing with Aloud TTS & Spaceforge AI keys ---
-    const aloudSetting = new Setting(container)
-        .setName('Import from Aloud TTS')
-        .setDesc('Check the vault for obsidian-aloud-tts settings (data.json) and copy its endpoints, keys, voices, cache, and chunking preferences.');
-
-    aloudSetting.addButton(btn =>
-        btn.setButtonText('Import Aloud settings').onClick(async () => {
-            const svc = plugin.ttsService;
-            if (!svc) {
-                showStatus('TTS service is unavailable in this session.', 'warn');
-                return;
-            }
-            const res = await svc.importFromAloudSettings();
-            if (!res.imported) {
-                showStatus('No Aloud TTS data.json found under plugins/aloud-tts/.', 'warn');
-                return;
-            }
-            container.empty();
-            renderTtsSettingsSection(container, plugin);
-            new Notice(`Imported Aloud TTS settings (${res.provider ?? 'openai'}).`);
-        }),
-    );
-
-    aloudSetting.addButton(btn =>
-        btn.setButtonText('Reuse Spaceforge AI keys').onClick(() => {
-            const copied = shareSpaceforgeApiKeys(tts, plugin.settings);
-            if (!copied) {
-                showStatus('No empty OpenAI, Gemini, or custom API key slots to fill.', 'warn');
-                return;
-            }
-            save();
-            renderProviderFields();
-            showStatus('Copied matching API keys from Spaceforge AI settings into TTS.', 'ok');
-        }),
-    );
-
-    void plugin.ttsService?.detectAloudSettings?.().then(detected => {
-        if (!detected) return;
-        const providers = detected.preview.configuredProviders.join(', ') || detected.preview.provider;
-        aloudSetting.setDesc(
-            `Detected Aloud TTS configuration at ${detected.path} (active: ${detected.preview.provider}; configured: ${providers}).`,
-        );
-    }).catch(() => undefined);
 
     // --- Test & Validation Row ---
     new Setting(container)
@@ -108,7 +74,7 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
     // --- Provider selector + dynamic endpoint fields ---
     new Setting(container)
         .setName('TTS provider')
-        .setDesc('Select any of the 11 Aloud-compatible text-to-speech endpoints.')
+        .setDesc('Select any of the 11 supported text-to-speech endpoints.')
         .addDropdown(dd => {
             for (const p of TTS_PROVIDERS) {
                 dd.addOption(p.id, p.label);
@@ -123,9 +89,82 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
 
     const providerSlot = container.createDiv({ cls: 'sf-settings-subsection sf-tts-provider-slot' });
 
-    const maskInput = (el: HTMLInputElement) => {
-        el.type = 'password';
-        el.autocomplete = 'off';
+    const addTextField = (
+        name: string,
+        value: string,
+        onChange: (val: string) => void,
+        opts: { desc?: string; placeholder?: string; secret?: boolean; trim?: boolean } = {},
+    ): void => {
+        const row = new Setting(providerSlot).setName(name);
+        if (opts.desc) row.setDesc(opts.desc);
+        row.addText(t => {
+            if (opts.secret) {
+                t.inputEl.type = 'password';
+                t.inputEl.autocomplete = 'off';
+            }
+            if (opts.placeholder) t.setPlaceholder(opts.placeholder);
+            t.setValue(value).onChange(v => {
+                onChange(opts.trim === false ? v : v.trim());
+                save();
+            });
+        });
+    };
+
+    const addTextAreaField = (
+        name: string,
+        value: string,
+        onChange: (val: string) => void,
+        opts: { desc?: string; placeholder?: string } = {},
+    ): void => {
+        const row = new Setting(providerSlot).setName(name);
+        if (opts.desc) row.setDesc(opts.desc);
+        row.addTextArea(t => {
+            if (opts.placeholder) t.setPlaceholder(opts.placeholder);
+            t.setValue(value).onChange(v => {
+                onChange(v);
+                save();
+            });
+        });
+    };
+
+    const addListDropdownField = (
+        name: string,
+        options: ReadonlyArray<string | { value: string; label: string }>,
+        value: string,
+        onChange: (val: string) => void,
+        opts: { desc?: string; rerender?: boolean } = {},
+    ): void => {
+        const row = new Setting(providerSlot).setName(name);
+        if (opts.desc) row.setDesc(opts.desc);
+        row.addDropdown(dd => {
+            for (const opt of options) {
+                if (typeof opt === 'string') dd.addOption(opt, opt);
+                else dd.addOption(opt.value, opt.label);
+            }
+            dd.setValue(value).onChange(v => {
+                onChange(v);
+                save();
+                if (opts.rerender) renderProviderFields();
+            });
+        });
+    };
+
+    const addSliderField = (
+        name: string,
+        min: number,
+        max: number,
+        step: number,
+        value: number,
+        onChange: (val: number) => void,
+    ): void => {
+        new Setting(providerSlot)
+            .setName(name)
+            .addSlider(s =>
+                s.setLimits(min, max, step).setValue(value).setDynamicTooltip().onChange(v => {
+                    onChange(v);
+                    save();
+                }),
+            );
     };
 
     const addVoiceDiscoveryRow = (parent: HTMLElement, currentVoice: string, onSelect: (voiceId: string) => void) => {
@@ -177,359 +216,144 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
 
         switch (tts.provider) {
             case 'openai': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .setDesc('OpenAI API key for /v1/audio/speech.')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('sk-...').setValue(tts.openai_apiKey).onChange(v => {
-                            tts.openai_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .setDesc('Model ID (gpt-4o-mini-tts, tts-1, or tts-1-hd).')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('gpt-4o-mini-tts', 'gpt-4o-mini-tts')
-                            .addOption('tts-1', 'tts-1')
-                            .addOption('tts-1-hd', 'tts-1-hd')
-                            .setValue(tts.openai_ttsModel || 'gpt-4o-mini-tts')
-                            .onChange(v => {
-                                tts.openai_ttsModel = v;
-                                save();
-                                renderProviderFields();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .setDesc('OpenAI voice preset.')
-                    .addDropdown(dd => {
-                        for (const voice of ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse']) {
-                            dd.addOption(voice, voice);
-                        }
-                        dd.setValue(tts.openai_ttsVoice || 'shimmer').onChange(v => {
-                            tts.openai_ttsVoice = v;
-                            save();
-                        });
-                    });
+                addTextField('TTS API key', tts.openai_apiKey, v => { tts.openai_apiKey = v; }, {
+                    desc: 'OpenAI API key for /v1/audio/speech.',
+                    placeholder: 'Enter OpenAI API key',
+                    secret: true,
+                });
+                addListDropdownField('TTS model', OPENAI_MODELS, tts.openai_ttsModel || 'gpt-4o-mini-tts', v => { tts.openai_ttsModel = v; }, {
+                    desc: 'Select an OpenAI speech model.',
+                    rerender: true,
+                });
+                addListDropdownField('TTS voice', OPENAI_VOICES, tts.openai_ttsVoice || 'shimmer', v => { tts.openai_ttsVoice = v; }, {
+                    desc: 'OpenAI voice preset.',
+                });
                 if (tts.openai_ttsModel === 'gpt-4o-mini-tts') {
-                    new Setting(providerSlot)
-                        .setName('TTS voice instructions')
-                        .setDesc('Optional tone/cadence instructions for gpt-4o-mini-tts.')
-                        .addTextArea(t =>
-                            t
-                                .setPlaceholder('Speak clearly and calmly at a teaching pace...')
-                                .setValue(tts.openai_ttsInstructions)
-                                .onChange(v => {
-                                    tts.openai_ttsInstructions = v;
-                                    save();
-                                }),
-                        );
+                    addTextAreaField('TTS voice instructions', tts.openai_ttsInstructions, v => { tts.openai_ttsInstructions = v; }, {
+                        desc: 'Optional tone and cadence instructions for this model.',
+                        placeholder: 'Speak clearly and calmly at a teaching pace...',
+                    });
                 }
                 break;
             }
 
             case 'openaicompat': {
-                new Setting(providerSlot)
-                    .setName('TTS custom base URL')
-                    .setDesc('Base URL for OpenAI-compatible speech server (e.g. Kokoro, LocalAI, AllTalk, Speaches).')
-                    .addText(t =>
-                        t
-                            .setPlaceholder('http://localhost:8880')
-                            .setValue(tts.openaicompat_apiBase)
-                            .onChange(v => {
-                                tts.openaicompat_apiBase = v.trim();
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .setDesc('Optional bearer API key if required by the custom server.')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Optional key').setValue(tts.openaicompat_apiKey).onChange(v => {
-                            tts.openaicompat_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addText(t =>
-                        t.setPlaceholder('kokoro').setValue(tts.openaicompat_ttsModel).onChange(v => {
-                            tts.openaicompat_ttsModel = v.trim();
-                            save();
-                        }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('af_bella').setValue(tts.openaicompat_ttsVoice).onChange(v => {
-                            tts.openaicompat_ttsVoice = v.trim();
-                            save();
-                        }),
-                    );
-                new Setting(providerSlot)
-                    .setName('Response audio format')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('mp3', 'mp3')
-                            .addOption('wav', 'wav')
-                            .addOption('pcm', 'pcm')
-                            .setValue(tts.openaicompat_responseFormat)
-                            .onChange(v => {
-                                tts.openaicompat_responseFormat = v as TtsOpenAICompatFormat;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('Server generation speed')
-                    .addSlider(s =>
-                        s
-                            .setLimits(0.25, 2.5, 0.05)
-                            .setValue(tts.openaicompat_generationSpeed)
-                            .setDynamicTooltip()
-                            .onChange(v => {
-                                tts.openaicompat_generationSpeed = v;
-                                save();
-                            }),
-                    );
+                addTextField('TTS custom base URL', tts.openaicompat_apiBase, v => { tts.openaicompat_apiBase = v; }, {
+                    desc: 'Base URL for an OpenAI-compatible speech server (e.g. Kokoro, LocalAI, AllTalk, Speaches).',
+                    placeholder: 'Enter server base URL',
+                });
+                addTextField('TTS API key', tts.openaicompat_apiKey, v => { tts.openaicompat_apiKey = v; }, {
+                    desc: 'Optional bearer API key if required by the custom server.',
+                    placeholder: 'Optional key',
+                    secret: true,
+                });
+                addTextField('TTS model', tts.openaicompat_ttsModel, v => { tts.openaicompat_ttsModel = v; }, {
+                    placeholder: 'Enter model name',
+                });
+                addTextField('TTS voice', tts.openaicompat_ttsVoice, v => { tts.openaicompat_ttsVoice = v; }, {
+                    placeholder: 'Enter voice name',
+                });
+                addListDropdownField('Response audio format', OPENAI_COMPAT_FORMATS, tts.openaicompat_responseFormat, v => {
+                    tts.openaicompat_responseFormat = v as TtsOpenAICompatFormat;
+                });
+                addSliderField('Server generation speed', 0.25, 2.5, 0.05, tts.openaicompat_generationSpeed, v => {
+                    tts.openaicompat_generationSpeed = v;
+                });
                 break;
             }
 
             case 'gemini': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .setDesc('Google Gemini API key.')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('AIza...').setValue(tts.gemini_apiKey).onChange(v => {
-                            tts.gemini_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('gemini-2.5-flash-preview-tts', 'gemini-2.5-flash-preview-tts')
-                            .addOption('gemini-2.5-pro-preview-tts', 'gemini-2.5-pro-preview-tts')
-                            .setValue(tts.gemini_ttsModel || 'gemini-2.5-flash-preview-tts')
-                            .onChange(v => {
-                                tts.gemini_ttsModel = v;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addDropdown(dd => {
-                        for (const voice of ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede', 'Callirrhoe', 'Autonoe']) {
-                            dd.addOption(voice, voice);
-                        }
-                        dd.setValue(tts.gemini_ttsVoice || 'Zephyr').onChange(v => {
-                            tts.gemini_ttsVoice = v;
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS style instructions')
-                    .setDesc('Optional prompt guidance prepended to Gemini TTS requests.')
-                    .addTextArea(t =>
-                        t
-                            .setPlaceholder('Read in a clear educational tone...')
-                            .setValue(tts.gemini_ttsInstructions)
-                            .onChange(v => {
-                                tts.gemini_ttsInstructions = v;
-                                save();
-                            }),
-                    );
+                addTextField('TTS API key', tts.gemini_apiKey, v => { tts.gemini_apiKey = v; }, {
+                    desc: 'Google Gemini API key.',
+                    placeholder: 'Enter Gemini API key',
+                    secret: true,
+                });
+                addListDropdownField('TTS model', GEMINI_MODELS, tts.gemini_ttsModel || 'gemini-2.5-flash-preview-tts', v => {
+                    tts.gemini_ttsModel = v;
+                });
+                addListDropdownField('TTS voice', GEMINI_VOICES, tts.gemini_ttsVoice || 'Zephyr', v => {
+                    tts.gemini_ttsVoice = v;
+                });
+                addTextAreaField('TTS style instructions', tts.gemini_ttsInstructions, v => { tts.gemini_ttsInstructions = v; }, {
+                    desc: 'Optional prompt guidance prepended to Gemini TTS requests.',
+                    placeholder: 'Read in a clear educational tone...',
+                });
                 break;
             }
 
             case 'elevenlabs': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('xi-...').setValue(tts.elevenlabs_apiKey).onChange(v => {
-                            tts.elevenlabs_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('eleven_multilingual_v2', 'eleven_multilingual_v2')
-                            .addOption('eleven_flash_v2_5', 'eleven_flash_v2_5')
-                            .addOption('eleven_turbo_v2_5', 'eleven_turbo_v2_5')
-                            .addOption('eleven_monolingual_v1', 'eleven_monolingual_v1')
-                            .setValue(tts.elevenlabs_model || 'eleven_multilingual_v2')
-                            .onChange(v => {
-                                tts.elevenlabs_model = v;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice ID')
-                    .addText(t =>
-                        t.setPlaceholder('Voice ID').setValue(tts.elevenlabs_voice).onChange(v => {
-                            tts.elevenlabs_voice = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.elevenlabs_voice, v => {
-                    tts.elevenlabs_voice = v;
+                addTextField('TTS API key', tts.elevenlabs_apiKey, v => { tts.elevenlabs_apiKey = v; }, {
+                    placeholder: 'Enter ElevenLabs API key',
+                    secret: true,
                 });
-                new Setting(providerSlot)
-                    .setName('Voice stability')
-                    .addSlider(s =>
-                        s
-                            .setLimits(0, 1, 0.05)
-                            .setValue(tts.elevenlabs_stability)
-                            .setDynamicTooltip()
-                            .onChange(v => {
-                                tts.elevenlabs_stability = v;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('Voice similarity boost')
-                    .addSlider(s =>
-                        s
-                            .setLimits(0, 1, 0.05)
-                            .setValue(tts.elevenlabs_similarity)
-                            .setDynamicTooltip()
-                            .onChange(v => {
-                                tts.elevenlabs_similarity = v;
-                                save();
-                            }),
-                    );
+                addListDropdownField('TTS model', ELEVENLABS_MODELS, tts.elevenlabs_model || 'eleven_multilingual_v2', v => {
+                    tts.elevenlabs_model = v;
+                });
+                addTextField('TTS voice ID', tts.elevenlabs_voice, v => { tts.elevenlabs_voice = v; }, {
+                    placeholder: 'Voice ID',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.elevenlabs_voice, v => { tts.elevenlabs_voice = v; });
+                addSliderField('Voice stability', 0, 1, 0.05, tts.elevenlabs_stability, v => { tts.elevenlabs_stability = v; });
+                addSliderField('Voice similarity boost', 0, 1, 0.05, tts.elevenlabs_similarity, v => { tts.elevenlabs_similarity = v; });
                 break;
             }
 
             case 'azure': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Azure Speech Key').setValue(tts.azure_apiKey).onChange(v => {
-                            tts.azure_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('Azure region')
-                    .addText(t =>
-                        t.setPlaceholder('eastus').setValue(tts.azure_region).onChange(v => {
-                            tts.azure_region = v.trim();
-                            save();
-                        }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('en-US-JennyNeural').setValue(tts.azure_voice).onChange(v => {
-                            tts.azure_voice = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.azure_voice, v => {
-                    tts.azure_voice = v;
+                addTextField('TTS API key', tts.azure_apiKey, v => { tts.azure_apiKey = v; }, {
+                    placeholder: 'Enter Azure speech key',
+                    secret: true,
                 });
-                new Setting(providerSlot)
-                    .setName('Azure output format')
-                    .addText(t =>
-                        t
-                            .setPlaceholder('audio-24khz-96kbitrate-mono-mp3')
-                            .setValue(tts.azure_outputFormat)
-                            .onChange(v => {
-                                tts.azure_outputFormat = v.trim();
-                                save();
-                            }),
-                    );
+                addTextField('Azure region', tts.azure_region, v => { tts.azure_region = v; }, {
+                    placeholder: 'Enter Azure region',
+                });
+                addTextField('TTS voice', tts.azure_voice, v => { tts.azure_voice = v; }, {
+                    placeholder: 'Enter Azure voice ID',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.azure_voice, v => { tts.azure_voice = v; });
+                addTextField('Azure output format', tts.azure_outputFormat, v => { tts.azure_outputFormat = v; }, {
+                    placeholder: 'Enter audio output format',
+                });
                 break;
             }
 
             case 'hume': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Hume API Key').setValue(tts.hume_apiKey).onChange(v => {
-                            tts.hume_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('Hume voice source')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('HUME_AI', 'Hume AI library')
-                            .addOption('CUSTOM_VOICE', 'Custom voice')
-                            .setValue(tts.hume_sourceType)
-                            .onChange(v => {
-                                tts.hume_sourceType = v as TtsHumeSourceType;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('Voice name').setValue(tts.hume_ttsVoice).onChange(v => {
-                            tts.hume_ttsVoice = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.hume_ttsVoice, v => {
-                    tts.hume_ttsVoice = v;
+                addTextField('TTS API key', tts.hume_apiKey, v => { tts.hume_apiKey = v; }, {
+                    placeholder: 'Enter Hume API key',
+                    secret: true,
                 });
-                new Setting(providerSlot)
-                    .setName('Hume acting instructions')
-                    .addTextArea(t =>
-                        t.setPlaceholder('Optional voice description...').setValue(tts.hume_ttsInstructions).onChange(v => {
-                            tts.hume_ttsInstructions = v;
-                            save();
-                        }),
-                    );
+                addListDropdownField(
+                    'Hume voice source',
+                    [
+                        { value: 'HUME_AI', label: 'Hume library' },
+                        { value: 'CUSTOM_VOICE', label: 'Custom voice' },
+                    ],
+                    tts.hume_sourceType,
+                    v => { tts.hume_sourceType = v as TtsHumeSourceType; },
+                );
+                addTextField('TTS voice', tts.hume_ttsVoice, v => { tts.hume_ttsVoice = v; }, {
+                    placeholder: 'Voice name',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.hume_ttsVoice, v => { tts.hume_ttsVoice = v; });
+                addTextAreaField('Hume acting instructions', tts.hume_ttsInstructions, v => { tts.hume_ttsInstructions = v; }, {
+                    placeholder: 'Optional voice description...',
+                });
                 break;
             }
 
             case 'minimax': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('MiniMax API Key').setValue(tts.minimax_apiKey).onChange(v => {
-                            tts.minimax_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('MiniMax Group ID')
-                    .addText(t =>
-                        t.setPlaceholder('Group ID').setValue(tts.minimax_groupId).onChange(v => {
-                            tts.minimax_groupId = v.trim();
-                            save();
-                        }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addText(t =>
-                        t.setPlaceholder('speech-2.6-turbo').setValue(tts.minimax_ttsModel).onChange(v => {
-                            tts.minimax_ttsModel = v.trim();
-                            save();
-                        }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('English_Graceful_Lady').setValue(tts.minimax_ttsVoice).onChange(v => {
-                            tts.minimax_ttsVoice = v.trim();
-                            save();
-                        }),
-                    );
+                addTextField('TTS API key', tts.minimax_apiKey, v => { tts.minimax_apiKey = v; }, {
+                    placeholder: 'Enter MiniMax API key',
+                    secret: true,
+                });
+                addTextField('MiniMax group ID', tts.minimax_groupId, v => { tts.minimax_groupId = v; }, {
+                    placeholder: 'Group ID',
+                });
+                addTextField('TTS model', tts.minimax_ttsModel, v => { tts.minimax_ttsModel = v; }, {
+                    placeholder: 'Enter model ID',
+                });
+                addTextField('TTS voice', tts.minimax_ttsVoice, v => { tts.minimax_ttsVoice = v; }, {
+                    placeholder: 'Enter voice ID',
+                });
                 new Setting(providerSlot)
                     .setName('Use China endpoint (api.minimaxi.com)')
                     .addToggle(tg =>
@@ -542,188 +366,92 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
             }
 
             case 'fish': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Fish Audio Key').setValue(tts.fish_apiKey).onChange(v => {
-                            tts.fish_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('s1', 's1')
-                            .addOption('s2-pro', 's2-pro')
-                            .setValue(tts.fish_model || 's1')
-                            .onChange(v => {
-                                tts.fish_model = v;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('Fish voice source')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('my-voices', 'My voices')
-                            .addOption('custom', 'Custom reference ID')
-                            .setValue(tts.fish_voiceSource)
-                            .onChange(v => {
-                                tts.fish_voiceSource = v as TtsFishVoiceSource;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('Fish voice ID')
-                    .addText(t =>
-                        t.setPlaceholder('Reference model ID').setValue(tts.fish_voiceId).onChange(v => {
-                            tts.fish_voiceId = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.fish_voiceId, v => {
-                    tts.fish_voiceId = v;
+                addTextField('TTS API key', tts.fish_apiKey, v => { tts.fish_apiKey = v; }, {
+                    placeholder: 'Enter Fish Audio key',
+                    secret: true,
                 });
-                new Setting(providerSlot)
-                    .setName('Sentence pause')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('none', 'None')
-                            .addOption('short', 'Short')
-                            .addOption('long', 'Long')
-                            .setValue(tts.fish_sentencePause)
-                            .onChange(v => {
-                                tts.fish_sentencePause = v as TtsFishSentencePause;
-                                save();
-                            }),
-                    );
+                addListDropdownField('TTS model', FISH_MODELS, tts.fish_model || 's1', v => { tts.fish_model = v; });
+                addListDropdownField(
+                    'Fish voice source',
+                    [
+                        { value: 'my-voices', label: 'My voices' },
+                        { value: 'custom', label: 'Custom reference ID' },
+                    ],
+                    tts.fish_voiceSource,
+                    v => { tts.fish_voiceSource = v as TtsFishVoiceSource; },
+                );
+                addTextField('Fish voice ID', tts.fish_voiceId, v => { tts.fish_voiceId = v; }, {
+                    placeholder: 'Reference model ID',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.fish_voiceId, v => { tts.fish_voiceId = v; });
+                addListDropdownField(
+                    'Sentence pause',
+                    [
+                        { value: 'none', label: 'None' },
+                        { value: 'short', label: 'Short' },
+                        { value: 'long', label: 'Long' },
+                    ],
+                    tts.fish_sentencePause,
+                    v => { tts.fish_sentencePause = v as TtsFishSentencePause; },
+                );
                 break;
             }
 
             case 'inworld': {
-                new Setting(providerSlot)
-                    .setName('TTS API key (Basic token)')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Inworld Base64 key').setValue(tts.inworld_apiKey).onChange(v => {
-                            tts.inworld_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('inworld-tts-1', 'inworld-tts-1')
-                            .addOption('inworld-tts-1-max', 'inworld-tts-1-max')
-                            .setValue(tts.inworld_modelId || 'inworld-tts-1')
-                            .onChange(v => {
-                                tts.inworld_modelId = v;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('Ronald').setValue(tts.inworld_voiceId).onChange(v => {
-                            tts.inworld_voiceId = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.inworld_voiceId, v => {
-                    tts.inworld_voiceId = v;
+                addTextField('TTS API key (basic token)', tts.inworld_apiKey, v => { tts.inworld_apiKey = v; }, {
+                    placeholder: 'Enter Inworld Base64 key',
+                    secret: true,
                 });
+                addListDropdownField('TTS model', INWORLD_MODELS, tts.inworld_modelId || 'inworld-tts-1', v => {
+                    tts.inworld_modelId = v;
+                });
+                addTextField('TTS voice', tts.inworld_voiceId, v => { tts.inworld_voiceId = v; }, {
+                    placeholder: 'Enter voice ID',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.inworld_voiceId, v => { tts.inworld_voiceId = v; });
                 break;
             }
 
             case 'polly': {
-                new Setting(providerSlot)
-                    .setName('AWS Access Key ID')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('AKIA...').setValue(tts.polly_accessKeyId).onChange(v => {
-                            tts.polly_accessKeyId = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('AWS Secret Access Key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Secret key').setValue(tts.polly_secretAccessKey).onChange(v => {
-                            tts.polly_secretAccessKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('AWS region')
-                    .addText(t =>
-                        t.setPlaceholder('us-east-1').setValue(tts.polly_region).onChange(v => {
-                            tts.polly_region = v.trim();
-                            save();
-                        }),
-                    );
-                new Setting(providerSlot)
-                    .setName('Polly engine')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('neural', 'Neural')
-                            .addOption('standard', 'Standard')
-                            .setValue(tts.polly_engine)
-                            .onChange(v => {
-                                tts.polly_engine = v as TtsPollyEngine;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('Joanna').setValue(tts.polly_voiceId).onChange(v => {
-                            tts.polly_voiceId = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.polly_voiceId, v => {
-                    tts.polly_voiceId = v;
+                addTextField('AWS access key ID', tts.polly_accessKeyId, v => { tts.polly_accessKeyId = v; }, {
+                    placeholder: 'Enter AWS access key ID',
+                    secret: true,
                 });
+                addTextField('AWS secret access key', tts.polly_secretAccessKey, v => { tts.polly_secretAccessKey = v; }, {
+                    placeholder: 'Secret key',
+                    secret: true,
+                });
+                addTextField('AWS region', tts.polly_region, v => { tts.polly_region = v; }, {
+                    placeholder: 'Enter AWS region',
+                });
+                addListDropdownField(
+                    'Polly engine',
+                    [
+                        { value: 'neural', label: 'Neural' },
+                        { value: 'standard', label: 'Standard' },
+                    ],
+                    tts.polly_engine,
+                    v => { tts.polly_engine = v as TtsPollyEngine; },
+                );
+                addTextField('TTS voice', tts.polly_voiceId, v => { tts.polly_voiceId = v; }, {
+                    placeholder: 'Enter voice ID',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.polly_voiceId, v => { tts.polly_voiceId = v; });
                 break;
             }
 
             case 'speechify': {
-                new Setting(providerSlot)
-                    .setName('TTS API key')
-                    .addText(t => {
-                        maskInput(t.inputEl);
-                        t.setPlaceholder('Speechify API Key').setValue(tts.speechify_apiKey).onChange(v => {
-                            tts.speechify_apiKey = v.trim();
-                            save();
-                        });
-                    });
-                new Setting(providerSlot)
-                    .setName('TTS model')
-                    .addDropdown(dd =>
-                        dd
-                            .addOption('simba-3.2', 'simba-3.2')
-                            .addOption('simba-3.0', 'simba-3.0')
-                            .setValue(tts.speechify_model || 'simba-3.2')
-                            .onChange(v => {
-                                tts.speechify_model = v;
-                                save();
-                            }),
-                    );
-                new Setting(providerSlot)
-                    .setName('TTS voice')
-                    .addText(t =>
-                        t.setPlaceholder('dominic_32').setValue(tts.speechify_voice).onChange(v => {
-                            tts.speechify_voice = v.trim();
-                            save();
-                        }),
-                    );
-                addVoiceDiscoveryRow(providerSlot, tts.speechify_voice, v => {
-                    tts.speechify_voice = v;
+                addTextField('TTS API key', tts.speechify_apiKey, v => { tts.speechify_apiKey = v; }, {
+                    placeholder: 'Enter Speechify API key',
+                    secret: true,
                 });
+                addListDropdownField('TTS model', SPEECHIFY_MODELS, tts.speechify_model || 'simba-3.2', v => {
+                    tts.speechify_model = v;
+                });
+                addTextField('TTS voice', tts.speechify_voice, v => { tts.speechify_voice = v; }, {
+                    placeholder: 'Enter voice ID',
+                });
+                addVoiceDiscoveryRow(providerSlot, tts.speechify_voice, v => { tts.speechify_voice = v; });
                 break;
             }
         }
@@ -736,7 +464,7 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
 
     new Setting(container)
         .setName('Default read aloud source')
-        .setDesc('Auto detects an editor selection, active study material surface (Mind map / Visualize / Summary / Tutor), or falls back to the review note.')
+        .setDesc('Auto detects an editor selection, active Study material surface (mind map / visualize / summary / tutor), or falls back to the review note.')
         .addDropdown(dd =>
             dd
                 .addOption('auto', 'Auto (context-aware)')
@@ -795,12 +523,12 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
     new Setting(container).setName('Audio cache & storage').setHeading();
 
     new Setting(container)
-        .setName('Audio cache backend')
-        .setDesc('Store synthesized audio locally in IndexedDB or in a vault folder for cross-device / offline reuse.')
+        .setName('Audio cache')
+        .setDesc('Where spoken audio is kept so a passage is never paid for twice. Both options are the same places Obsidian Aloud uses: its local cache on this device, or its hidden .tts folder in the vault (which syncs, and never shows among your notes).')
         .addDropdown(dd =>
             dd
-                .addOption('local', 'Local IndexedDB cache')
-                .addOption('vault', 'Vault folder cache')
+                .addOption('local', 'On this device (shared with Aloud TTS)')
+                .addOption('vault', 'Hidden .tts folder in the vault')
                 .setValue(tts.cacheType)
                 .onChange(v => {
                     tts.cacheType = v as TtsCacheType;
@@ -820,31 +548,38 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
             });
         });
 
-    new Setting(container)
-        .setName('Vault audio folder')
-        .setDesc('Vault path used for vault-cached clips and exported audio files.')
+    const folderRow = new Setting(container)
+        .setName('Vault folder for saved audio')
+        .setDesc('Used when saved audio goes to a vault folder.')
         .addText(t =>
-            t.setPlaceholder('spaceforge/tts-audio').setValue(tts.audioFolder).onChange(v => {
+            t.setPlaceholder('Enter vault folder path').setValue(tts.audioFolder).onChange(v => {
                 tts.audioFolder = v.trim() || 'spaceforge/tts-audio';
                 save();
             }),
         );
+    const showFolder = () => folderRow.settingEl.toggleClass('sf-hidden', tts.audioExportDestination !== 'vault');
 
     new Setting(container)
-        .setName('Audio export destination')
+        .setName('Save audio to')
+        .setDesc('Where the save button in the player puts the audio it has read.')
         .addDropdown(dd =>
             dd
-                .addOption('vault', 'Save into vault folder')
-                .addOption('browser', 'Download file')
+                .addOption('cache', 'Hidden .tts folder in the vault')
+                .addOption('vault', 'A vault folder')
+                .addOption('browser', 'Downloads')
                 .setValue(tts.audioExportDestination)
                 .onChange(v => {
                     tts.audioExportDestination = v as TtsExportDestination;
+                    showFolder();
                     save();
                 }),
         );
+    // The folder row follows the destination, so it sits under it.
+    container.appendChild(folderRow.settingEl);
+    showFolder();
 
     const cacheRow = new Setting(container)
-        .setName('Cached audio size')
+        .setName('Spaceforge audio in the cache')
         .setDesc('Calculating cache usage…');
 
     const updateCacheDesc = async () => {
@@ -859,10 +594,55 @@ export function renderTtsSettingsSection(container: HTMLElement, plugin: Spacefo
     void updateCacheDesc();
 
     cacheRow.addButton(btn =>
-        btn.setButtonText('Clear TTS cache').onClick(async () => {
+        btn.setButtonText('Clear Spaceforge audio').onClick(async () => {
             await plugin.ttsService?.clearCache();
             await updateCacheDesc();
-            showStatus('Cleared TTS audio cache.', 'ok');
+            showStatus('Cleared Spaceforge\'s cached audio. Aloud\'s own audio was left alone.', 'ok');
         }),
     );
+
+    // --- Bring settings in from elsewhere: last, since it is done once ---
+    new Setting(container).setName('Import').setHeading();
+    const aloudSetting = new Setting(container)
+        .setName('Import from Aloud TTS')
+        .setDesc('Check the vault for Aloud TTS settings (data.json) and copy its endpoints, keys, voices, cache, and chunking preferences.');
+
+    aloudSetting.addButton(btn =>
+        btn.setButtonText('Import Aloud TTS settings').onClick(async () => {
+            const svc = plugin.ttsService;
+            if (!svc) {
+                showStatus('TTS service is unavailable in this session.', 'warn');
+                return;
+            }
+            const res = await svc.importFromAloudSettings();
+            if (!res.imported) {
+                showStatus('No Aloud TTS data.json found under plugins/aloud-tts/.', 'warn');
+                return;
+            }
+            container.empty();
+            renderTtsSettingsSection(container, plugin);
+            new Notice(`Imported Aloud TTS settings (${res.provider ?? 'OpenAI'}).`);
+        }),
+    );
+
+    aloudSetting.addButton(btn =>
+        btn.setButtonText('Reuse Spaceforge AI keys').onClick(() => {
+            const copied = shareSpaceforgeApiKeys(tts, plugin.settings);
+            if (!copied) {
+                showStatus('No empty OpenAI, Gemini, or custom API key slots to fill.', 'warn');
+                return;
+            }
+            save();
+            renderProviderFields();
+            showStatus('Copied matching API keys from Spaceforge AI settings into TTS.', 'ok');
+        }),
+    );
+
+    void plugin.ttsService?.detectAloudSettings?.().then(detected => {
+        if (!detected) return;
+        const providers = detected.preview.configuredProviders.join(', ') || detected.preview.provider;
+        aloudSetting.setDesc(
+            `Detected Aloud TTS configuration at ${detected.path} (active: ${detected.preview.provider}; configured: ${providers}).`,
+        );
+    }).catch(() => undefined);
 }

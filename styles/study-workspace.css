@@ -1,12 +1,13 @@
 /* Review Study only: one note, one canvas, reader-sized type. */
 .sf-study-panel { container-type: inline-size; }
 .sf-study-workspace { min-width: 0; overflow: hidden; font-size: var(--sf-font-text); }
-.sf-study-workspace-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 6px 10px; border-bottom: 1px solid var(--background-modifier-border); }
-.sf-study-workspace .sf-study-workspace-note { appearance: none; background: transparent; box-shadow: none; border: 0; padding: 0; height: auto; min-height: 32px; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); font-size: var(--sf-font-text); font-weight: var(--font-semibold); text-align: start; }
-.sf-study-workspace-progress { display: flex; flex: 1 1 12em; flex-direction: column; gap: 3px; color: var(--text-muted); font-size: var(--sf-font-ui); }
-.sf-study-workspace-progress progress { width: 100%; max-width: 24em; height: 4px; accent-color: var(--interactive-accent); }
-.sf-study-workspace-views { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--background-modifier-border); }
-.sf-study-workspace .sf-study-workspace-view { appearance: none; background: transparent; box-shadow: none; border: 1px solid transparent; border-radius: var(--radius-s); height: auto; min-height: 32px; padding: 4px 8px; font-size: var(--sf-font-ui); color: var(--text-muted); white-space: normal; }
+.sf-study-workspace-topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 8px; padding: 3px 8px; border-bottom: 1px solid var(--background-modifier-border); }
+.sf-study-workspace-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 0; }
+.sf-study-workspace .sf-study-workspace-note { appearance: none; background: transparent; box-shadow: none; border: 0; padding: 0; height: auto; min-height: 26px; white-space: normal; overflow-wrap: anywhere; color: var(--text-normal); font-size: var(--sf-font-text); font-weight: var(--font-semibold); text-align: start; }
+.sf-study-workspace-progress { display: flex; flex: 0 1 auto; flex-direction: row; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--sf-font-small); }
+.sf-study-workspace-progress progress { width: 42px; height: 3px; accent-color: var(--interactive-accent); }
+.sf-study-workspace-views { display: flex; flex-wrap: wrap; gap: 2px; padding: 0; }
+.sf-study-workspace .sf-study-workspace-view { appearance: none; background: transparent; box-shadow: none; border: 1px solid transparent; border-radius: var(--radius-s); height: auto; min-height: 26px; padding: 2px 8px; font-size: var(--sf-font-ui); color: var(--text-muted); white-space: normal; }
 .sf-study-workspace .sf-study-workspace-view:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
 .sf-study-workspace .sf-study-workspace-view.is-selected { color: var(--text-normal); border-color: var(--background-modifier-border); background: var(--background-secondary); }
 .sf-study-workspace button:focus-visible, .sf-study-workspace select:focus-visible, .sf-study-workspace summary:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
@@ -40,15 +41,19 @@
 .sf-study-workspace .sf-study-quick { gap: 4px; }
 .sf-study-workspace .sf-study-quick-btn { min-height: 32px; height: auto; white-space: normal; }
 .sf-study-workspace .sf-study-digest { padding: 6px 10px; }
-.sf-study-workspace .sf-study-material { padding: 8px 10px; }
-.sf-study-workspace .sf-study-material-head { gap: 6px; }
+.sf-study-workspace .sf-study-material { padding: 4px 10px 8px; margin-top: 0; border-top: none; }
+.sf-study-workspace .sf-study-material-head { gap: 4px; justify-content: flex-end; }
+.sf-study-workspace .sf-study-section-title { display: none; }
+.sf-study-workspace .sf-study-material-head .sf-btn { min-height: 24px; padding: 1px 8px; font-size: var(--sf-font-small); border: 1px solid var(--sf-border); background: var(--background-secondary); color: var(--text-muted); }
+.sf-study-workspace .sf-study-material-head .sf-btn:hover:not(:disabled) { color: var(--text-normal); filter: none; background: var(--background-modifier-hover); }
 .sf-study-workspace .sf-study-material-state:empty { display: none; }
 .sf-study-workspace .sf-study-obj { width: 100%; height: auto; min-height: 32px; text-align: start; white-space: normal; box-shadow: none; }
 .sf-study-workspace.is-short .sf-study-session-menu { display: flex; }
 .sf-study-workspace.is-short .sf-study-header { display: none; }
 .sf-study-workspace.is-short .sf-study-workspace-progress { display: none; }
-.sf-study-workspace.is-short .sf-study-workspace-heading { padding: 2px 10px; }
-.sf-study-workspace.is-short .sf-study-workspace-views { padding: 2px 8px; }
+.sf-study-workspace.is-short .sf-study-workspace-topbar { padding: 2px 8px; }
+.sf-study-workspace.is-short .sf-study-workspace-heading { padding: 0; }
+.sf-study-workspace.is-short .sf-study-workspace-views { padding: 0; }
 .sf-study-workspace.is-short .sf-study-workspace-objective { padding: 2px 10px; }
 .sf-study-workspace.is-short .sf-study-quick-more { display: none; }
 .sf-study-workspace.is-short .sf-study-workspace-objective { display: flex; }
@@ -88,9 +93,15 @@
   display: none;
 }
 
-.sf-dock .sf-study-workspace-heading,
-.sf-host-sidebar .sf-study-workspace-heading {
-  padding: 4px 10px;
+.sf-host-sidebar .sf-study-workspace-topbar {
+  padding: 2px 8px;
+}
+
+/* Docked under the review bar, the bar's own tab row already carries Learn,
+   Visualize, Mind map and Summary — a second row of the same four tabs inside
+   the panel was the most confusing thing on screen. */
+.sf-study-panel.is-compact .sf-study-workspace-topbar {
+  display: none;
 }
 
 .sf-host-sidebar .sf-study-header {
@@ -127,4 +138,32 @@
     gap: 1px;
     padding: 2px 4px;
   }
+}
+
+/* Settled material: nothing to report, so the head is a quiet footer under it
+   ("Regenerate", for the rare remake) instead of a row of buttons above it. */
+.sf-study-material.is-settled {
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-study-material.is-settled .sf-study-material-host {
+  order: 1;
+}
+
+.sf-study-material.is-settled .sf-study-material-head {
+  order: 2;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.sf-study-workspace .sf-study-material.is-settled .sf-study-material-head .sf-btn {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.sf-study-workspace .sf-study-material.is-settled .sf-study-material-head .sf-btn:hover:not(:disabled) {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }

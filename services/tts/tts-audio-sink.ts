@@ -26,7 +26,7 @@ export class HtmlAudioTtsSink implements TtsAudioSink {
         if (typeof Audio === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
             return {
                 pause: () => undefined,
-                resume: async () => undefined,
+                resume: () => Promise.resolve(),
                 stop: () => undefined,
                 setRate: () => undefined,
                 finished: Promise.resolve('stopped'),

@@ -86,7 +86,7 @@ export class MCQModal extends Modal {
         const existingAnswer = this.session.answers.find(a => a.questionIndex === questionIndex);
         const progressEl = contentEl.createDiv('mcq-progress');
         const progressPercent = Math.round(((questionIndex + 1) / this.mcqSet.questions.length) * 100);
-        contentEl.setAttribute('data-progress', progressPercent.toString());
+        contentEl.setCssProps({ '--sf-mcq-progress': `${progressPercent}%` });
 
         if (existingAnswer) {
             progressEl.setText(`Question ${questionIndex + 1} of ${this.mcqSet.questions.length} (Attempt ${existingAnswer.attempts + 1})`);
@@ -175,27 +175,6 @@ export class MCQModal extends Modal {
         for (let i = 0; i < 9; i++) { // A-I
             this.scope.register([], String.fromCharCode(65 + i), keyDownHandler);
         }
-
-        // Cleanup handled by Modal's onClose automatically if using this.scope.register
-        // Original onClose logic for saving partial progress:
-        const originalOnClose = (): void => { this.onClose(); };
-        this.onClose = () => {
-            originalOnClose();
-            if (!this.session.completed && this.session.answers.length > 0) {
-                // Session was closed prematurely but some answers were given
-                this.session.completedAt = Date.now();
-                this.calculateScore(); // Calculate score based on answers so far
-                this.plugin.mcqService.saveMCQSession(this.session);
-                void this.plugin.savePluginData();
-                if (this.onCompleteCallback) {
-                    // Indicate it was not fully completed if onCompleteCallback expects a 'completed' flag
-                    this.onCompleteCallback(this.notePath, this.session.score, false);
-                }
-            } else if (!this.session.completed && this.onCompleteCallback) {
-                // Closed before any answers or completion
-                this.onCompleteCallback(this.notePath, 0, false);
-            }
-        };
     }
 
     displayCurrentQuestion(containerEl: HTMLElement): void {
@@ -312,7 +291,7 @@ export class MCQModal extends Modal {
                 const progressEl = contentEl.querySelector('.mcq-progress');
                 if (progressEl instanceof HTMLElement) progressEl.textContent = `Question ${this.session.currentQuestionIndex + 1} of ${this.mcqSet.questions.length}`;
                 const newProgressPercent = Math.round(((this.session.currentQuestionIndex + 1) / this.mcqSet.questions.length) * 100);
-                contentEl.setAttribute('data-progress', newProgressPercent.toString());
+                contentEl.setCssProps({ '--sf-mcq-progress': `${newProgressPercent}%` });
                 if (this.session.currentQuestionIndex < this.mcqSet.questions.length) {
                     this.displayCurrentQuestion(contentEl);
                 } else {
@@ -457,7 +436,21 @@ export class MCQModal extends Modal {
         );
     }
 
-    // onClose is now handled by the keyboard shortcut registration cleanup
+    onClose(): void {
+        super.onClose();
+        this.contentEl.empty();
+        if (!this.session.completed && this.session.answers.length > 0) {
+            this.session.completedAt = Date.now();
+            this.calculateScore();
+            this.plugin.mcqService.saveMCQSession(this.session);
+            void this.plugin.savePluginData();
+            if (this.onCompleteCallback) {
+                this.onCompleteCallback(this.notePath, this.session.score, false);
+            }
+        } else if (!this.session.completed && this.onCompleteCallback) {
+            this.onCompleteCallback(this.notePath, 0, false);
+        }
+    }
 }
 
 // Helper function to map FSRS state number to a string

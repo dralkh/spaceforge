@@ -1,12 +1,11 @@
 /* Spaceforge - Sidebar View Styles */
 
 .spaceforge-container {
-  padding: var(--sf-space-md);
+  padding: 8px 10px;
   overflow-y: auto;
   height: 100%;
-  background: var(--background-primary); /* Use Obsidian background */
-  color: var(--text-normal); /* Use Obsidian text color */
-  box-shadow: var(--sf-shadow-md); /* Added subtle shadow */
+  background: var(--background-primary);
+  color: var(--text-normal);
 }
 
 /* Upcoming Reviews Section */
@@ -106,9 +105,7 @@
 .review-header {
   display: flex;
   flex-direction: column;
-  margin-bottom: var(--sf-space-md);
-  border-bottom: 1px solid var(--background-modifier-border);
-  padding-bottom: var(--sf-space-sm);
+  margin-bottom: var(--sf-space-xs);
 }
 
 .review-header h2 {
@@ -187,7 +184,7 @@
 
 .review-view-toggle {
   display: flex;
-  margin-top: var(--sf-space-sm);
+  margin-top: 0;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--sf-radius-md);
   overflow: hidden;
@@ -197,7 +194,7 @@
    width and the button keeps a small square of its own. */
 .review-header-row {
   display: flex;
-  gap: var(--sf-space-sm);
+  gap: var(--sf-space-xs);
   align-items: stretch;
 }
 
@@ -211,14 +208,14 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  margin-top: var(--sf-space-sm);
+  width: 30px;
+  margin-top: 0;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--sf-radius-md);
   background-color: var(--background-secondary);
   color: var(--text-muted);
   cursor: pointer;
-  transition: var(--sf-transition);
+  transition: background-color var(--sf-transition-fast), color var(--sf-transition-fast);
 }
 
 .review-stats-btn:hover {
@@ -229,12 +226,19 @@
 .review-view-btn {
   flex: 1;
   text-align: center;
-  padding: 6px;
+  padding: 4px 8px;
+  font-size: var(--sf-font-ui);
   cursor: pointer;
   color: var(--text-normal);
   background-color: var(--background-secondary);
-  transition: var(--sf-transition);
+  transition: background-color var(--sf-transition-fast), color var(--sf-transition-fast);
   font-weight: 500;
+}
+
+.review-view-btn:focus-visible,
+.review-stats-btn:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
 }
 
 .review-view-btn.active {
@@ -295,20 +299,19 @@
   cursor: pointer;
   font-weight: 500;
   text-align: center;
-  border: none;
-  transition: var(--sf-transition);
-  box-shadow: var(--sf-shadow-sm);
-  background-color: var(--background-modifier-border);
+  border: 1px solid var(--sf-border);
+  transition: background-color var(--sf-transition-fast), border-color var(--sf-transition-fast);
+  background-color: var(--background-secondary);
   color: var(--text-normal);
 }
 
 .review-bulk-button:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
+  border-color: var(--sf-border-strong);
+  background-color: var(--background-modifier-hover);
 }
 
 .review-bulk-button:active {
-  transform: translateY(0);
+  transform: scale(0.985);
 }
 
 .review-selection-info {
@@ -551,8 +554,17 @@
 .review-note-button:hover,
 .review-note-postpone:hover,
 .review-note-remove:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
+  filter: brightness(1.06);
+}
+
+.review-note-button:focus-visible,
+.review-note-postpone:focus-visible,
+.review-note-remove:focus-visible,
+.review-bulk-button:focus-visible,
+.review-session-continue:focus-visible,
+.review-session-end:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
 }
 
 .review-note-drag-handle {
@@ -605,10 +617,7 @@
   color: var(--sf-text-muted);
   background-color: var(--sf-bg-secondary);
   border-radius: var(--sf-radius-md);
-  box-shadow: var(--sf-shadow-md); /* Using defined shadow variable */
-  border: 1px solid var(--background-modifier-border);
-  position: relative;
-  overflow: hidden;
+  border: 1px solid var(--sf-border);
 }
 
 .review-all-caught-up::before {
@@ -618,29 +627,13 @@
   margin-bottom: var(--sf-space-sm);
 }
 
-.review-all-caught-up::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 300%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 100%
-  );
-  animation: shimmer 2s infinite;
-}
-
 .review-session-section {
   margin-bottom: var(--sf-space-lg);
   padding: var(--sf-space-md);
   background-color: var(--sf-bg-secondary);
+  border: 1px solid var(--sf-border);
   border-radius: var(--sf-radius-md);
-  box-shadow: var(--sf-shadow-md); /* Using defined shadow variable */
-  border-left: 4px solid var(--sf-primary);
+  border-inline-start: 3px solid var(--sf-primary);
 }
 
 .review-session-info {
@@ -662,7 +655,7 @@
 
 .review-session-progress-bar-container {
   height: 5px;
-  background-color: var(--background-modifier-border);
+  background-color: var(--sf-border);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 10px;
@@ -674,24 +667,8 @@
   /* The bar's fill is set by the sidebar as --sf-session-progress. */
   width: var(--sf-session-progress, 0);
   background-color: var(--sf-primary);
-  position: relative;
-  overflow: hidden;
-}
-
-.review-session-progress-bar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.15) 50%,
-    transparent 100%
-  );
-  animation: shimmer 2s infinite;
+  border-radius: 3px;
+  transition: width 220ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .review-session-continue,
@@ -719,8 +696,7 @@
 
 .review-session-continue:hover,
 .review-session-end:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sf-shadow-lg); /* Using defined shadow variable */
+  filter: brightness(1.06);
 }
 
 

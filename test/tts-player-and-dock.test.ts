@@ -400,6 +400,20 @@ test('ReviewDock integrates TtsPlayerBar and automatically selects and reads Min
     assert.equal(ttsService.getSnapshot().sourceSurface, 'note');
     assert.match(ttsService.getSnapshot().segments[0].text, /Light bends across boundaries/);
 
+    // The reader leaves Summary for Visualize while Summary is being read: the
+    // track's highlight never pulls them back, and Play reads Visualize — the
+    // view on screen — instead of resuming the Summary track.
+    await dock.readAloud('summary');
+    assert.equal(dock.tabState().view, 'summary');
+    dock.openTab('study', 'board');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(dock.tabState().view, 'board', 'a Summary track does not drag the reader back to Summary');
+    assert.equal(dock.tabState().listen?.playing, false, 'the speaker offers to read Visualize, not to pause Summary');
+    if (ttsService.getSnapshot().status === 'playing') await ttsService.togglePlayPause();
+    dock.toggleListen();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(ttsService.getSnapshot().sourceSurface, 'visualize', 'Play reads what is on screen');
+
     await new Promise(resolve => setTimeout(resolve, 15));
     dock.destroy();
     ttsService.destroy();

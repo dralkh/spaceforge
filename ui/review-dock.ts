@@ -64,13 +64,27 @@ export interface DockSuggestion {
     label: string;
 }
 
-/** The Study / MCQs / Cards buttons, drawn by the bar beside the scheduler line. */
+/** One of the bar's tabs: its name, its hover, and a short count badge. */
+export interface DockTabEntry {
+    label: string;
+    title: string;
+    count?: string;
+}
+
+/** The study panel's views, which the bar shows as tabs of their own. */
+export type DockStudyView = 'learn' | 'board' | 'mindmap' | 'summary';
+
+/** The bar's tab row: Learn / Visualize / Mind map / Summary / MCQs / Cards. */
 export interface DockTabState {
-    study: { label: string; title: string } | null;
-    mcq: { label: string; title: string } | null;
+    study: DockTabEntry | null;
+    mcq: DockTabEntry | null;
     /** The card lane's tab; null when the vault has no deck lane to offer. */
-    cards: { label: string; title: string } | null;
+    cards: DockTabEntry | null;
     active: DockTab | null;
+    /** The study panel's view on screen (or the one it will open on). */
+    view: DockStudyView;
+    /** Read aloud, when a voice is ready and there is a note to read. */
+    listen: { playing: boolean } | null;
 }
 
 /** What the bar and the controller need from the dock. */
@@ -142,6 +156,13 @@ export class ReviewDock {
     /** Kept so a re-render can put the finished card back. */
     private lastScore: { summary: McqRunSummary; score: number; suggestedLabel: string } | null = null;
     private tab: DockTab = 'study';
+    /** The study view the bar asked for; the panel's own answer wins once it exists. */
+    private studyView: DockStudyView = 'learn';
+    /** A view the reader picked before the panel existed; applied on mount. */
+    private requestedView: DockStudyView | null = null;
+    /** Last playing state told to the bar, so a TTS tick only re-renders on a change. */
+    private listenPlaying = false;
+    private listenKey = '';
     private expanded = false;
     private gate: DockGate | null = null;
     /** The panel the cards tab's sitting was mounted into, once it was. */
@@ -215,13 +236,48 @@ export class ReviewDock {
         return this.tab === 'mcq' && this.runner?.answering === true;
     }
 
-    openTab(tab: DockTab): void {
-        if (this.expanded && this.tab === tab) {
+    openTab(tab: DockTab, view?: DockStudyView): void {
+        const current = this.currentStudyView();
+        if (this.expanded && this.tab === tab && (tab !== 'study' || !view || view === current)) {
+            // Pressing the open tab puts the panel away.
             this.setExpanded(false);
             return;
         }
+        if (tab === 'study' && view) {
+            this.studyView = view;
+            if (this.panel) this.panel.setWorkspaceView(view);
+            else this.requestedView = view;
+        }
         this.tab = tab;
         this.setExpanded(true);
+    }
+
+    /** The study view on screen: the panel's, once it has one. */
+    private currentStudyView(): DockStudyView {
+        return this.panel?.getActiveWorkspaceView() ?? this.studyView;
+    }
+
+    /** Read aloud what is on screen, or pause / resume what is already playing. */
+    toggleListen(): void {
+        const tts = this.getTtsService();
+        if (!tts || !this.path) return;
+        const snapshot = tts.getSnapshot();
+        const active = snapshot.status === 'playing' || snapshot.status === 'loading' || snapshot.status === 'paused';
+        const onScreen = this.resolveReadAloudSource('auto', this.path);
+        // Play means "read what I am looking at". Only the track already
+        // reading this very view is paused or resumed; a track left over from
+        // another view (or another note) gives way to the one on screen.
+        if (active && snapshot.notePath === this.path && snapshot.sourceSurface === onScreen) {
+            void tts.togglePlayPause();
+            return;
+        }
+        void this.readAloud(onScreen);
+    }
+
+    /** True while the track playing is reading the view on screen. */
+    private trackOnScreen(snapshot: TtsPlayerSnapshot): boolean {
+        if (!this.path || snapshot.notePath !== this.path) return false;
+        return snapshot.sourceSurface === this.resolveReadAloudSource('auto', this.path);
     }
 
     /**
@@ -359,13 +415,23 @@ export class ReviewDock {
             this.ttsBarHost = root.createDiv('sf-dock-tts');
             this.ttsBar = new TtsPlayerBar(ttsService, {
                 onReadTarget: source => this.readAloud(source),
+                onToggle: () => this.toggleListen(),
                 onResumeFollow: () => this.syncTtsHighlight(ttsService.getSnapshot()),
             });
             this.ttsBar.mount(this.ttsBarHost);
             this.editorHighlighter = new TtsEditorHighlighter(this.plugin.app, () =>
                 ttsService.pauseAutoScrollByUser(),
             );
-            this.ttsUnsubscribe = ttsService.subscribe(snapshot => this.syncTtsHighlight(snapshot));
+            this.ttsUnsubscribe = ttsService.subscribe(snapshot => {
+                this.syncTtsHighlight(snapshot);
+                const playing = snapshot.status === 'playing' || snapshot.status === 'loading';
+                const key = `${playing}:${snapshot.notePath ?? ''}:${snapshot.sourceSurface ?? ''}`;
+                if (key !== this.listenKey) {
+                    this.listenKey = key;
+                    this.listenPlaying = playing;
+                    this.handlers.onTabs?.(this.tabState());
+                }
+            });
         }
 
         // The Study / MCQs buttons live on the bar's own identity line now, so
@@ -634,8 +700,13 @@ export class ReviewDock {
             compact: true,
             onRequestSpace: () => this.setExpanded(true),
             onSessionEnd: payload => this.afterStudySession(payload),
-            onReadAloud: view => void this.readAloud(view === 'board' ? 'visualize' : view),
+            onViewChange: view => {
+                this.studyView = view;
+                this.handlers.onTabs?.(this.tabState());
+            },
         });
+        if (this.requestedView) this.panel.setWorkspaceView(this.requestedView);
+        this.requestedView = null;
         this.panel.mount(host);
     }
 
@@ -675,7 +746,7 @@ export class ReviewDock {
                 this.controller.planService.getPlan(path)?.visuals ??
                 null;
             if (!pack) {
-                new Notice('Study material has not been generated for this note yet. Click "Make it" first.');
+                new Notice('Study material has not been generated for this note yet. Generate it first.');
                 return;
             }
 
@@ -708,7 +779,7 @@ export class ReviewDock {
             const turns = this.panel?.getTutorTurns() ?? [];
             const segments = convertTutorTurnsToAloudSegments(turns);
             if (segments.length === 0) {
-                new Notice('No study tutor conversation yet for this note.');
+                new Notice('No Study tutor conversation yet for this note.');
                 return;
             }
             await ttsService.playSegments({
@@ -827,10 +898,11 @@ export class ReviewDock {
             seg.targetSurface === 'summary' ||
             seg.targetSurface === 'tutor'
         ) {
-            if (!this.expanded || this.tab !== 'study') {
-                this.tab = 'study';
-                this.setExpanded(true);
-            }
+            // The highlight follows the reader, never the other way round: a
+            // track playing on, say, Summary never pulls the reader back from
+            // the Visualize tab they moved to. It marks its place only when its
+            // own view is the one on screen.
+            if (!this.expanded || this.tab !== 'study') return;
             this.panel?.highlightTtsSegment(seg, snapshot.autoScroll);
         }
     }
@@ -1040,9 +1112,17 @@ export class ReviewDock {
         const studyOn = this.plugin.settings.studyEnabled && !!this.plugin.studyController;
         const mcqOn = this.plugin.settings.enableMCQ && !!this.plugin.mcqController;
         const cards = this.cardsTabState();
+        const active = this.expanded ? this.tab : null;
+        const view = this.currentStudyView();
+        const tts = this.getTtsService();
+        // The speaker shows "pause" only while it is reading the view on
+        // screen; on any other view it offers to read that one instead.
+        const listen = tts && path
+            ? { playing: this.listenPlaying && this.trackOnScreen(tts.getSnapshot()) }
+            : null;
         // No note under the bar: the card lane is still a sitting of its own,
         // and it is what the row after a finished queue offers.
-        if (!path) return { study: null, mcq: null, cards, active: this.expanded ? this.tab : null };
+        if (!path) return { study: null, mcq: null, cards, active, view, listen: null };
 
         // A note's tab row is about the note: the decks' control appears once
         // the run has actually stood on one of their steps — or when a sitting
@@ -1054,14 +1134,13 @@ export class ReviewDock {
             const badge = this.controller.studyBadge(path);
             const charting = this.controller.isCharting(path);
             study = {
-                label: charting
-                    ? 'Study · charting…'
+                label: 'Learn',
+                count: charting ? '…' : badge.hasPlan && badge.due > 0 ? `${badge.due} due` : undefined,
+                title: charting
+                    ? 'Charting this note into objectives…'
                     : badge.hasPlan
-                        ? (badge.due > 0 ? `Study · ${badge.due} due` : `Study · ${badge.total} objective${badge.total === 1 ? '' : 's'}`)
-                        : 'Study this note',
-                title: badge.hasPlan
-                    ? `${badge.mastered}/${badge.total} solid · teach me these objectives here, under the note`
-                    : 'Chart this note into objectives and be taught them',
+                        ? `Learn with a tutor · ${badge.mastered}/${badge.total} objectives solid`
+                        : 'Chart this note into objectives and be taught them',
             };
         }
 
@@ -1070,14 +1149,15 @@ export class ReviewDock {
             const set = this.plugin.mcqService?.getMCQSetForNote(path) ?? null;
             const count = set?.questions.length ?? 0;
             mcq = {
-                label: count > 0 ? `MCQs · ${count}` : 'MCQs',
+                label: 'MCQs',
+                count: count > 0 ? String(count) : undefined,
                 title: count > 0
-                    ? `Sit ${count} questions on this note, here, under the note`
-                    : 'Write questions for this note and sit them here',
+                    ? `Answer ${count} questions on this note`
+                    : 'Write questions for this note and answer them',
             };
         }
 
-        return { study, mcq, cards: cardsForNote, active: this.expanded ? this.tab : null };
+        return { study, mcq, cards: cardsForNote, active, view, listen };
     }
 
     /**
@@ -1095,7 +1175,8 @@ export class ReviewDock {
         const live = this.liveCardCount();
         if (live !== null) {
             return {
-                label: live > 0 ? `Cards · ${live}` : 'Cards',
+                label: 'Cards',
+                count: live > 0 ? String(live) : undefined,
                 title: live > 0
                     ? `${live} card${live === 1 ? '' : 's'} left in the sitting below`
                     : 'The sitting below is done',
@@ -1105,7 +1186,8 @@ export class ReviewDock {
         const at = this.plugin.deckDueCountedAt;
         const due = counted !== null && Date.now() - at < 60_000 ? counted : 0;
         return {
-            label: due > 0 ? `Cards · ${due}` : 'Cards',
+            label: 'Cards',
+            count: due > 0 ? String(due) : undefined,
             title: due > 0
                 ? `${due} card${due === 1 ? '' : 's'} due in your decks · opens a card sitting under the bar`
                 : 'Your decks · opens a card sitting under the bar',

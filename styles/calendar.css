@@ -10,7 +10,6 @@
   width: 100%;
   background-color: var(--background-primary);
   border-radius: var(--radius-m, 8px);
-  box-shadow: var(--sf-shadow-md); /* Added subtle shadow */
   /* The pane's own width is what the month has to work with, so the container is
      a size container too: the rules below give a narrow month's cells back the
      width their padding was taking. */
@@ -150,18 +149,24 @@
   font-size: var(--sf-font-ui);
   cursor: pointer;
   padding: 6px 12px;
-  border-radius: 20px; /* More rounded */
+  border-radius: 20px;
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   border: none;
-  transition: var(--sf-transition);
+  transition: background-color var(--sf-transition-fast);
   font-weight: 500;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-today-btn:hover {
   background-color: var(--interactive-accent-hover);
-  transform: translateY(-1px);
+}
+
+.calendar-today-btn:focus-visible,
+.calendar-day:focus-visible,
+.day-reviews-all-button:focus-visible,
+.day-reviews-skip-next-button:focus-visible {
+  outline: var(--sf-focus-outline);
+  outline-offset: 2px;
 }
 
 /* Calendar grid with equal-sized cells */
@@ -212,9 +217,7 @@
 
 .calendar-day:hover {
   border-color: var(--interactive-accent);
-  box-shadow: var(--sf-shadow-lg); /* Using defined shadow variable */
-  transform: translateY(-2px);
-  z-index: 10;
+  background-color: var(--background-secondary);
 }
 
 .calendar-day.empty {
@@ -224,26 +227,23 @@
 }
 
 .calendar-day.empty:hover {
-  transform: none;
-  box-shadow: none;
   border-color: var(--background-modifier-border);
+  background-color: var(--background-secondary);
 }
 
 .calendar-day.today {
-  background-color: rgba(var(--interactive-accent-rgb), 0.15);
+  background-color: var(--sf-primary-light);
   border-color: var(--interactive-accent);
   font-weight: 600;
-  box-shadow: var(--sf-shadow-sm); /* Added subtle shadow for today */
 }
 
 .calendar-day.has-reviews {
-  background-color: rgba(var(--interactive-accent-rgb), 0.1);
-  border-color: var(--interactive-accent);
-  box-shadow: var(--sf-shadow-sm); /* Added subtle shadow for days with reviews */
+  background-color: color-mix(in srgb, var(--interactive-accent) 9%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
 }
 
 .calendar-day.has-reviews:hover {
-  background-color: rgba(var(--interactive-accent-rgb), 0.2);
+  background-color: var(--sf-primary-light);
 }
 
 .calendar-day-number {
@@ -469,14 +469,11 @@
   background-color: var(--sf-primary);
   color: var(--sf-text-on-primary);
   border: none;
-  transition: var(--sf-transition);
-  box-shadow: var(--sf-shadow);
+  transition: filter var(--sf-transition-fast);
 }
 
 .day-reviews-all-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sf-shadow-lg);
-  filter: brightness(1.05);
+  filter: brightness(1.06);
 }
 
 .day-reviews-notes {
@@ -494,18 +491,15 @@
   cursor: pointer;
   font-weight: 500;
   text-align: center;
-  background-color: var(--warning-color, #e78a4e);
-  color: white;
+  background-color: var(--sf-warning);
+  color: var(--text-on-accent, white);
   border: none;
-  transition: var(--sf-transition);
-  box-shadow: var(--sf-shadow);
+  transition: filter var(--sf-transition-fast);
   margin-top: var(--sf-space-sm);
 }
 
 .day-reviews-skip-next-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sf-shadow-lg);
-  filter: brightness(1.05);
+  filter: brightness(1.06);
 }
 
 /* Mobile optimization */
