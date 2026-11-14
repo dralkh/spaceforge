@@ -82,10 +82,9 @@ export function convertSummaryToAloudSegments(
         if (pearlsOnly && bullet.emphasis !== 'pearl') return;
         const spokenBullet = cleanMarkdownForSpeech(bullet.text);
         if (spokenBullet) {
-            const prefix = bullet.emphasis === 'pearl' ? 'Key pearl: ' : '';
             segments.push({
                 id: `summary-bullet-${bulletIndex}`,
-                text: ensureSentenceEnding(`${prefix}${spokenBullet}`),
+                text: ensureSentenceEnding(spokenBullet),
                 label: bullet.emphasis === 'pearl' ? `Pearl ${bulletIndex + 1}` : `Point ${bulletIndex + 1}`,
                 targetSurface: 'summary',
                 summaryTarget: { kind: 'bullet', bulletIndex },

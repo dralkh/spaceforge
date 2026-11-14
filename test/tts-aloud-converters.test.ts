@@ -78,7 +78,7 @@ test('reads StudySummary directly while respecting pearlsOnly toggle and preserv
     assert.equal(all.length, 6);
     assert.deepEqual(all[1].summaryTarget, { kind: 'bullet', bulletIndex: 0 });
     assert.deepEqual(all[2].summaryTarget, { kind: 'child', bulletIndex: 0, childIndex: 0 });
-    assert.match(all[3].text, /^Key pearl:/);
+    assert.equal(all[3].text, 'GFR equals filtration coefficient times net pressure.');
     assert.deepEqual(all[5].summaryTarget, { kind: 'kept' });
 
     const pearls = convertSummaryToAloudSegments(summary, { pearlsOnly: true });
