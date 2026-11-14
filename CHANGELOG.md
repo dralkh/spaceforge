@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.93
+## 1.3.0
 
 ### Review panel, redesigned
 
