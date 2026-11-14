@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+### Read aloud
+
+- **Pearls are read as written.** A pearl bullet in the summary is no longer announced with "Key pearl:" every time the reader reaches one; the highlight on screen already marks it.
+
 ## 1.3.0
 
 ### Review panel, redesigned
