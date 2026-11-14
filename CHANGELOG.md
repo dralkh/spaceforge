@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.2.93
+
+### Review panel, redesigned
+
+- **Three rows instead of seven.** The note's name with one line under it, the grades, and one row of tabs. Previous / place / next sit together (`‹ 5/26 notes ›`); undo appears only once there is something to undo; postpone, skip, where the review lives and the keyboard shortcuts moved into `⋯`.
+- **One row of tabs.** Learn, Visualize, Mind map, Summary, MCQs and Cards are tabs of the same row — the study panel's second row of the same four tabs is gone. Pressing the open tab puts the panel away.
+- **Reading time instead of "overdue".** The line under the name reads "6 min read · 2h 35m left today": this note, then what is left of the run — the day picked on the calendar ("left for Nov 16"), or every due note when none was. How late the note is moved to the hover.
+- **Grades** carry their colour in the name with the interval under it, at a 44 px touch height; the 1–4 keys show only on a device with a mouse, on hover.
+- **A long title wraps by words** and the controls drop to their own line, instead of the name being squeezed to a column of letters.
+
+### iPad
+
+- **The bar's icons show on iPadOS.** Obsidian pads every tablet button 20 px a side (`.is-tablet button:not(.clickable-icon)`), which left the bar's 22 px icon buttons no room inside, so WebKit shrank their icons to nothing. Each icon now sits in a fixed-size box under rules that win outright, and no Spaceforge icon may shrink.
+
+### Read aloud
+
+- **Play reads what is on screen.** A track playing on one view no longer pulls the reader back to it, and Play on another view reads that view instead of resuming the old track. The speaker shows "pause" only while it is reading the view in front of you.
+- **One compact player row** — play, skip, what is being read, speed, follow, source, save and stop on one line with a hairline progress bar, shown only while something is being read.
+- **Follow keeps the line being read centred**, scrolling only the panel itself.
+- **Audio is kept where Obsidian Aloud keeps it.** The on-device cache lives in Aloud's own local cache database, in Aloud's record format, touching only Spaceforge's clips when it sizes or clears; the vault cache uses Aloud's hidden `.tts` folder. Saved audio goes to `.tts/exports` by default, or to a vault folder or Downloads.
+- **Importing Aloud's settings keeps its "Download" choice**, which was silently dropped. The settings section is now "Text-to-speech", with the Aloud import last.
+
+### Providers and theme
+
+- **MCQs are written through the one chat client** every other feature uses, so they inherit its reasoning-model handling and token-ceiling retry; the seven per-provider services are gone.
+- **No answer is cut off by default.** The 2048 / 2000 output caps are lifted (an old saved 2000 is cleared once), Claude's ceiling is learned from its own error and remembered, and every Study turn reads the provider selected now. Pi joins the local CLI providers.
+- **Colours follow the theme.** Semantic colours, borders and accents come from the active Obsidian theme instead of fixed hex values.
+
 ## 1.2.92
 
 ### The community-plugin review
