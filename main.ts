@@ -38,16 +38,10 @@ import {
     PROGRESS_FILE,
 } from './services/progress-mirror';
 import { EstimationUtils } from './utils/estimation';
-import { OpenRouterService } from './api/openrouter-service';
-import { OpenAIService } from './api/openai-service';
-import { OllamaService } from './api/ollama-service';
-import { GeminiService } from './api/gemini-service';
-import { ClaudeService } from './api/claude-service';
-import { TogetherService } from './api/together-service';
-import { OpenAICompatibleService } from './api/openai-compatible-service';
-import { OpenAIHttpService } from './api/openai-http-service';
+import { ChatClientMcqService } from './api/mcq-chat-service';
+import { inspectChatProvider } from './api/chat-client';
 import { CliService } from './api/cli-service';
-import { agentIdOfProvider, describeProviderGap, getHttpProvider, providerIsOpenAiShaped } from './api/provider-registry';
+import { agentIdOfProvider } from './api/provider-registry';
 import { getCliAgent } from './api/cli/cli-agents';
 import { setCliExtraPath } from './api/cli/cli-runner';
 import { IMCQGenerationService } from './api/mcq-generation-service';
@@ -344,7 +338,6 @@ export default class SpaceforgePlugin extends Plugin {
         this.setupStudyCharting();
 
         EstimationUtils.setPlugin(this);
-        this.addIcons();
         this.contextMenuHandler.register();
         this.addRibbonIcon('calendar-clock', 'Spaceforge review', async () => {
             await this.activateSidebarView();
@@ -370,7 +363,6 @@ export default class SpaceforgePlugin extends Plugin {
             }
         });
 
-        this.registerEvent(this.app.workspace.on('file-open', (_file) => { /* ... */ }));
         this.registerEvent(this.app.vault.on('modify', (file) => {
             if (file instanceof TFile) this.wordCounts.forget(file.path);
         }));
@@ -428,10 +420,6 @@ export default class SpaceforgePlugin extends Plugin {
 
         // Styles come from the styles.css Obsidian loads for the plugin; there is
         // no manual stylesheet or filesystem watcher to keep alive here.
-
-        if (this.settings.notifyBeforeDue > 0) {
-            this.registerInterval(window.setInterval(() => this.checkForDueNotes(), 5 * 60 * 1000));
-        }
 
         this.registerInterval(window.setInterval(() => {
             void (async () => {
@@ -1768,7 +1756,7 @@ export default class SpaceforgePlugin extends Plugin {
 
         this.addCommand({
             id: 'tts-read-aloud-review',
-            name: 'Read aloud current review note or study material',
+            name: 'Read aloud current review note or Study material',
             checkCallback: (checking: boolean) => {
                 const dock = this.reviewFlowController?.getDock();
                 const file = this.activeMarkdownFile();
@@ -1828,8 +1816,6 @@ export default class SpaceforgePlugin extends Plugin {
         });
     }
 
-    addIcons(): void { /* ... */ }
-
     initializeMCQComponents(): void {
         this.mcqGenerationCache = null;
         this.mcqController = undefined;
@@ -1849,92 +1835,27 @@ export default class SpaceforgePlugin extends Plugin {
     }
 
     private createMcqGenerationService(notify = true): IMCQGenerationService | undefined {
-        // Reads resolve the service on every access, so only an explicit
-        // (re)initialisation may speak; a silent read must not raise notices.
         const say = (message: string): void => { if (notify) new Notice(message); };
-        switch (this.settings.mcqApiProvider) {
-            case ApiProvider.OpenRouter:
-                if (!this.settings.openRouterApiKey) {
-                    say('OpenRouter API key is not set in settings');
-                    return undefined;
-                }
-                return new OpenRouterService(this);
-            case ApiProvider.OpenAI:
-                if (!this.settings.openaiApiKey) {
-                    say('OpenAI API key is not set in settings');
-                    return undefined;
-                }
-                return new OpenAIService(this);
-            case ApiProvider.Ollama:
-                if (!this.settings.ollamaApiUrl || !this.settings.ollamaModel) {
-                    say('Ollama API URL or model is not set in settings');
-                    return undefined;
-                }
-                return new OllamaService(this);
-            case ApiProvider.Gemini:
-                if (!this.settings.geminiApiKey) {
-                    say('Gemini API key is not set in settings');
-                    return undefined;
-                }
-                return new GeminiService(this);
-            case ApiProvider.Claude:
-                if (!this.settings.claudeApiKey || !this.settings.claudeModel) {
-                    say('Claude API key or model is not set in settings');
-                    return undefined;
-                }
-                return new ClaudeService(this);
-            case ApiProvider.Together:
-                if (!this.settings.togetherApiKey || !this.settings.togetherModel) {
-                    say('Together AI API key or model is not set in settings');
-                    return undefined;
-                }
-                return new TogetherService(this);
-            case ApiProvider.OpenAICompatible:
-                if (!this.settings.openaiCompatibleApiUrl || !this.settings.openaiCompatibleModel) {
-                    say('The provider needs a server address and a model.');
-                    return undefined;
-                }
-                return new OpenAICompatibleService(this);
-            case ApiProvider.Cli:
-                if (!this.settings.cliAgent) {
-                    say('No local CLI chosen yet.');
-                    return undefined;
-                }
-                // The CLI brings its own login, so there is no key to check here;
-                // whether it is installed and signed in is reported by detection
-                // in the settings, and by the run itself if it is not.
-                return new CliService(this);
-            default: {
-                // A local CLI is its own provider row (`cli:claude`), and runs
-                // through the same service the old single CLI choice used.
-                const agentId = agentIdOfProvider(this.settings.mcqApiProvider);
-                if (agentId) {
-                    if (!getCliAgent(agentId)) {
-                        say(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
-                        return undefined;
-                    }
-                    return new CliService(this);
-                }
-                // Every other provider in the registry is spoken to through one
-                // OpenAI-shaped service, so a new company needs no case here.
-                const descriptor = getHttpProvider(this.settings.mcqApiProvider);
-                if (!descriptor || !providerIsOpenAiShaped(descriptor)) {
-                    say(`Unsupported MCQ API provider selected: ${String(this.settings.mcqApiProvider)}`);
-                    return undefined;
-                }
-                const gap = describeProviderGap(descriptor, this.settings);
-                if (gap) {
-                    say(gap);
-                    return undefined;
-                }
-                return new OpenAIHttpService(this, descriptor);
+        const provider = this.settings.mcqApiProvider;
+        const agentId = agentIdOfProvider(provider);
+        if (provider === ApiProvider.Cli || agentId) {
+            if (provider === ApiProvider.Cli && !this.settings.cliAgent) {
+                say('No local CLI chosen yet.');
+                return undefined;
             }
+            if (agentId && !getCliAgent(agentId)) {
+                say(`Unsupported MCQ API provider selected: ${String(provider)}`);
+                return undefined;
+            }
+            return new CliService(this);
         }
+        const info = inspectChatProvider(this.settings);
+        if (!info.ready) {
+            say(info.reason ?? `Unsupported MCQ API provider selected: ${String(provider)}`);
+            return undefined;
+        }
+        return new ChatClientMcqService(this);
     }
-
-    checkForDueNotes(): void { /* ... */ }
-    exportPluginData(): void { /* ... */ }
-    importPluginData(_fileContent: string): void { /* ... */ }
 
     /**
      * Count the words of every scheduled note once the workspace is up.
